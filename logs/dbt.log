@@ -1,0 +1,292 @@
+2022-03-08 11:59:30.023896 (MainThread): Running with dbt=0.19.2
+2022-03-08 11:59:30.118176 (MainThread): running dbt with arguments Namespace(cls=<class 'dbt.task.run.RunTask'>, debug=False, defer=None, exclude=None, fail_fast=False, full_refresh=False, log_cache_events=False, log_format='default', models=['stg_fam_ef_arena_dim_maalgruppe'], partial_parse=None, profile=None, profiles_dir='C:\\Users\\R164210\\.dbt', project_dir=None, record_timing_info=None, rpc_method='run', selector_name=None, single_threaded=False, state=None, strict=False, target=None, test_new_parser=False, threads=None, use_cache=True, use_colors=None, vars='{}', version_check=True, warn_error=False, which='run', write_json=True)
+2022-03-08 11:59:30.119164 (MainThread): Tracking: tracking
+2022-03-08 11:59:30.157180 (MainThread): Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'start', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001CC7C243A90>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001CC7C2D6F40>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001CC7C2D6EE0>]}
+2022-03-08 11:59:30.170008 (MainThread): Partial parsing not enabled
+2022-03-08 11:59:30.170995 (MainThread): Parsing macros\correct_schema.sql
+2022-03-08 11:59:30.173954 (MainThread): Parsing macros\adapters.sql
+2022-03-08 11:59:30.241233 (MainThread): Parsing macros\catalog.sql
+2022-03-08 11:59:30.245197 (MainThread): Parsing macros\schema_tests.sql
+2022-03-08 11:59:30.252647 (MainThread): Parsing macros\materializations\incremental\helpers.sql
+2022-03-08 11:59:30.261519 (MainThread): Parsing macros\materializations\incremental\incremental.sql
+2022-03-08 11:59:30.271423 (MainThread): Parsing macros\materializations\seed\seed.sql
+2022-03-08 11:59:30.278362 (MainThread): Parsing macros\materializations\snapshot\snapshot.sql
+2022-03-08 11:59:30.334125 (MainThread): Parsing macros\materializations\snapshot\snapshot_merge.sql
+2022-03-08 11:59:30.337083 (MainThread): Parsing macros\materializations\snapshot\strategies.sql
+2022-03-08 11:59:30.350399 (MainThread): Parsing macros\core.sql
+2022-03-08 11:59:30.356318 (MainThread): Parsing macros\adapters\common.sql
+2022-03-08 11:59:30.424718 (MainThread): Parsing macros\etc\datetime.sql
+2022-03-08 11:59:30.437613 (MainThread): Parsing macros\etc\get_custom_alias.sql
+2022-03-08 11:59:30.439591 (MainThread): Parsing macros\etc\get_custom_database.sql
+2022-03-08 11:59:30.442076 (MainThread): Parsing macros\etc\get_custom_schema.sql
+2022-03-08 11:59:30.445046 (MainThread): Parsing macros\etc\is_incremental.sql
+2022-03-08 11:59:30.447029 (MainThread): Parsing macros\etc\query.sql
+2022-03-08 11:59:30.449009 (MainThread): Parsing macros\materializations\helpers.sql
+2022-03-08 11:59:30.462870 (MainThread): Parsing macros\materializations\common\merge.sql
+2022-03-08 11:59:30.484598 (MainThread): Parsing macros\materializations\incremental\helpers.sql
+2022-03-08 11:59:30.486572 (MainThread): Parsing macros\materializations\incremental\incremental.sql
+2022-03-08 11:59:30.496450 (MainThread): Parsing macros\materializations\seed\seed.sql
+2022-03-08 11:59:30.530542 (MainThread): Parsing macros\materializations\snapshot\snapshot.sql
+2022-03-08 11:59:30.581887 (MainThread): Parsing macros\materializations\snapshot\snapshot_merge.sql
+2022-03-08 11:59:30.583863 (MainThread): Parsing macros\materializations\snapshot\strategies.sql
+2022-03-08 11:59:30.609139 (MainThread): Parsing macros\materializations\table\table.sql
+2022-03-08 11:59:30.621085 (MainThread): Parsing macros\materializations\view\create_or_replace_view.sql
+2022-03-08 11:59:30.628800 (MainThread): Parsing macros\materializations\view\view.sql
+2022-03-08 11:59:30.638232 (MainThread): Parsing macros\schema_tests\accepted_values.sql
+2022-03-08 11:59:30.642205 (MainThread): Parsing macros\schema_tests\not_null.sql
+2022-03-08 11:59:30.644188 (MainThread): Parsing macros\schema_tests\relationships.sql
+2022-03-08 11:59:30.647163 (MainThread): Parsing macros\schema_tests\unique.sql
+2022-03-08 11:59:30.656109 (MainThread): Partial parsing not enabled
+2022-03-08 11:59:30.994889 (MainThread): Acquiring new oracle connection "model.dvh_familie.ef_stonad_arena".
+2022-03-08 11:59:31.017117 (MainThread): Acquiring new oracle connection "model.dvh_familie.stg_fam_ef_arena_dim_maalgruppe".
+2022-03-08 11:59:31.022041 (MainThread): Acquiring new oracle connection "model.dvh_familie.stg_fam_ef_arena_dim_omraade".
+2022-03-08 11:59:31.118041 (MainThread): Sending event: {'category': 'dbt', 'action': 'load_project', 'label': '5a80ff64-ec48-4040-89b7-276d05986e17', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001CC7D536F40>]}
+2022-03-08 11:59:31.124480 (MainThread): write_gpickle is deprecated and will be removed in 3.0.Use ``pickle.dump(G, path, protocol)``
+2022-03-08 11:59:31.125488 (MainThread): Sending event: {'category': 'dbt', 'action': 'resource_counts', 'label': '5a80ff64-ec48-4040-89b7-276d05986e17', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001CC7C4555E0>]}
+2022-03-08 11:59:31.126476 (MainThread): Found 3 models, 0 tests, 0 snapshots, 0 analyses, 163 macros, 0 operations, 0 seed files, 6 sources, 0 exposures
+2022-03-08 11:59:31.128452 (MainThread): 
+2022-03-08 11:59:31.134379 (MainThread): Acquiring new oracle connection "master".
+2022-03-08 11:59:31.155100 (ThreadPoolExecutor-0_0): Acquiring new oracle connection "list_dwh_ha".
+2022-03-08 11:59:31.194208 (ThreadPoolExecutor-0_0): Using oracle connection "list_dwh_ha".
+2022-03-08 11:59:31.194208 (ThreadPoolExecutor-0_0): On list_dwh_ha: /* {"app": "dbt", "dbt_version": "0.19.2", "profile_name": "dvh_familie", "target_name": "dev", "connection_name": "list_dwh_ha"} */
+select lower(username) as "name"
+      from sys.all_users
+      order by username
+  
+2022-03-08 11:59:31.194208 (ThreadPoolExecutor-0_0): Opening a new connection, currently in state init
+2022-03-08 11:59:31.194208 (ThreadPoolExecutor-0_0): Attempting to connect using Oracle method: 'OracleConnectionMethod.HOST' and dsn: 'dm08-scan.adeo.no:1521/dwh_ha'
+2022-03-08 11:59:31.655741 (ThreadPoolExecutor-0_0): SQL status: OK in 0.46 seconds
+2022-03-08 11:59:31.666216 (ThreadPoolExecutor-0_0): On list_dwh_ha: Close
+2022-03-08 11:59:31.672650 (ThreadPoolExecutor-1_0): Acquiring new oracle connection "list_dwh_ha_dvh_fam_ef".
+2022-03-08 11:59:31.679569 (ThreadPoolExecutor-1_0): Opening a new connection, currently in state init
+2022-03-08 11:59:31.679569 (ThreadPoolExecutor-1_0): Attempting to connect using Oracle method: 'OracleConnectionMethod.HOST' and dsn: 'dm08-scan.adeo.no:1521/dwh_ha'
+2022-03-08 11:59:31.827174 (ThreadPoolExecutor-1_0): Using oracle connection "list_dwh_ha_dvh_fam_ef".
+2022-03-08 11:59:31.827174 (ThreadPoolExecutor-1_0): On list_dwh_ha_dvh_fam_ef: /* {"app": "dbt", "dbt_version": "0.19.2", "profile_name": "dvh_familie", "target_name": "dev", "connection_name": "list_dwh_ha_dvh_fam_ef"} */
+with tables as
+      (select UPPER(SYS_CONTEXT('userenv', 'DB_NAME')) table_catalog,
+         UPPER(owner) table_schema,
+         table_name,
+         case
+           when iot_type = 'Y'
+           then 'IOT'
+           when temporary = 'Y'
+           then 'TEMP'
+           else 'BASE TABLE'
+         end table_type
+       from sys.all_tables
+       union all
+       select UPPER(SYS_CONTEXT('userenv', 'DB_NAME')),
+         UPPER(owner),
+         view_name,
+         'VIEW'
+       from sys.all_views
+  )
+  select lower(table_catalog) as "database_name"
+    ,lower(table_name) as "name"
+    ,lower(table_schema) as "schema_name"
+    ,case table_type
+      when 'BASE TABLE' then 'table'
+      when 'VIEW' then 'view'
+    end as "kind"
+  from tables
+  where table_type in ('BASE TABLE', 'VIEW')
+    and table_catalog = upper('dwh_ha')
+    and table_schema = upper('dvh_fam_ef')
+  
+2022-03-08 11:59:31.882893 (ThreadPoolExecutor-1_0): SQL status: OK in 0.06 seconds
+2022-03-08 11:59:31.882893 (ThreadPoolExecutor-1_0): On list_dwh_ha_dvh_fam_ef: ROLLBACK
+2022-03-08 11:59:31.884638 (ThreadPoolExecutor-1_0): On list_dwh_ha_dvh_fam_ef: Close
+2022-03-08 11:59:31.887618 (MainThread): Opening a new connection, currently in state init
+2022-03-08 11:59:31.887618 (MainThread): Attempting to connect using Oracle method: 'OracleConnectionMethod.HOST' and dsn: 'dm08-scan.adeo.no:1521/dwh_ha'
+2022-03-08 11:59:32.042283 (MainThread): On master: COMMIT
+2022-03-08 11:59:32.042866 (MainThread): Using oracle connection "master".
+2022-03-08 11:59:32.042866 (MainThread): On master: COMMIT
+2022-03-08 11:59:32.045336 (MainThread): SQL status: OK in 0.00 seconds
+2022-03-08 11:59:32.045336 (MainThread): On master: Close
+2022-03-08 11:59:32.047711 (MainThread): 12:59:32 | Concurrency: 4 threads (target='dev')
+2022-03-08 11:59:32.048712 (MainThread): 12:59:32 | 
+2022-03-08 11:59:32.056613 (Thread-1): Began running node model.dvh_familie.stg_fam_ef_arena_dim_maalgruppe
+2022-03-08 11:59:32.056613 (Thread-1): 12:59:32 | 1 of 1 START view model dvh_fam_ef.stg_fam_ef_arena_dim_maalgruppe... [RUN]
+2022-03-08 11:59:32.057600 (Thread-1): Acquiring new oracle connection "model.dvh_familie.stg_fam_ef_arena_dim_maalgruppe".
+2022-03-08 11:59:32.058589 (Thread-1): Compiling model.dvh_familie.stg_fam_ef_arena_dim_maalgruppe
+2022-03-08 11:59:32.066470 (Thread-1): Writing injected SQL for node "model.dvh_familie.stg_fam_ef_arena_dim_maalgruppe"
+2022-03-08 11:59:32.067455 (Thread-1): finished collecting timing info
+2022-03-08 11:59:32.165112 (Thread-1): Using oracle connection "model.dvh_familie.stg_fam_ef_arena_dim_maalgruppe".
+2022-03-08 11:59:32.165112 (Thread-1): On model.dvh_familie.stg_fam_ef_arena_dim_maalgruppe: /* {"app": "dbt", "dbt_version": "0.19.2", "profile_name": "dvh_familie", "target_name": "dev", "node_id": "model.dvh_familie.stg_fam_ef_arena_dim_maalgruppe"} */
+DECLARE
+     dne_942    EXCEPTION;
+     PRAGMA EXCEPTION_INIT(dne_942, -942);
+     attempted_ddl_on_in_use_GTT EXCEPTION;
+     pragma EXCEPTION_INIT(attempted_ddl_on_in_use_GTT, -14452);
+  BEGIN
+     EXECUTE IMMEDIATE 'DROP view dvh_fam_ef.stg_fam_ef_arena_dim_maalgruppe__dbt_tmp cascade constraint';
+  EXCEPTION
+     WHEN attempted_ddl_on_in_use_GTT THEN
+        NULL; -- if it its a global temporary table, leave it alone.
+     WHEN dne_942 THEN
+        NULL; -- if it doesn't exist, do nothing .. no error, nothing .. ignore.
+  END;
+2022-03-08 11:59:32.165112 (Thread-1): Opening a new connection, currently in state init
+2022-03-08 11:59:32.165112 (Thread-1): Attempting to connect using Oracle method: 'OracleConnectionMethod.HOST' and dsn: 'dm08-scan.adeo.no:1521/dwh_ha'
+2022-03-08 11:59:32.454276 (Thread-1): SQL status: OK in 0.29 seconds
+2022-03-08 11:59:32.456701 (Thread-1): Using oracle connection "model.dvh_familie.stg_fam_ef_arena_dim_maalgruppe".
+2022-03-08 11:59:32.457232 (Thread-1): On model.dvh_familie.stg_fam_ef_arena_dim_maalgruppe: /* {"app": "dbt", "dbt_version": "0.19.2", "profile_name": "dvh_familie", "target_name": "dev", "node_id": "model.dvh_familie.stg_fam_ef_arena_dim_maalgruppe"} */
+DECLARE
+     dne_942    EXCEPTION;
+     PRAGMA EXCEPTION_INIT(dne_942, -942);
+     attempted_ddl_on_in_use_GTT EXCEPTION;
+     pragma EXCEPTION_INIT(attempted_ddl_on_in_use_GTT, -14452);
+  BEGIN
+     EXECUTE IMMEDIATE 'DROP view dvh_fam_ef.stg_fam_ef_arena_dim_maalgruppe__dbt_backup cascade constraint';
+  EXCEPTION
+     WHEN attempted_ddl_on_in_use_GTT THEN
+        NULL; -- if it its a global temporary table, leave it alone.
+     WHEN dne_942 THEN
+        NULL; -- if it doesn't exist, do nothing .. no error, nothing .. ignore.
+  END;
+2022-03-08 11:59:32.461603 (Thread-1): SQL status: OK in 0.00 seconds
+2022-03-08 11:59:32.466585 (Thread-1): Writing runtime SQL for node "model.dvh_familie.stg_fam_ef_arena_dim_maalgruppe"
+2022-03-08 11:59:32.468559 (Thread-1): Using oracle connection "model.dvh_familie.stg_fam_ef_arena_dim_maalgruppe".
+2022-03-08 11:59:32.468559 (Thread-1): On model.dvh_familie.stg_fam_ef_arena_dim_maalgruppe: /* {"app": "dbt", "dbt_version": "0.19.2", "profile_name": "dvh_familie", "target_name": "dev", "node_id": "model.dvh_familie.stg_fam_ef_arena_dim_maalgruppe"} */
+
+  create view dvh_fam_ef.stg_fam_ef_arena_dim_maalgruppe__dbt_tmp as
+    with stg_fam_ef_arena_dim_maalgruppe as(
+  select * from DT_p.dim_maalgruppe_type
+),
+
+final as (
+  select pk_dim_maalgruppe_type, maalgruppe_kode, maalgruppe_navn_scd1 from stg_fam_ef_arena_dim_maalgruppe
+  where maalgruppe_kode in ('ENSFORUTD','ENSFORARBS','TIDLFAMPL','GJENEKUTD','GJENEKARBS')
+)
+
+select * from final
+
+
+2022-03-08 11:59:32.483430 (Thread-1): SQL status: OK in 0.01 seconds
+2022-03-08 11:59:32.492349 (Thread-1): Using oracle connection "model.dvh_familie.stg_fam_ef_arena_dim_maalgruppe".
+2022-03-08 11:59:32.493338 (Thread-1): On model.dvh_familie.stg_fam_ef_arena_dim_maalgruppe: /* {"app": "dbt", "dbt_version": "0.19.2", "profile_name": "dvh_familie", "target_name": "dev", "node_id": "model.dvh_familie.stg_fam_ef_arena_dim_maalgruppe"} */
+rename stg_fam_ef_arena_dim_maalgruppe__dbt_tmp to stg_fam_ef_arena_dim_maalgruppe
+2022-03-08 11:59:32.501045 (Thread-1): Oracle error: ORA-00955: name is already used by an existing object
+2022-03-08 11:59:32.501660 (Thread-1): On model.dvh_familie.stg_fam_ef_arena_dim_maalgruppe: ROLLBACK
+2022-03-08 11:59:32.502160 (Thread-1): On model.dvh_familie.stg_fam_ef_arena_dim_maalgruppe: Close
+2022-03-08 11:59:32.505129 (Thread-1): Rolling back transaction.
+2022-03-08 11:59:32.505129 (Thread-1): finished collecting timing info
+2022-03-08 11:59:32.506118 (Thread-1): Database Error in model stg_fam_ef_arena_dim_maalgruppe (models\staging\stg_fam_ef_arena_dim_maalgruppe.sql)
+  ORA-00955: name is already used by an existing object
+  compiled SQL at target\run\dvh_familie\models\staging\stg_fam_ef_arena_dim_maalgruppe.sql
+Traceback (most recent call last):
+  File "c:\users\r164210\appdata\local\programs\python\python38\lib\site-packages\dbt\adapters\oracle\connections.py", line 153, in exception_handler
+    yield
+  File "c:\users\r164210\appdata\local\programs\python\python38\lib\site-packages\dbt\adapters\oracle\connections.py", line 210, in add_query
+    cursor.execute(sql, bindings)
+cx_Oracle.DatabaseError: ORA-00955: name is already used by an existing object
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "c:\users\r164210\appdata\local\programs\python\python38\lib\site-packages\dbt\task\base.py", line 344, in safe_run
+    result = self.compile_and_execute(manifest, ctx)
+  File "c:\users\r164210\appdata\local\programs\python\python38\lib\site-packages\dbt\task\base.py", line 287, in compile_and_execute
+    result = self.run(ctx.node, manifest)
+  File "c:\users\r164210\appdata\local\programs\python\python38\lib\site-packages\dbt\task\base.py", line 389, in run
+    return self.execute(compiled_node, manifest)
+  File "c:\users\r164210\appdata\local\programs\python\python38\lib\site-packages\dbt\task\run.py", line 248, in execute
+    result = MacroGenerator(materialization_macro, context)()
+  File "c:\users\r164210\appdata\local\programs\python\python38\lib\site-packages\dbt\clients\jinja.py", line 332, in __call__
+    return self.call_macro(*args, **kwargs)
+  File "c:\users\r164210\appdata\local\programs\python\python38\lib\site-packages\dbt\clients\jinja.py", line 259, in call_macro
+    return macro(*args, **kwargs)
+  File "c:\users\r164210\appdata\local\programs\python\python38\lib\site-packages\jinja2\runtime.py", line 675, in __call__
+    return self._invoke(arguments, autoescape)
+  File "c:\users\r164210\appdata\local\programs\python\python38\lib\site-packages\jinja2\runtime.py", line 679, in _invoke
+    rv = self._func(*arguments)
+  File "<template>", line 74, in macro
+  File "c:\users\r164210\appdata\local\programs\python\python38\lib\site-packages\jinja2\sandbox.py", line 462, in call
+    return __context.call(__obj, *args, **kwargs)
+  File "c:\users\r164210\appdata\local\programs\python\python38\lib\site-packages\jinja2\runtime.py", line 290, in call
+    return __obj(*args, **kwargs)
+  File "c:\users\r164210\appdata\local\programs\python\python38\lib\site-packages\dbt\adapters\sql\impl.py", line 165, in rename_relation
+    self.execute_macro(
+  File "c:\users\r164210\appdata\local\programs\python\python38\lib\site-packages\dbt\adapters\base\impl.py", line 1002, in execute_macro
+    result = macro_function(**kwargs)
+  File "c:\users\r164210\appdata\local\programs\python\python38\lib\site-packages\dbt\clients\jinja.py", line 332, in __call__
+    return self.call_macro(*args, **kwargs)
+  File "c:\users\r164210\appdata\local\programs\python\python38\lib\site-packages\dbt\clients\jinja.py", line 259, in call_macro
+    return macro(*args, **kwargs)
+  File "c:\users\r164210\appdata\local\programs\python\python38\lib\site-packages\jinja2\runtime.py", line 675, in __call__
+    return self._invoke(arguments, autoescape)
+  File "c:\users\r164210\appdata\local\programs\python\python38\lib\site-packages\jinja2\runtime.py", line 679, in _invoke
+    rv = self._func(*arguments)
+  File "<template>", line 22, in macro
+  File "c:\users\r164210\appdata\local\programs\python\python38\lib\site-packages\jinja2\sandbox.py", line 462, in call
+    return __context.call(__obj, *args, **kwargs)
+  File "c:\users\r164210\appdata\local\programs\python\python38\lib\site-packages\jinja2\runtime.py", line 290, in call
+    return __obj(*args, **kwargs)
+  File "c:\users\r164210\appdata\local\programs\python\python38\lib\site-packages\dbt\clients\jinja.py", line 332, in __call__
+    return self.call_macro(*args, **kwargs)
+  File "c:\users\r164210\appdata\local\programs\python\python38\lib\site-packages\dbt\clients\jinja.py", line 259, in call_macro
+    return macro(*args, **kwargs)
+  File "c:\users\r164210\appdata\local\programs\python\python38\lib\site-packages\jinja2\runtime.py", line 675, in __call__
+    return self._invoke(arguments, autoescape)
+  File "c:\users\r164210\appdata\local\programs\python\python38\lib\site-packages\jinja2\runtime.py", line 679, in _invoke
+    rv = self._func(*arguments)
+  File "<template>", line 31, in macro
+  File "c:\users\r164210\appdata\local\programs\python\python38\lib\site-packages\jinja2\sandbox.py", line 462, in call
+    return __context.call(__obj, *args, **kwargs)
+  File "c:\users\r164210\appdata\local\programs\python\python38\lib\site-packages\jinja2\runtime.py", line 290, in call
+    return __obj(*args, **kwargs)
+  File "c:\users\r164210\appdata\local\programs\python\python38\lib\site-packages\dbt\clients\jinja.py", line 332, in __call__
+    return self.call_macro(*args, **kwargs)
+  File "c:\users\r164210\appdata\local\programs\python\python38\lib\site-packages\dbt\clients\jinja.py", line 259, in call_macro
+    return macro(*args, **kwargs)
+  File "c:\users\r164210\appdata\local\programs\python\python38\lib\site-packages\jinja2\runtime.py", line 675, in __call__
+    return self._invoke(arguments, autoescape)
+  File "c:\users\r164210\appdata\local\programs\python\python38\lib\site-packages\jinja2\runtime.py", line 679, in _invoke
+    rv = self._func(*arguments)
+  File "<template>", line 41, in macro
+  File "c:\users\r164210\appdata\local\programs\python\python38\lib\site-packages\jinja2\sandbox.py", line 462, in call
+    return __context.call(__obj, *args, **kwargs)
+  File "c:\users\r164210\appdata\local\programs\python\python38\lib\site-packages\jinja2\runtime.py", line 290, in call
+    return __obj(*args, **kwargs)
+  File "c:\users\r164210\appdata\local\programs\python\python38\lib\site-packages\dbt\adapters\base\impl.py", line 227, in execute
+    return self.connections.execute(
+  File "c:\users\r164210\appdata\local\programs\python\python38\lib\site-packages\dbt\adapters\sql\connections.py", line 124, in execute
+    _, cursor = self.add_query(sql, auto_begin)
+  File "c:\users\r164210\appdata\local\programs\python\python38\lib\site-packages\dbt\adapters\oracle\connections.py", line 218, in add_query
+    return connection, cursor
+  File "c:\users\r164210\appdata\local\programs\python\python38\lib\contextlib.py", line 131, in __exit__
+    self.gen.throw(type, value, traceback)
+  File "c:\users\r164210\appdata\local\programs\python\python38\lib\site-packages\dbt\adapters\oracle\connections.py", line 165, in exception_handler
+    raise dbt.exceptions.DatabaseException(str(e).strip()) from e
+dbt.exceptions.DatabaseException: Database Error in model stg_fam_ef_arena_dim_maalgruppe (models\staging\stg_fam_ef_arena_dim_maalgruppe.sql)
+  ORA-00955: name is already used by an existing object
+  compiled SQL at target\run\dvh_familie\models\staging\stg_fam_ef_arena_dim_maalgruppe.sql
+2022-03-08 11:59:32.515983 (Thread-1): Sending event: {'category': 'dbt', 'action': 'run_model', 'label': '5a80ff64-ec48-4040-89b7-276d05986e17', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001CC7D5686D0>]}
+2022-03-08 11:59:32.515983 (Thread-1): 12:59:32 | 1 of 1 ERROR creating view model dvh_fam_ef.stg_fam_ef_arena_dim_maalgruppe [ERROR in 0.46s]
+2022-03-08 11:59:32.516972 (Thread-1): Finished running node model.dvh_familie.stg_fam_ef_arena_dim_maalgruppe
+2022-03-08 11:59:32.530799 (MainThread): Acquiring new oracle connection "master".
+2022-03-08 11:59:32.530799 (MainThread): Opening a new connection, currently in state closed
+2022-03-08 11:59:32.530799 (MainThread): Attempting to connect using Oracle method: 'OracleConnectionMethod.HOST' and dsn: 'dm08-scan.adeo.no:1521/dwh_ha'
+2022-03-08 11:59:32.798001 (MainThread): On master: COMMIT
+2022-03-08 11:59:32.798001 (MainThread): Using oracle connection "master".
+2022-03-08 11:59:32.798001 (MainThread): On master: COMMIT
+2022-03-08 11:59:32.801443 (MainThread): SQL status: OK in 0.00 seconds
+2022-03-08 11:59:32.801443 (MainThread): On master: Close
+2022-03-08 11:59:32.805417 (MainThread): 12:59:32 | 
+2022-03-08 11:59:32.805417 (MainThread): 12:59:32 | Finished running 1 view model in 1.67s.
+2022-03-08 11:59:32.806407 (MainThread): Connection 'master' was properly closed.
+2022-03-08 11:59:32.806407 (MainThread): Connection 'list_dwh_ha' was properly closed.
+2022-03-08 11:59:32.806407 (MainThread): Connection 'list_dwh_ha_dvh_fam_ef' was properly closed.
+2022-03-08 11:59:32.806407 (MainThread): Connection 'model.dvh_familie.stg_fam_ef_arena_dim_maalgruppe' was properly closed.
+2022-03-08 11:59:32.815304 (MainThread): 
+2022-03-08 11:59:32.815304 (MainThread): Completed with 1 error and 0 warnings:
+2022-03-08 11:59:32.819250 (MainThread): 
+2022-03-08 11:59:32.824182 (MainThread): Database Error in model stg_fam_ef_arena_dim_maalgruppe (models\staging\stg_fam_ef_arena_dim_maalgruppe.sql)
+2022-03-08 11:59:32.825170 (MainThread):   ORA-00955: name is already used by an existing object
+2022-03-08 11:59:32.825170 (MainThread):   compiled SQL at target\run\dvh_familie\models\staging\stg_fam_ef_arena_dim_maalgruppe.sql
+2022-03-08 11:59:32.826159 (MainThread): 
+Done. PASS=0 WARN=0 ERROR=1 SKIP=0 TOTAL=1
+2022-03-08 11:59:32.826159 (MainThread): Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'end', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001CC7C43B3A0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001CC7D5686D0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001CC7D5684F0>]}
+2022-03-08 11:59:32.827148 (MainThread): Flushing usage events
+2022-03-08 11:59:32.873029 (MainThread): The 'warn' method is deprecated, use 'warning' instead
+2022-03-08 11:59:32.873029 (MainThread): Error sending message, disabling tracking

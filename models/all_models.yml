@@ -1,0 +1,20 @@
+
+#version:  2
+
+#models:
+  #- name: stg_fam_ef_arena_dim_maalgruppe
+    #description: ''
+    #columns:
+      #- name: # column name
+      #  tests:
+        #- unique
+        #- not_null
+
+  #- name: stg_fam_ef_arena_dim_omraade
+    #description: ''
+    #columns:
+      #- name: # column name
+      #  tests:
+        #- unique
+        #- not_null
+
