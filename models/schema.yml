@@ -5,23 +5,23 @@ sources:
     description: ''
     schema: DT_p
     tables:
-    - name: DIM_F_STONAD_OMRAADE
-      description: ''
-    - name: dim_maalgruppe_type
-      description: ''
-    - name: fak_stonad
-      descripion: ''
+      - name: DIM_F_STONAD_OMRAADE
+        description: ''
+      - name: dim_maalgruppe_type
+        description: ''
+      - name: fak_stonad
+        descripion: ''
   
   - name: dt_person_arena
     schema: dt_person
     tables:
-    - name: dim_person
-    - name: dvh_person_ident_off_id_ikke_skjermet
+      - name: dim_person
+      - name: dvh_person_ident_off_id_ikke_skjermet
     
   - name: dt_kodeverk_arena
     schema: dt_kodeverk
     tables: 
-    - name: dim_kjonn
+      - name: dim_kjonn
     
     
 

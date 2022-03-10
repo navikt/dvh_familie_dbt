@@ -34,12 +34,34 @@ dmx_poc:
       dev:
          type: oracle
          host: dm07-scan.adeo.no
-         user: Personlig bruker med proxy til DVH_SYFO eks. A123456[DVH_SYFO]
+         user: Personlig bruker med proxy til DVH_SYFO eks. r164210[DVH_FAM_EF]
          password: passord
          dbname: dwhu1
          port: 1521
          service: dwhu1
          schema: dvh_syfo
+         threads: 4
+```
+
+## I prod
+
+```yaml
+pass på dbname
+
+dvh_familie:
+   target: dev
+   outputs:
+      dev:
+         type: oracle
+         host: dm08-scan.adeo.no
+         user: Personlig bruker med proxy til dvh_fam_ef eks. r164210[DVH_FAM_EF]
+         password: passord
+
+         # NB: I prod skal dbname være 'dwh' og ikke 'dwh_ha'. Dersom dbname blir satt til dwh_ha medfører dette til at dbt gjorde feil oppslag mot databasen når dbt skal sjekke om tabellen / viewet allerede eksisterer og ender opp med å ikke få treff (None/Null tabell/view eksisterer). Dette fører til at dbt hopper over “renaming” av en eksisterende tabellen / viewet og forårsaker feil når man skal kjør en modell mer enn en gang.
+         dbname: dwh  
+         port: 1521
+         service: dwh_ha
+         schema: dvh_fam_ef 
          threads: 4
 ```
 

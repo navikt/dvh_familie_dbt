@@ -1,4 +1,3 @@
-
 with stg_fam_ef_arena_dim_maalgruppe as(
   select * from {{source ('arena_stonad', 'dim_maalgruppe_type')}}
 ),
