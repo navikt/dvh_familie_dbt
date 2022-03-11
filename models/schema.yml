@@ -5,25 +5,37 @@ sources:
     description: ''
     schema: DT_p
     tables:
-      - name: DIM_F_STONAD_OMRAADE
+      - name: dim_f_stonad_omraade
         description: ''
       - name: dim_maalgruppe_type
         description: ''
       - name: fak_stonad
         descripion: ''
-  
+      - name: dim_vedtak_postering
+        description: ''
+      - name: dim_kjonn
+        description: ''
+      - name: dim_alder
+        description: ''
+      - name: dim_geografi
+        description: ''
+      - name: dim_person
+        description: ''
+
   - name: dt_person_arena
     schema: dt_person
     tables:
-      - name: dim_person
-      - name: dvh_person_ident_off_id_ikke_skjermet
-    
-  - name: dt_kodeverk_arena
-    schema: dt_kodeverk
-    tables: 
-      - name: dim_kjonn
-    
-    
+      - name: dim_person_kontaktinfo
+      #- name: dvh_person_ident_off_id_ikke_skjermet
+
+#  - name: dt_kodeverk_arena
+#    schema: dt_kodeverk
+#    tables:
+#      - name: dim_kjonn
+#      - name: dim_alder
+#      - name: dim_geografi
+
+
 
 
 

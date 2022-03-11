@@ -1,5 +1,5 @@
 with fam_ef_arena_dim_omraade as(
-  select * from {{source ('arena_stonad', 'DIM_F_STONAD_OMRAADE')}}
+  select * from {{source ('arena_stonad', 'dim_f_stonad_omraade')}}
 ),
 
 final as (
