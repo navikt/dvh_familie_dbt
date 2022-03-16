@@ -1,19 +1,26 @@
-with ef_stonad_arena_agg_pr_person_ as (
-  select * from {{ref ('ef_stonad_arena_agg_pr_person')}}
+WITH ef_stonad_arena_agg_pr_person_ AS (
+  SELECT
+    *
+  FROM
+    {{ ref ('ef_stonad_arena_agg_pr_person') }}
 ),
-
-hoy_lav as (
-  select fodselsnummer_gjeldende,
-    max(antblav) as antblav,
-    max(antbhoy) as antbhoy
-  from ef_stonad_arena_agg_pr_person_
-  group by fodselsnummer_gjeldende
+hoy_lav AS (
+  SELECT
+    fodselsnummer_gjeldende,
+    MAX(antblav) AS antblav,
+    MAX(antbhoy) AS antbhoy
+  FROM
+    ef_stonad_arena_agg_pr_person_
+  GROUP BY
+    fodselsnummer_gjeldende
 ),
-
-trans_ef_arena as (
-  select * from
+trans_ef_arena AS (
+  SELECT
+    *
+  FROM
     (
-      select periode,
+      SELECT
+        periode,
         stonad_kode,
         postert_belop,
         alder,
@@ -28,19 +35,25 @@ trans_ef_arena as (
         barn_under_18_antall,
         inntekt_siste_beraar,
         inntekt_3_siste_beraar,
-        fodselsnummer_gjeldende
-      from ef_stonad_arena_agg_pr_person_
-    )
-pivot(max(postert_belop) for stonad_kode
-IN ('TSOBOUTG','TSODAGREIS','TSOFLYTT','TSOLMIDLER','TSOREISAKT','TSOREISARB','TSOREISOBL','TSOTILBARN','TSOTILFAM'))
-
+        fodselsnummer_gjeldende,
+        fk_person1
+      FROM
+        ef_stonad_arena_agg_pr_person_
+    ) pivot(MAX(postert_belop) for stonad_kode IN ('TSOBOUTG' AS tsoboutg, 'TSODAGREIS' AS tsodagreis, 'TSOFLYTT' AS tsoflytt, 'TSOLMIDLER' AS tsolmidler, 'TSOREISAKT' AS tsoreisakt, 'TSOREISARB' AS tsoreisarb, 'TSOREISOBL' AS tsoreisobl, 'TSOTILBARN' AS tsotilbarn, 'TSOTILFAM' AS tsotilfam))
 ),
-
-final as (
-  select trans_ef_arena.*, hoy_lav.antblav, hoy_lav.antbhoy
-  from trans_ef_arena join hoy_lav
-  on trans_ef_arena.fodselsnummer_gjeldende = hoy_lav.fodselsnummer_gjeldende
-  order by trans_ef_arena.fodselsnummer_gjeldende
+FINAL AS (
+  SELECT
+    trans_ef_arena.*,
+    hoy_lav.antblav,
+    hoy_lav.antbhoy
+  FROM
+    trans_ef_arena
+    JOIN hoy_lav
+    ON trans_ef_arena.fodselsnummer_gjeldende = hoy_lav.fodselsnummer_gjeldende
+  ORDER BY
+    trans_ef_arena.fodselsnummer_gjeldende
 )
-
-select * from final
+SELECT
+  *
+FROM
+  FINAL

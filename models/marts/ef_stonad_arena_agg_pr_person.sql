@@ -1,31 +1,36 @@
-with ef_stonad_arena_ as (
-  select * from {{ref ('ef_stonad_arena')}}
+WITH ef_stonad_arena_ AS (
+  SELECT
+    *
+  FROM
+    {{ ref ('ef_stonad_arena') }}
 ),
-
-final as (
-  select periode,
+FINAL AS (
+  SELECT
+    periode,
     alder,
-    STONAD_kode,
+    stonad_kode,
     kommune_nr,
     bydel_nr,
     kjonn_kode,
+    fk_person1,
     maalgruppe_kode,
     maalgruppe_navn,
     statsborgerskap,
     fodeland,
     sivilstatus_kode,
-    max(antblav) as antblav,
-    max(antbhoy) as antbhoy,
+    MAX(antblav) AS antblav,
+    MAX(antbhoy) AS antbhoy,
     barn_under_18_antall,
     inntekt_siste_beraar,
     inntekt_3_siste_beraar,
     fodselsnummer_gjeldende,
-	  sum(postert_belop) as postert_belop
-
-  from ef_stonad_arena_
-  group by periode,
+    SUM(postert_belop) AS postert_belop
+  FROM
+    ef_stonad_arena_
+  GROUP BY
+    periode,
     alder,
-    STONAD_kode,
+    stonad_kode,
     kommune_nr,
     bydel_nr,
     kjonn_kode,
@@ -37,22 +42,26 @@ final as (
     barn_under_18_antall,
     inntekt_siste_beraar,
     inntekt_3_siste_beraar,
-    fodselsnummer_gjeldende
-
-  order by periode,
-   alder,
-   kommune_nr,
-   bydel_nr,
-   kjonn_kode,
-   maalgruppe_kode,
-   maalgruppe_navn,
-   statsborgerskap,
-   fodeland,
-   sivilstatus_kode,
-   barn_under_18_antall,
-   inntekt_siste_beraar,
-   inntekt_3_siste_beraar,
-   fodselsnummer_gjeldende
+    fodselsnummer_gjeldende,
+    fk_person1
+  ORDER BY
+    periode,
+    alder,
+    kommune_nr,
+    bydel_nr,
+    kjonn_kode,
+    maalgruppe_kode,
+    maalgruppe_navn,
+    statsborgerskap,
+    fodeland,
+    sivilstatus_kode,
+    barn_under_18_antall,
+    inntekt_siste_beraar,
+    inntekt_3_siste_beraar,
+    fodselsnummer_gjeldende,
+    fk_person1
 )
-
-select * from final
+SELECT
+  *
+FROM
+  FINAL
