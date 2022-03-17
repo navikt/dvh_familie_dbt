@@ -95,8 +95,10 @@ FINAL AS (
     bdk.antbu8,
     bdk.antbu10,
     bdk.antbu18,
-    'ARENA' AS kildesystem
-    --bdk.lastet_dato
+    'ARENA' as kildesystem,
+    (
+      select to_date(to_char(sysdate, 'ddmmyyyy')) from dual lastet_dato
+    ) as lastet_dato
   FROM
     legg_til_utdanningsstonad utdstnd
     JOIN barn_data_koloner bdk

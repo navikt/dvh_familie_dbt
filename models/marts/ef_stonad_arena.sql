@@ -115,7 +115,7 @@ FINAL AS (
     SELECT
         (
             SELECT
-                to_char(ADD_MONTHS(SYSDATE, -1), 'YYYYMM') AS periode
+                to_char(ADD_MONTHS(SYSDATE, -1), 'YYYYMM') --AS periode
             FROM
                 dual
         ) AS periode,-- {{ var ("periode") }} AS periode,
