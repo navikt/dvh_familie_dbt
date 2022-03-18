@@ -1,21 +1,10 @@
 WITH fak_stonad_ AS (
-    SELECT
-        *
-    FROM
-        {{ source (
-            'arena_stonad',
-            'fak_stonad'
-        ) }}
+    SELECT * FROM
+        {{ source ('arena_stonad','fak_stonad') }}
 ),
 dim_omraade AS(
-    SELECT
-        pk_dim_f_stonad_omraade,
-        stonad_kode
-    FROM
-        {{ source (
-            'arena_stonad',
-            'dim_f_stonad_omraade'
-        ) }}
+    SELECT pk_dim_f_stonad_omraade, stonad_kode FROM
+        {{ source ('arena_stonad', 'dim_f_stonad_omraade') }}
     WHERE
         stonad_kode IN (
             'TSOBOUTG',
@@ -113,12 +102,15 @@ dim_geo AS (
 ),
 FINAL AS (
     SELECT
+
         (
             SELECT
-                to_char(ADD_MONTHS(SYSDATE, -1), 'YYYYMM') --AS periode
+                to_char(ADD_MONTHS(SYSDATE, -1), 'YYYYMM')
             FROM
                 dual
-        ) AS periode,-- {{ var ("periode") }} AS periode,
+        ) AS periode,
+
+        --{{ var ("periode") }} AS periode,
         fs.lk_postering_id,
         ald.alder,
         so.stonad_kode,

@@ -1,5 +1,13 @@
 
-#version:  2
+version:  2
+
+models:
+  - name: ef_stonad_arena_final
+    columns:
+      - name: pk_ef_stonad_arena
+        tests:
+          - unique
+          - not_null
 
 #models:
   #- name: stg_fam_ef_arena_dim_maalgruppe

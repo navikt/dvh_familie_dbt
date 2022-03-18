@@ -1,3 +1,4 @@
+{{ config(materialized='incremental') }}
 WITH ef_stonad_arena_agg_per_pvt_ AS (
   SELECT * FROM {{ ref ('ef_stonad_arena_agg_per_pvt') }}
 ),
@@ -8,11 +9,17 @@ barntrygd_data AS (
   SELECT * FROM {{ source ('fam_bt', 'fam_bt_barn') }}
 ),
 ikke_skjermet_person_kontakt_info AS (
-  SELECT fk_person1, count(*) FROM {{ source ('dt_person_arena','dvh_person_ident_off_id_ikke_skjermet') }}
-  group by fk_person1
+  SELECT * FROM {{ source ('dt_person_arena','dvh_person_ident_off_id_ikke_skjermet') }}
 ),
+
+k67 as (
+    SELECT fk_person1, count(*) FROM ikke_skjermet_person_kontakt_info
+    group by fk_person1
+),
+
 legg_til_utdanningsstonad AS (
   SELECT
+
     fk_person1,
     periode,
     alder,
@@ -48,7 +55,7 @@ legg_til_utdanningsstonad AS (
 ),
 barn_data_koloner AS (
   SELECT
-    ef_stonad_arena_.fk_person1, -- bt_d.lastet_dato lastet_dato,
+    ef_stonad_arena_.fk_person1,
     MIN(NVL(CASE WHEN FLOOR(months_between(LAST_DAY(TO_DATE(ef_stonad_arena_.periode, 'yyyymm')),LAST_DAY(TO_DATE(bt_d.fodsel_aar_barn || bt_d.fodsel_mnd_barn,'yyyymm'))) / 12) < 0 THEN 0
     ELSE FLOOR(months_between(LAST_DAY(TO_DATE(ef_stonad_arena_.periode, 'yyyymm')),LAST_DAY(TO_DATE(bt_d.fodsel_aar_barn || bt_d.fodsel_mnd_barn,'yyyymm'))) / 12)
     END,0)) ybarn,
@@ -85,7 +92,7 @@ barn_data_koloner AS (
     ef_stonad_arena_.fk_person1
 ),
 
-FINAL AS (
+final AS (
   SELECT
     utdstnd.*,
     bdk.antbarn,
@@ -96,19 +103,19 @@ FINAL AS (
     bdk.antbu10,
     bdk.antbu18,
     'ARENA' as kildesystem,
-    (
-      select to_date(to_char(sysdate, 'ddmmyyyy')) from dual lastet_dato
-    ) as lastet_dato
+    sysdate lastet_dato
   FROM
     legg_til_utdanningsstonad utdstnd
     JOIN barn_data_koloner bdk
     ON utdstnd.fk_person1 = bdk.fk_person1
-    JOIN ikke_skjermet_person_kontakt_info
-    ON utdstnd.fk_person1 = ikke_skjermet_person_kontakt_info.fk_person1
+    JOIN k67
+    ON utdstnd.fk_person1 = k67.fk_person1
   ORDER BY
     utdstnd.fk_person1
 )
+
 SELECT
   *
-FROM
-  FINAL
+FROM final
+
+where periode > (select NVL(max(periode),0) from {{ this }})
