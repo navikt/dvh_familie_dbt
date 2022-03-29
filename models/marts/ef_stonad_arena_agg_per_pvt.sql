@@ -1,9 +1,7 @@
 WITH ef_stonad_arena_agg_pr_person_ AS (
-  SELECT
-    *
-  FROM
-    {{ ref ('ef_stonad_arena_agg_pr_person') }}
+  SELECT * FROM {{ ref ('ef_stonad_arena_agg_pr_person') }}
 ),
+
 hoy_lav AS (
   SELECT
     fodselsnummer_gjeldende,
@@ -26,6 +24,7 @@ trans_ef_arena AS (
         alder,
         kommune_nr,
         bydel_nr,
+        pk_dim_geografi,
         kjonn_kode,
         maalgruppe_kode,
         maalgruppe_navn,
@@ -36,6 +35,7 @@ trans_ef_arena AS (
         inntekt_siste_beraar,
         inntekt_3_siste_beraar,
         fodselsnummer_gjeldende,
+        fk_dim_person,
         fk_person1
       FROM
         ef_stonad_arena_agg_pr_person_

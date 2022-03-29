@@ -1,121 +1,63 @@
 WITH fak_stonad_ AS (
-    SELECT * FROM
-        {{ source ('arena_stonad','fak_stonad') }}
+    SELECT * FROM {{ ref ('stg_fam_ef_arena_fak_stonad') }}
 ),
+
 dim_omraade AS(
-    SELECT pk_dim_f_stonad_omraade, stonad_kode FROM
-        {{ source ('arena_stonad', 'dim_f_stonad_omraade') }}
+    SELECT pk_dim_f_stonad_omraade, stonad_kode
+    FROM
+        {{ ref ('stg_fam_ef_arena_dim_omraade') }}
     WHERE
-        stonad_kode IN (
-            'TSOBOUTG',
-            'TSODAGREIS',
-            'TSOFLYTT',
-            'TSOLMIDLER',
-            'TSOREISAKT',
-            'TSOREISARB',
-            'TSOREISOBL',
-            'TSOTILBARN',
-            'TSOTILFAM'
-        )
+        stonad_kode IN ('TSOBOUTG', 'TSODAGREIS', 'TSOFLYTT', 'TSOLMIDLER', 'TSOREISAKT', 'TSOREISARB',
+            'TSOREISOBL', 'TSOTILBARN', 'TSOTILFAM')
 ),
+
 person AS (
-    SELECT
-        *
-    FROM
-        {{ source (
-            'arena_stonad',
-            'dim_person'
-        ) }}
+    SELECT * FROM {{ ref ('stg_fam_ef_arena_dim_person') }}
 ),
+
 person_kontaktinfo AS (
-    SELECT
-        *
-    FROM
-        {{ source (
-            'dt_person_arena',
-            'dim_person_kontaktinfo'
-        ) }}
+    SELECT * FROM {{ ref ('stg_fam_ef_arena_dim_person_k_info') }}
 ),
-ikke_skjermet_person_kontakt_info AS (
-    SELECT
-        *
-    FROM
-        {{ source (
-            'dt_person_arena',
-            'dvh_person_ident_off_id_ikke_skjermet'
-        ) }}
-),
+
 dim_kjonn_ AS (
-    SELECT
-        *
-    FROM
-        {{ source (
-            'arena_stonad',
-            'dim_kjonn'
-        ) }}
+    SELECT * FROM {{ ref ('stg_fam_ef_arena_dim_kjonn') }}
 ),
+
 dim_alder_ AS (
-    SELECT
-        *
-    FROM
-        {{ source (
-            'arena_stonad',
-            'dim_alder'
-        ) }}
+    SELECT * FROM {{ ref ('stg_fam_ef_arena_dim_alder') }}
 ),
+
 dim_maalgruppe_type_ AS (
     SELECT
         pk_dim_maalgruppe_type,
         maalgruppe_kode,
         maalgruppe_navn_scd1
+       -- *
     FROM
-        {{ source (
-            'arena_stonad',
-            'dim_maalgruppe_type'
-        ) }}
+        {{ ref ('stg_fam_ef_arena_dim_maalgruppe') }}
     WHERE
-        maalgruppe_kode IN (
-            'ENSFORUTD',
-            'ENSFORARBS',
-            'TIDLFAMPL',
-            'GJENEKUTD',
-            'GJENEKARBS'
-        )
+        maalgruppe_kode IN ('ENSFORUTD', 'ENSFORARBS', 'TIDLFAMPL', 'GJENEKUTD', 'GJENEKARBS')
 ),
+
 dim_vedtak_postering_ AS (
-    SELECT
-        *
-    FROM
-        {{ source (
-            'arena_stonad',
-            'dim_vedtak_postering'
-        ) }}
+    SELECT * FROM {{ ref ('stg_fam_ef_arena_dim_vedtak_postering' ) }}
 ),
+
 dim_geo AS (
-    SELECT
-        *
-    FROM
-        {{ source (
-            'arena_stonad',
-            'dim_geografi'
-        ) }}
+    SELECT * FROM {{ ref ('stg_fam_ef_arena_dim_geo') }}
 ),
+
 FINAL AS (
     SELECT
 
-        (
-            SELECT
-                to_char(ADD_MONTHS(SYSDATE, -1), 'YYYYMM')
-            FROM
-                dual
-        ) AS periode,
-
-        --{{ var ("periode") }} AS periode,
+        --( SELECT to_char(ADD_MONTHS(SYSDATE, -1), 'YYYYMM') FROM dual) periode,
+        {{ var ("periode") }} AS periode,
         fs.lk_postering_id,
         ald.alder,
         so.stonad_kode,
         geo.kommune_nr,
         geo.bydel_nr,
+        geo.pk_dim_geografi,
         kjonn.kjonn_kode,
         maalt.maalgruppe_kode,
         maalt.maalgruppe_navn_scd1 AS maalgruppe_navn,
@@ -124,6 +66,7 @@ FINAL AS (
         per.sivilstatus_kode,
         per.barn_under_18_antall,
         fs.fk_person1,
+        fs.fk_dim_person,
         vp.antblav,
         vp.antbhoy,
         fs.postert_dato,
@@ -132,7 +75,6 @@ FINAL AS (
         fs.inntekt_siste_beraar,
         fs.inntekt_3_siste_beraar,
         dtp.fodselsnummer_gjeldende,
-        /*fs.stonadberett_aktivitet_flagg,*/
         fs.postert_belop
     FROM
         fak_stonad_ fs
@@ -157,7 +99,7 @@ FINAL AS (
         AND TRUNC(
             fs.postert_dato
         ) <= LAST_DAY(TO_DATE({{ var ("periode") }} || '01', 'yyyymmdd')))
-    SELECT
-        *
-    FROM
-        FINAL
+
+
+SELECT * FROM FINAL
+

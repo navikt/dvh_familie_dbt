@@ -1,2 +1,2 @@
-packages:
-  - local: dbt_modules\dbt-utils
+#packages:
+#  - local: dbt_modules\dbt-utils

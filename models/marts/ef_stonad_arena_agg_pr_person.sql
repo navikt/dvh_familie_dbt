@@ -1,17 +1,17 @@
 WITH ef_stonad_arena_ AS (
-  SELECT
-    *
-  FROM
-    {{ ref ('ef_stonad_arena') }}
+  SELECT * FROM {{ ref ('ef_stonad_arena') }}
 ),
+
 FINAL AS (
   SELECT
     periode,
     alder,
     stonad_kode,
     kommune_nr,
+    pk_dim_geografi,
     bydel_nr,
     kjonn_kode,
+    fk_dim_person,
     fk_person1,
     maalgruppe_kode,
     maalgruppe_navn,
@@ -33,6 +33,7 @@ FINAL AS (
     stonad_kode,
     kommune_nr,
     bydel_nr,
+    pk_dim_geografi,
     kjonn_kode,
     maalgruppe_kode,
     maalgruppe_navn,
@@ -43,12 +44,14 @@ FINAL AS (
     inntekt_siste_beraar,
     inntekt_3_siste_beraar,
     fodselsnummer_gjeldende,
+    fk_dim_person,
     fk_person1
   ORDER BY
     periode,
     alder,
     kommune_nr,
     bydel_nr,
+    pk_dim_geografi,
     kjonn_kode,
     maalgruppe_kode,
     maalgruppe_navn,
@@ -59,6 +62,7 @@ FINAL AS (
     inntekt_siste_beraar,
     inntekt_3_siste_beraar,
     fodselsnummer_gjeldende,
+    fk_dim_person,
     fk_person1
 )
 SELECT

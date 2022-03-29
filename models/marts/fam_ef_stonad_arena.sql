@@ -1,20 +1,21 @@
-{{ config(materialized='incremental') }}
+{{ config(
+    materialized='incremental',
+    pre_hook='{% if is_incremental() %}
+                delete from {{ this }} where periode = {{ var("periode") }}
+              {% endif %}'
+)
+}}
+
 WITH ef_stonad_arena_agg_per_pvt_ AS (
   SELECT * FROM {{ ref ('ef_stonad_arena_agg_per_pvt') }}
 ),
+
 ef_stonad_arena_ AS (
   SELECT * FROM {{ ref ('ef_stonad_arena') }}
 ),
-barntrygd_data AS (
-  SELECT * FROM {{ source ('fam_bt', 'fam_bt_barn') }}
-),
-ikke_skjermet_person_kontakt_info AS (
-  SELECT * FROM {{ source ('dt_person_arena','dvh_person_ident_off_id_ikke_skjermet') }}
-),
 
-k67 as (
-    SELECT fk_person1, count(*) FROM ikke_skjermet_person_kontakt_info
-    group by fk_person1
+barntrygd_data AS (
+  SELECT * FROM {{ ref ('stg_fam_bt_barn') }}
 ),
 
 legg_til_utdanningsstonad AS (
@@ -22,8 +23,10 @@ legg_til_utdanningsstonad AS (
 
     fk_person1,
     periode,
+    fk_dim_person,
     alder,
     kommune_nr,
+    pk_dim_geografi as fk_dim_geografi,
     bydel_nr,
     kjonn_kode,
     maalgruppe_kode,
@@ -102,20 +105,70 @@ final AS (
     bdk.antbu8,
     bdk.antbu10,
     bdk.antbu18,
-    'ARENA' as kildesystem,
-    sysdate lastet_dato
+    'DBT_ARENA' as kildesystem,
+    '-' as fodsel_aar,
+    '-' as fodsel_mnd,
+    sysdate lastet_dato,
+    0 as ALDER_GML,
+    sysdate oppdatert_dato
+
   FROM
     legg_til_utdanningsstonad utdstnd
     JOIN barn_data_koloner bdk
     ON utdstnd.fk_person1 = bdk.fk_person1
-    JOIN k67
-    ON utdstnd.fk_person1 = k67.fk_person1
   ORDER BY
     utdstnd.fk_person1
 )
 
+
 SELECT
-  *
+DVH_FAM_EF.ISEQ$$_18277021.nextval PK_FAM_EF_STONAD_ARENA,
+FODSEL_AAR
+,FODSEL_MND
+,FK_PERSON1
+,FK_DIM_PERSON
+,PERIODE
+,ALDER
+,KOMMUNE_NR
+,BYDEL_NR
+,KJONN_KODE
+,MAALGRUPPE_KODE
+,MAALGRUPPE_NAVN
+,STATSBORGERSKAP
+,FODELAND
+,SIVILSTATUS_KODE
+,ANTBLAV
+,ANTBHOY
+,BARN_UNDER_18_ANTALL
+,INNTEKT_SISTE_BERAAR
+,INNTEKT_3_SISTE_BERAAR
+,UTDSTONAD
+,TSOTILBARN
+,TSOLMIDLER
+,TSOBOUTG
+,TSODAGREIS
+,TSOREISOBL
+,TSOFLYTT
+,TSOREISAKT
+,TSOREISARB
+,TSOTILFAM
+,YBARN
+,ANTBARN
+,ANTBU1
+,ANTBU3
+,ANTBU8
+,ANTBU10
+,ANTBU18
+,KILDESYSTEM
+,LASTET_DATO
+,ALDER_GML
+,OPPDATERT_DATO
+,FK_DIM_GEOGRAFI
 FROM final
 
-where periode > (select NVL(max(periode),0) from {{ this }})
+{% if is_incremental() %}
+  where periode = {{ var ("periode") }}
+  --where periode > (select NVL(max(periode),0) from {{ this }})
+{% endif %}
+
+
