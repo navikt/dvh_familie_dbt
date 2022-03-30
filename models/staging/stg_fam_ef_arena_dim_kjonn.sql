@@ -3,11 +3,10 @@ with stg_fam_ef_arena_dim_kjonn as (
 ),
 
 final as (
-  select * from stg_fam_ef_arena_dim_kjonn
-  /*
+  select --* from stg_fam_ef_arena_dim_kjonn
   pk_dim_kjonn,
   kjonn_kode
-  from stg_fam_ef_arena_dim_kjonn */
+  from stg_fam_ef_arena_dim_kjonn
 )
 
 select * from final

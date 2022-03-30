@@ -6,12 +6,13 @@ FINAL AS (
   SELECT
     periode,
     alder,
+    postert_dato,
     stonad_kode,
     kommune_nr,
     pk_dim_geografi,
     bydel_nr,
     kjonn_kode,
-    fk_dim_person,
+    max(fk_dim_person) keep (dense_rank first order by postert_dato desc) fk_dim_person,
     fk_person1,
     maalgruppe_kode,
     maalgruppe_navn,
@@ -31,6 +32,7 @@ FINAL AS (
     periode,
     alder,
     stonad_kode,
+    postert_dato,
     kommune_nr,
     bydel_nr,
     pk_dim_geografi,
@@ -44,7 +46,6 @@ FINAL AS (
     inntekt_siste_beraar,
     inntekt_3_siste_beraar,
     fodselsnummer_gjeldende,
-    fk_dim_person,
     fk_person1
   ORDER BY
     periode,

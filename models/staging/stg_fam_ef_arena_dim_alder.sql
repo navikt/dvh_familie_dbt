@@ -3,11 +3,10 @@ with stg_fam_ef_arena_dim_alder as (
 ),
 
 final as (
-  select * from stg_fam_ef_arena_dim_alder
-  /*
+  select --* from stg_fam_ef_arena_dim_alder
   pk_dim_alder,
   alder
-  from stg_fam_ef_arena_dim_alder */
+  from stg_fam_ef_arena_dim_alder
 )
 
 select * from final

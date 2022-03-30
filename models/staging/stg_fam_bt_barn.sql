@@ -3,15 +3,14 @@ with stg_fam_bt_barn as (
 ),
 
 final as (
-  select * from stg_fam_bt_barn
-  /*
+  select --* from stg_fam_bt_barn
   fk_person1,
   fkb_person1,
   fodsel_aar_barn,
   fodsel_mnd_barn,
   stat_aarmnd
 
-  from stg_fam_bt_barn where stat_aarmnd = {{ var ("periode") }} */
+  from stg_fam_bt_barn where stat_aarmnd = {{ var ("periode") }} 
 )
 
 select * from final

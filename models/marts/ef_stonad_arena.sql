@@ -3,12 +3,12 @@ WITH fak_stonad_ AS (
 ),
 
 dim_omraade AS(
-    SELECT pk_dim_f_stonad_omraade, stonad_kode
+    SELECT *  --pk_dim_f_stonad_omraade, stonad_kode
     FROM
         {{ ref ('stg_fam_ef_arena_dim_omraade') }}
-    WHERE
-        stonad_kode IN ('TSOBOUTG', 'TSODAGREIS', 'TSOFLYTT', 'TSOLMIDLER', 'TSOREISAKT', 'TSOREISARB',
-            'TSOREISOBL', 'TSOTILBARN', 'TSOTILFAM')
+    --WHERE
+        --stonad_kode IN ('TSOBOUTG', 'TSODAGREIS', 'TSOFLYTT', 'TSOLMIDLER', 'TSOREISAKT', 'TSOREISARB',
+            --'TSOREISOBL', 'TSOTILBARN', 'TSOTILFAM')
 ),
 
 person AS (
@@ -28,15 +28,15 @@ dim_alder_ AS (
 ),
 
 dim_maalgruppe_type_ AS (
-    SELECT
-        pk_dim_maalgruppe_type,
-        maalgruppe_kode,
-        maalgruppe_navn_scd1
-       -- *
+    SELECT *
+        --pk_dim_maalgruppe_type,
+        --maalgruppe_kode,
+        --maalgruppe_navn_scd1
+
     FROM
         {{ ref ('stg_fam_ef_arena_dim_maalgruppe') }}
-    WHERE
-        maalgruppe_kode IN ('ENSFORUTD', 'ENSFORARBS', 'TIDLFAMPL', 'GJENEKUTD', 'GJENEKARBS')
+    --WHERE
+        --maalgruppe_kode IN ('ENSFORUTD', 'ENSFORARBS', 'TIDLFAMPL', 'GJENEKUTD', 'GJENEKARBS')
 ),
 
 dim_vedtak_postering_ AS (
@@ -82,8 +82,12 @@ FINAL AS (
         ON fs.fk_dim_f_stonad_omraade = so.pk_dim_f_stonad_omraade
         JOIN dim_maalgruppe_type_ maalt
         ON fs.fk_dim_maalgruppe_type = maalt.pk_dim_maalgruppe_type
+
         JOIN person per
         ON fs.fk_dim_person = per.pk_dim_person
+        --and per.gyldig_fra_dato <= last_day(fs.postert_dato)
+        --and per.gyldig_til_dato > last_day(fs.postert_dato)
+
         JOIN person_kontaktinfo dtp
         ON per.fk_person1 = dtp.fk_person1
         JOIN dim_kjonn_ kjonn
@@ -102,4 +106,8 @@ FINAL AS (
 
 
 SELECT * FROM FINAL
+
+
+
+
 

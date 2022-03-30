@@ -3,11 +3,11 @@ with stg_fam_ef_arena_dim_omraade as(
 ),
 
 final as (
-  select * from stg_fam_ef_arena_dim_omraade
-  --select pk_dim_f_stonad_omraade, stonad_kode, stonad_navn
-  --from stg_fam_ef_arena_dim_omraade
-  --where stonad_kode in ('TSOBOUTG','TSODAGREIS','TSOFLYTT','TSOLMIDLER','TSOREISAKT',
-  --'TSOREISARB','TSOREISOBL','TSOTILBARN','TSOTILFAM')
+  --select * from stg_fam_ef_arena_dim_omraade
+  select pk_dim_f_stonad_omraade, stonad_kode, stonad_navn
+  from stg_fam_ef_arena_dim_omraade
+  where stonad_kode in ('TSOBOUTG','TSODAGREIS','TSOFLYTT','TSOLMIDLER','TSOREISAKT',
+  'TSOREISARB','TSOREISOBL','TSOTILBARN','TSOTILFAM')
 )
 
 select * from final

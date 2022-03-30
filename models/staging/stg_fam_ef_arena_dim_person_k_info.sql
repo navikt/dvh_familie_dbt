@@ -3,11 +3,11 @@ with stg_fam_ef_arena_dim_person_k_info as (
 ),
 
 final as (
-  select * from stg_fam_ef_arena_dim_person_k_info
-  /*
+  select --* from stg_fam_ef_arena_dim_person_k_info
+
   fk_person1,
   fodselsnummer_gjeldende
-  from stg_fam_ef_arena_dim_person_k_info */
+  from stg_fam_ef_arena_dim_person_k_info
 )
 
 select * from final
