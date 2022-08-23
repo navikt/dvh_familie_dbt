@@ -43,11 +43,10 @@ if __name__ == "__main__":
     time.tzset()
     profiles_dir = str(sys.path[0])
     command = os.environ["DBT_COMMAND"].split()
-    log_level = os.environ["LOG_LEVEL"]
-    schema = os.environ["DB_SCHEMA"]
+    log_level = os.getenv("LOG_LEVEL")
+    schema = os.getenv("DB_SCHEMA")
 
     set_secrets_as_envs()
-    vault_api.set_secrets_as_envs()
 
     if not log_level: log_level = 'INFO'
     logger.setLevel(log_level)
@@ -58,7 +57,7 @@ if __name__ == "__main__":
 
     # setter miljø og korrekt skjema med riktig proxy
     os.environ['DBT_ORCL_USER_PROXY'] = f"{os.environ['DBT_ORCL_USER']}" + (f"[{schema}]" if schema else '')
-    os.environ['DBT_ORCL_SCHEMA'] = (schema if schema else os.environ['DBT_ORCL_USER_PROXY'])
+    os.environ['DBT_ORCL_SCHEMA'] = (schema if schema else os.environ['DBT_ORCL_USER']) # samme som i Vault
 
     logger.info(f"bruker: {os.environ['DBT_ORCL_USER_PROXY']}")
 
