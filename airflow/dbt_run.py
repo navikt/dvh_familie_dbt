@@ -41,7 +41,7 @@ if __name__ == "__main__":
     stream_handler = logging.StreamHandler(sys.stdout)
     os.environ["TZ"] = "Europe/Oslo"
     time.tzset()
-    profiles_dir = str(sys.path[0])
+    profiles_dir = str(sys.path) #str(sys.path[0])
     command = os.environ["DBT_COMMAND"].split()
     log_level = os.getenv("LOG_LEVEL")
     schema = os.getenv("DB_SCHEMA")
