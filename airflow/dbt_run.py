@@ -52,6 +52,9 @@ if __name__ == "__main__":
     logger.setLevel(log_level)
     logger.addHandler(stream_handler)
 
+    logger.debug(f"dbt command: {command}")
+    logger.debug(f"db schema: {schema}")
+
     def dbt_logg(my_path) -> str:
       with open(my_path + "/logs/dbt.log") as log: return log.read()
 
@@ -65,7 +68,6 @@ if __name__ == "__main__":
     logger.info(f"Prosjekt path er: {project_path}")
 
     try:
-        logger.debug(f"running command: {command}")
         output = subprocess.run(
             (
               ["dbt", "--no-use-colors", "--log-format", "json"] +
