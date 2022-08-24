@@ -77,11 +77,11 @@ if __name__ == "__main__":
             check=True, capture_output=True
         )
         logger.info(output.stdout.decode("utf-8"))
-        #logger.debug(dbt_logg(project_path))
+        logger.debug(dbt_logg(project_path))
     except subprocess.CalledProcessError as err:
-        #raise Exception(logger.error(dbt_logg(project_path)),
-        #               err.stdout.decode("utf-8"))
-       raise Exception("dbt feiler")
+        raise Exception(logger.error(dbt_logg(project_path)),
+                       err.stdout.decode("utf-8"))
+       #raise Exception("dbt feiler")
 
-    #filtered_logs = filter_logs(f"{project_path}/logs/dbt.log")
-    #write_to_xcom_push_file(filtered_logs)
+    filtered_logs = filter_logs(f"{project_path}/logs/dbt.log")
+    write_to_xcom_push_file(filtered_logs)
