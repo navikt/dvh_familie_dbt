@@ -20,6 +20,7 @@ dvh_familie:
       port: 1521
       service: dwhr
       schema: "{{env_var('DBT_DB_SCHEMA')}}"
+      database: "dwh"
       threads: 4
     dwhq0:
       type: oracle

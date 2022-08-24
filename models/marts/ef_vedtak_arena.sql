@@ -1,8 +1,3 @@
-{{ config(
-    materialized='table'
-)
-}}
-
 with dim_maalgruppe_type_ AS (
     SELECT *
     FROM {{ ref ('stg_fam_ef_arena_dim_maalgruppe') }}
@@ -114,7 +109,7 @@ final as (
   WHERE
 	VFAKTA_INNFV.VEDTAK_FAKTA_KODE = 'INNVF'
 	AND VFAKTA_INNFV.VEDTAK_FAKTA_VERDI_DATO BETWEEN to_date({{ var ("periode") }}||'01','yyyymmdd') and last_day(to_date({{ var ("periode") }}||'01','yyyymmdd'))
-	and FASV.GYLDIG_TIL_DATO = to_date('31129999','ddmmyyyy') 
+	and FASV.GYLDIG_TIL_DATO = to_date('31129999','ddmmyyyy')
 
 )
 
@@ -124,4 +119,3 @@ select *
 
 from final
 order by fk_person1
-

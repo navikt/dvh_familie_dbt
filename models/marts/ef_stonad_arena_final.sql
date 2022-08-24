@@ -98,8 +98,6 @@ final AS (
     bdk.antbu10,
     bdk.antbu18,
     'DBT_ARENA' as kildesystem,
-    '-' as fodsel_aar,
-    '-' as fodsel_mnd,
     sysdate lastet_dato,
     0 as ALDER_GML,
     sysdate oppdatert_dato
@@ -114,10 +112,7 @@ final AS (
 
 
 SELECT
---DVH_FAM_EF.ISEQ$$_18277021.nextval PK_FAM_EF_STONAD_ARENA,
-FODSEL_AAR
-,FODSEL_MND
-,FK_PERSON1
+FK_PERSON1
 ,FK_DIM_PERSON
 ,PERIODE
 ,ALDER
@@ -153,7 +148,6 @@ FODSEL_AAR
 ,ANTBU18
 ,KILDESYSTEM
 ,LASTET_DATO
-,ALDER_GML
 ,OPPDATERT_DATO
 ,FK_DIM_GEOGRAFI
 FROM final
