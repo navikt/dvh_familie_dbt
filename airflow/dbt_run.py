@@ -44,7 +44,7 @@ if __name__ == "__main__":
     profiles_dir = str(sys.path[0])
     command = os.environ["DBT_COMMAND"].split()
     log_level = os.getenv("LOG_LEVEL")
-    schema = os.getenv("DB_SCHEMA") 
+    schema = os.getenv("DB_SCHEMA")
 
     set_secrets_as_envs()
 
