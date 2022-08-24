@@ -44,7 +44,7 @@ if __name__ == "__main__":
     profiles_dir = str(sys.path[0])
     command = os.environ["DBT_COMMAND"].split()
     log_level = os.getenv("LOG_LEVEL")
-    schema = os.getenv("DB_SCHEMA")
+    schema = os.getenv("DB_SCHEMA") 
 
     set_secrets_as_envs()
 
@@ -53,7 +53,14 @@ if __name__ == "__main__":
     logger.addHandler(stream_handler)
 
     def dbt_logg(my_path) -> str:
-      with open(my_path + "/logs/dbt.log") as log: return log.read()
+      try:
+        f = open(my_path + "/logs/dbt.log")
+        return f.read()
+      except:
+        logger.debug('The file couldnt be found')
+      finally:
+        f.close()
+      #with open(my_path + "/logs/dbt.log") as log: return log.read()
 
     # setter miljø og korrekt skjema med riktig proxy
     os.environ['DBT_ORCL_USER_PROXY'] = f"{os.environ['DBT_ORCL_USER']}" + (f"[{schema}]" if schema else '')
