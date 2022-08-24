@@ -53,14 +53,7 @@ if __name__ == "__main__":
     logger.addHandler(stream_handler)
 
     def dbt_logg(my_path) -> str:
-      try:
-        f = open(my_path + "/logs/dbt.log")
-        return f.read()
-      except:
-        logger.debug('The file couldnt be found')
-      finally:
-        f.close()
-      #with open(my_path + "/logs/dbt.log") as log: return log.read()
+      with open(my_path + "/logs/dbt.log") as log: return log.read()
 
     # setter miljø og korrekt skjema med riktig proxy
     os.environ['DBT_ORCL_USER_PROXY'] = f"{os.environ['DBT_ORCL_USER']}" + (f"[{schema}]" if schema else '')
