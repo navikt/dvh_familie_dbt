@@ -81,7 +81,7 @@ if __name__ == "__main__":
     except subprocess.CalledProcessError as err:
         #raise Exception(logger.error(dbt_logg(project_path)),
         #               err.stdout.decode("utf-8"))
-        logger.error("dbt feiler")
+       raise Exception("dbt feiler")
 
     #filtered_logs = filter_logs(f"{project_path}/logs/dbt.log")
     #write_to_xcom_push_file(filtered_logs)
