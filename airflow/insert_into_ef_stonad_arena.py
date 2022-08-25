@@ -62,9 +62,11 @@ def get_periode():
 #     connection(sql)
 
 def give_grant():
-    sql = ('''grant read on dvh_fam_ef.ef_stonad_arena_final to DVH_FAM_AIRFLOW;
-              grant insert, delete, select, update, read on dvh_fam_ef.ef_stonad_arena_final to DVH_FAM_AIRFLOW;
-    ''')
+    sql = ('grant read on dvh_fam_ef.ef_stonad_arena_final to DVH_FAM_AIRFLOW')
+    connection(sql)
+
+def give_more_grants():
+    sql = ('grant insert, delete, select, update, read on dvh_fam_ef.ef_stonad_arena_final to DVH_FAM_AIRFLOW')
     connection(sql)
 
 def delete_data():
@@ -97,9 +99,10 @@ def insert_data():
 
 if __name__ == '__main__':
     periode = get_periode()
+    give_grant()
+    give_more_grants()
     delete_data()
     #delete_data(periode)
-    give_grant()
     insert_data()
 
 
