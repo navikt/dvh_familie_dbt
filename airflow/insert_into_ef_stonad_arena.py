@@ -61,6 +61,12 @@ def get_periode():
 #     sql = ('delete from dvh_fam_ef.fam_ef_stonad_arena where periode =: periode')
 #     connection(sql)
 
+def give_grant():
+    sql = ('''grant read on dvh_fam_ef.ef_stonad_arena_final to DVH_FAM_AIRFLOW;
+              grant insert, delete, select, update, read on dvh_fam_ef.ef_stonad_arena_final to DVH_FAM_AIRFLOW;
+    ''')
+    connection(sql)
+
 def delete_data():
     """
     sletter data fra fam_ef_stonad_arena med periode som kriteriea.
@@ -68,10 +74,6 @@ def delete_data():
     :return:
     """
     sql = ('delete from dvh_fam_ef.fam_ef_stonad_arena where periode = 202207')
-    connection(sql)
-
-def give_grant():
-    sql = ('grant read on dvh_fam_ef.ef_stonad_arena_final to DVH_FAM_AIRFLOW')
     connection(sql)
 
 def insert_data():
