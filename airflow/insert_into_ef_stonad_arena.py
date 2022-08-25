@@ -52,13 +52,22 @@ def get_periode():
     return lastMonth.strftime("%Y%m") # henter bare aar og maaned
 
 
-def delete_data(periode):
+# def delete_data(periode):
+#     """
+#     sletter data fra fam_ef_stonad_arena med periode som kriteriea.
+#     :param periode:
+#     :return:
+#     """
+#     sql = ('delete from dvh_fam_ef.fam_ef_stonad_arena where periode =: periode')
+#     connection(sql)
+
+def delete_data():
     """
     sletter data fra fam_ef_stonad_arena med periode som kriteriea.
     :param periode:
     :return:
     """
-    sql = ('delete from dvh_fam_ef.fam_ef_stonad_arena where periode =: periode')
+    sql = ('delete from dvh_fam_ef.fam_ef_stonad_arena where periode = 202207')
     connection(sql)
 
 def give_grant():
@@ -86,8 +95,8 @@ def insert_data():
 
 if __name__ == '__main__':
     periode = get_periode()
-    print(oracle_secrets['user'])
-    delete_data(periode)
+    delete_data()
+    #delete_data(periode)
     give_grant()
     insert_data()
 
