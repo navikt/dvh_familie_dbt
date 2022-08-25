@@ -61,7 +61,9 @@ def delete_data(periode):
     sql = ('delete from dvh_fam_ef.fam_ef_stonad_arena where periode =: periode')
     connection(sql)
 
-
+def give_grant():
+    sql = ('grant read on dvh_fam_ef.ef_stonad_arena_final to DVH_FAM_AIRFLOW')
+    connection(sql)
 
 def insert_data():
     """
@@ -86,6 +88,7 @@ if __name__ == '__main__':
     periode = get_periode()
     print(oracle_secrets['user'])
     delete_data(periode)
+    give_grant()
     insert_data()
 
 
