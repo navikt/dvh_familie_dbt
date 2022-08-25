@@ -15,7 +15,7 @@ def oracle_secrets():
   )
 
 oracle_secrets = oracle_secrets()
-user_proxy = str(oracle_secrets['user'])+"['dvh_fam_ef']"
+user_proxy = str(oracle_secrets['user'])+"[dvh_fam_ef]"
 
 def connection(sql):
     """
