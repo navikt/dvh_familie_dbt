@@ -26,8 +26,7 @@ def connection(sql):
     dsn_tns_HardCode = cx_Oracle.makedsn('dm07-scan.adeo.no', 1521, service_name = 'dwhr')
     try:
         # establish a new connection
-        proxy_user = str(oracle_secrets['user'])+"['dvh_fam_ef']"
-        with cx_Oracle.connect(user = proxy_user,
+        with cx_Oracle.connect(user = oracle_secrets['user'],
                             password = oracle_secrets['password'],
                             dsn = dsn_tns_HardCode) as connection:
             # create a cursor
@@ -68,11 +67,11 @@ def delete_data():
     :param periode:
     :return:
     """
-    sql = ('delete from fam_ef_stonad_arena where periode = 202207')
+    sql = ('delete from dvh_fam_ef.fam_ef_stonad_arena where periode = 202207')
     connection(sql)
 
 def give_grant():
-    sql = ('grant read on ef_stonad_arena_final to DVH_FAM_AIRFLOW')
+    sql = ('grant read on dvh_fam_ef.ef_stonad_arena_final to DVH_FAM_AIRFLOW')
     connection(sql)
 
 def insert_data():
@@ -82,7 +81,7 @@ def insert_data():
     :return:
     """
     sql = ('''
-            INSERT INTO fam_ef_stonad_arena (FK_PERSON1,FK_DIM_PERSON,PERIODE,ALDER,KOMMUNE_NR,BYDEL_NR,KJONN_KODE,MAALGRUPPE_KODE
+            INSERT INTO dvh_fam_ef.fam_ef_stonad_arena (FK_PERSON1,FK_DIM_PERSON,PERIODE,ALDER,KOMMUNE_NR,BYDEL_NR,KJONN_KODE,MAALGRUPPE_KODE
             ,MAALGRUPPE_NAVN,STATSBORGERSKAP,FODELAND,SIVILSTATUS_KODE,ANTBLAV,ANTBHOY,BARN_UNDER_18_ANTALL,INNTEKT_SISTE_BERAAR,INNTEKT_3_SISTE_BERAAR
             ,UTDSTONAD,TSOTILBARN,TSOLMIDLER,TSOBOUTG,TSODAGREIS,TSOREISOBL,TSOFLYTT,TSOREISAKT,TSOREISARB,TSOTILFAM,YBARN
             ,ANTBARN,ANTBU1,ANTBU3,ANTBU8,ANTBU10,ANTBU18,KILDESYSTEM,LASTET_DATO,OPPDATERT_DATO,FK_DIM_GEOGRAFI)
@@ -90,17 +89,16 @@ def insert_data():
             ,MAALGRUPPE_NAVN,STATSBORGERSKAP,FODELAND,SIVILSTATUS_KODE,ANTBLAV,ANTBHOY,BARN_UNDER_18_ANTALL,INNTEKT_SISTE_BERAAR,INNTEKT_3_SISTE_BERAAR
             ,UTDSTONAD,TSOTILBARN,TSOLMIDLER,TSOBOUTG,TSODAGREIS,TSOREISOBL,TSOFLYTT,TSOREISAKT,TSOREISARB,TSOTILFAM,YBARN
             ,ANTBARN,ANTBU1,ANTBU3,ANTBU8,ANTBU10,ANTBU18,KILDESYSTEM,LASTET_DATO,OPPDATERT_DATO,FK_DIM_GEOGRAFI
-            FROM ef_stonad_arena_final
+            FROM dvh_fam_ef.ef_stonad_arena_final
         ''')
     connection(sql)
 
 if __name__ == '__main__':
     periode = get_periode()
-    print(str(oracle_secrets['user'])+"['dvh_fam_ef']")
-    #delete_data()
+    delete_data()
     #delete_data(periode)
-    #give_grant()
-    #insert_data()
+    give_grant()
+    insert_data()
 
 
 
