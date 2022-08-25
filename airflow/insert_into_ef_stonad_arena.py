@@ -70,6 +70,16 @@ def get_periode():
 #     sql = ('grant insert, delete, select, update, read on dvh_fam_ef.fam_ef_stonad_arena to DVH_FAM_AIRFLOW')
 #     connection(sql)
 
+def send_context():
+    sql = ('''
+        begin
+            dbms_application_info.set_client_info( client_info => 'Klient_info Familie-Airflow');
+            dbms_application_info.set_module( module_name => 'Kjører Team-familie Airflow applikasjon'
+                                            , action_name => 'delete/insert into dvh_fam_ef.fam_ef_stonad_arena' );
+        end;
+    ''')
+    connection(sql)
+
 def delete_data():
     """
     sletter data fra fam_ef_stonad_arena med periode som kriteriea.
@@ -100,7 +110,7 @@ def insert_data():
 
 if __name__ == '__main__':
     periode = get_periode()
-    print(user_proxy)
+    send_context()
     delete_data()
     #delete_data(periode)
     insert_data()
