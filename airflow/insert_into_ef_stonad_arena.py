@@ -96,10 +96,11 @@ def insert_data():
 
 if __name__ == '__main__':
     periode = get_periode()
-    delete_data()
+    print(str(oracle_secrets['user'])+"['dvh_fam_ef']")
+    #delete_data()
     #delete_data(periode)
-    give_grant()
-    insert_data()
+    #give_grant()
+    #insert_data()
 
 
 
