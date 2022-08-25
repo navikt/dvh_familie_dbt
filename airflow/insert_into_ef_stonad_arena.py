@@ -14,13 +14,14 @@ def oracle_secrets():
     nencoding="UTF-8"
   )
 
+oracle_secrets = oracle_secrets()
+
 def connection(sql):
     """
     lager en db-connection for querryen vi kjører
     :param sql:
     :return:
     """
-    oracle_secrets = oracle_secrets()
     #dsn_tns = cx_Oracle.makedsn(dsn_tns['host'], dsn_tns['port'], service_name = dsn_tns['service'])
     dsn_tns_HardCode = cx_Oracle.makedsn('dm07-scan.adeo.no', 1521, service_name = 'dwhr')
     try:
