@@ -58,7 +58,7 @@ def delete_data(periode):
     :param periode:
     :return:
     """
-    sql = ('delete from fam_ef_stonad_arena where periode =: periode')
+    sql = ('delete from dvh_fam_ef.fam_ef_stonad_arena where periode =: periode')
     connection(sql)
 
 
@@ -78,7 +78,7 @@ def insert_data():
             ,MAALGRUPPE_NAVN,STATSBORGERSKAP,FODELAND,SIVILSTATUS_KODE,ANTBLAV,ANTBHOY,BARN_UNDER_18_ANTALL,INNTEKT_SISTE_BERAAR,INNTEKT_3_SISTE_BERAAR
             ,UTDSTONAD,TSOTILBARN,TSOLMIDLER,TSOBOUTG,TSODAGREIS,TSOREISOBL,TSOFLYTT,TSOREISAKT,TSOREISARB,TSOTILFAM,YBARN
             ,ANTBARN,ANTBU1,ANTBU3,ANTBU8,ANTBU10,ANTBU18,KILDESYSTEM,LASTET_DATO,OPPDATERT_DATO,FK_DIM_GEOGRAFI
-            FROM ef_stonad_arena_final
+            FROM dvh_fam_ef.ef_stonad_arena_final
         ''')
     connection(sql)
 
