@@ -26,8 +26,8 @@ def connection(sql):
     dsn_tns_HardCode = cx_Oracle.makedsn('dm07-scan.adeo.no', 1521, service_name = 'dwhr')
     try:
         # establish a new connection
-        with cx_Oracle.connect(user = oracle_secrets.user,
-                            password = oracle_secrets.password,
+        with cx_Oracle.connect(user = oracle_secrets['user'],
+                            password = oracle_secrets['password'],
                             dsn = dsn_tns_HardCode) as connection:
             # create a cursor
             with connection.cursor() as cursor:
@@ -84,8 +84,7 @@ def insert_data():
 
 if __name__ == '__main__':
     periode = get_periode()
-    print(periode)
-    print(oracle_secrets().user)
+    print(oracle_secrets['user'])
     delete_data(periode)
     insert_data()
 
