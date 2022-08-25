@@ -12,7 +12,6 @@ barntrygd_data AS (
 
 legg_til_utdanningsstonad AS (
   SELECT
-
     fk_person1,
     periode,
     fk_dim_person,
