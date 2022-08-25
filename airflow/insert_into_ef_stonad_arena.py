@@ -26,7 +26,7 @@ def connection(sql):
     dsn_tns_HardCode = cx_Oracle.makedsn('dm07-scan.adeo.no', 1521, service_name = 'dwhr')
     try:
         # establish a new connection
-        with cx_Oracle.connect(user = oracle_secrets['user'],
+        with cx_Oracle.connect(user = str(oracle_secrets['user'])+"['dvh_fam_ef']",
                             password = oracle_secrets['password'],
                             dsn = dsn_tns_HardCode) as connection:
             # create a cursor
