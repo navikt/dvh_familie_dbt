@@ -8,8 +8,8 @@ from dataverk_vault.api import set_secrets_as_envs
 def oracle_secrets():
   set_secrets_as_envs()
   return dict(
-    user=getenv("AIRFLOW_ORCL_USER"),
-    password=getenv("AIRFLOW_ORCL_PASS"),
+    user=getenv("DBT_ORCL_USER"),
+    password=getenv("DBT_ORCL_PASS"),
     encoding="UTF-8",
     nencoding="UTF-8"
   )
@@ -61,13 +61,13 @@ def get_periode():
 #     sql = ('delete from dvh_fam_ef.fam_ef_stonad_arena where periode =: periode')
 #     connection(sql)
 
-def give_grant():
-    sql = ('grant read on dvh_fam_ef.ef_stonad_arena_final to DVH_FAM_AIRFLOW')
-    connection(sql)
+# def give_grant():
+#     sql = ('grant read on dvh_fam_ef.ef_stonad_arena_final to DVH_FAM_AIRFLOW')
+#     connection(sql)
 
-def give_more_grants():
-    sql = ('grant insert, delete, select, update, read on dvh_fam_ef.fam_ef_stonad_arena to DVH_FAM_AIRFLOW')
-    connection(sql)
+# def give_more_grants():
+#     sql = ('grant insert, delete, select, update, read on dvh_fam_ef.fam_ef_stonad_arena to DVH_FAM_AIRFLOW')
+#     connection(sql)
 
 def delete_data():
     """
@@ -99,8 +99,6 @@ def insert_data():
 
 if __name__ == '__main__':
     periode = get_periode()
-    give_grant()
-    give_more_grants()
     delete_data()
     #delete_data(periode)
     insert_data()
