@@ -66,7 +66,7 @@ def give_grant():
     connection(sql)
 
 def give_more_grants():
-    sql = ('grant insert, delete, select, update, read on dvh_fam_ef.ef_stonad_arena_final to DVH_FAM_AIRFLOW')
+    sql = ('grant insert, delete, select, update, read on dvh_fam_ef.fam_ef_stonad_arena to DVH_FAM_AIRFLOW')
     connection(sql)
 
 def delete_data():
