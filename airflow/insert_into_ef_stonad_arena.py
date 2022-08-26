@@ -73,23 +73,23 @@ def send_context():
     ''')
     connection(sql)
 
-def delete_data(periode):
-    """
-    sletter data fra fam_ef_stonad_arena med periode som kriteriea.
-    :param periode:
-    :return:
-    """
-    sql = ('delete from dvh_fam_ef.fam_ef_stonad_arena where periode =: periode')
-    connection(sql)
-
-# def delete_data():
+# def delete_data(periode):
 #     """
 #     sletter data fra fam_ef_stonad_arena med periode som kriteriea.
 #     :param periode:
 #     :return:
 #     """
-#     sql = ('delete from dvh_fam_ef.fam_ef_stonad_arena where periode = 202207')
+#     sql = ('delete from dvh_fam_ef.fam_ef_stonad_arena where periode =: periode')
 #     connection(sql)
+
+def delete_data():
+    """
+    sletter data fra fam_ef_stonad_arena med periode som kriteriea.
+    :param periode:
+    :return:
+    """
+    sql = ('delete from dvh_fam_ef.fam_ef_stonad_arena where periode = 202207')
+    connection(sql)
 
 def insert_data():
     """
@@ -113,8 +113,8 @@ def insert_data():
 if __name__ == '__main__':
     periode = get_periode()
     send_context()
-    #delete_data()
-    delete_data(periode)
+    delete_data()
+    #delete_data(periode)
     insert_data()
 
 
