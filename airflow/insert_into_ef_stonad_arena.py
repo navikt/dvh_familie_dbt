@@ -17,7 +17,7 @@ def oracle_secrets():
   )
 
 oracle_secrets = oracle_secrets()
-user_proxy = str(oracle_secrets['user'])+"[dvh_fam_ef]"
+#user_proxy = str(oracle_secrets['user'])+"[dvh_fam_ef]"
 
 def connection(sql):
     """
@@ -29,7 +29,7 @@ def connection(sql):
     dsn_tns_HardCode = cx_Oracle.makedsn(oracle_secrets['host'], 1521, service_name = oracle_secrets['service'])
     try:
         # establish a new connection
-        with cx_Oracle.connect(user = user_proxy,
+        with cx_Oracle.connect(user = oracle_secrets['user'],
                             password = oracle_secrets['password'],
                             dsn = dsn_tns_HardCode) as connection:
             # create a cursor
