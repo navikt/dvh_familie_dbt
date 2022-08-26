@@ -11,7 +11,7 @@ def oracle_secrets():
     user=getenv("AIRFLOW_ORCL_USER"),
     password=getenv("AIRFLOW_ORCL_PASS"),
     host = getenv("DBT_ORCL_HOST"),
-    service = getenv("DBT_ORCL_SERVICE")
+    service = getenv("DBT_ORCL_SERVICE"),
     encoding="UTF-8",
     nencoding="UTF-8"
   )
