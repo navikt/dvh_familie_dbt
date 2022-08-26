@@ -8,8 +8,10 @@ from dataverk_vault.api import set_secrets_as_envs
 def oracle_secrets():
   set_secrets_as_envs()
   return dict(
-    user=getenv("DBT_ORCL_USER"),
-    password=getenv("DBT_ORCL_PASS"),
+    user=getenv("AIRFLOW_ORCL_USER"),
+    password=getenv("AIRFLOW_ORCL_PASS"),
+    host = getenv("DBT_ORCL_HOST"),
+    service = getenv("DBT_ORCL_SERVICE")
     encoding="UTF-8",
     nencoding="UTF-8"
   )
@@ -24,7 +26,7 @@ def connection(sql):
     :return:
     """
     #dsn_tns = cx_Oracle.makedsn(dsn_tns['host'], dsn_tns['port'], service_name = dsn_tns['service'])
-    dsn_tns_HardCode = cx_Oracle.makedsn('dm07-scan.adeo.no', 1521, service_name = 'dwhr')
+    dsn_tns_HardCode = cx_Oracle.makedsn(oracle_secrets['host'], 1521, service_name = oracle_secrets['service'])
     try:
         # establish a new connection
         with cx_Oracle.connect(user = user_proxy,
@@ -53,15 +55,6 @@ def get_periode():
     return lastMonth.strftime("%Y%m") # henter bare aar og maaned
 
 
-# def delete_data(periode):
-#     """
-#     sletter data fra fam_ef_stonad_arena med periode som kriteriea.
-#     :param periode:
-#     :return:
-#     """
-#     sql = ('delete from dvh_fam_ef.fam_ef_stonad_arena where periode =: periode')
-#     connection(sql)
-
 # def give_grant():
 #     sql = ('grant read on dvh_fam_ef.ef_stonad_arena_final to DVH_FAM_AIRFLOW')
 #     connection(sql)
@@ -80,14 +73,23 @@ def send_context():
     ''')
     connection(sql)
 
-def delete_data():
+def delete_data(periode):
     """
     sletter data fra fam_ef_stonad_arena med periode som kriteriea.
     :param periode:
     :return:
     """
-    sql = ('delete from dvh_fam_ef.fam_ef_stonad_arena where periode = 202207')
+    sql = ('delete from dvh_fam_ef.fam_ef_stonad_arena where periode =: periode')
     connection(sql)
+
+# def delete_data():
+#     """
+#     sletter data fra fam_ef_stonad_arena med periode som kriteriea.
+#     :param periode:
+#     :return:
+#     """
+#     sql = ('delete from dvh_fam_ef.fam_ef_stonad_arena where periode = 202207')
+#     connection(sql)
 
 def insert_data():
     """
