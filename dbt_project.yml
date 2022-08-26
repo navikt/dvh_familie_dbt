@@ -35,14 +35,14 @@ clean-targets:         # directories to be removed by `dbt clean`
 # as tables. These settings can be overridden in the individual model files
 # using the `{{ config(...) }}` macro.
 
-on-run-start:
-  - """
-    begin
-        dbms_application_info.set_client_info( client_info => 'Klient_info Familie-DBT');
-        dbms_application_info.set_module( module_name => 'Kjører Team-familie DBT applikasjon med Airflow'
-                                          , action_name => 'Oppretter views i dvh_fam_ef med ved bruk av DBT' );
-    end;
-    """
+# on-run-start:
+#   - """
+#     begin
+#         dbms_application_info.set_client_info( client_info => 'Klient_info Familie-DBT');
+#         dbms_application_info.set_module( module_name => 'Kjører Team-familie DBT applikasjon med Airflow'
+#                                           , action_name => 'Oppretter views i dvh_fam_ef med ved bruk av DBT' );
+#     end;
+#     """
 
  on-run-end:
    - "grant select, update, read on fam_ef_stonad_arena to DVH_FAM_AIRFLOW"
