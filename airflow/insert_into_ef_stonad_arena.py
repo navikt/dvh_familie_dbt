@@ -113,8 +113,8 @@ def insert_data():
 if __name__ == '__main__':
     periode = get_periode()
     send_context()
-    delete_data()
-    #delete_data(periode)
+    #delete_data()
+    delete_data(periode)
     insert_data()
 
 
