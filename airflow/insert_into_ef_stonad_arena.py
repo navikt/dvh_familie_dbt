@@ -17,47 +17,49 @@ def oracle_secrets():
   )
 
 oracle_secrets = oracle_secrets()
-dsn_tns_HardCode = cx_Oracle.makedsn(oracle_secrets['host'], 1521, service_name = oracle_secrets['service'])
+#dsn_tns_HardCode = cx_Oracle.makedsn(oracle_secrets['host'], 1521, service_name = oracle_secrets['service'])
 
 #user_proxy = str(oracle_secrets['user'])+"[dvh_fam_ef]"
 
-# def connection(sql):
-#     """
-#     lager en db-connection for querryen vi kjører
-#     :param sql:
-#     :return:
-#     """
-#     #dsn_tns = cx_Oracle.makedsn(dsn_tns['host'], dsn_tns['port'], service_name = dsn_tns['service'])
-#     dsn_tns_HardCode = cx_Oracle.makedsn(oracle_secrets['host'], 1521, service_name = oracle_secrets['service'])
-#     try:
-#         # establish a new connection
-#         with cx_Oracle.connect(user = oracle_secrets['user'],
-#                             password = oracle_secrets['password'],
-#                             dsn = dsn_tns_HardCode) as connection:
-#             # create a cursor
-#             with connection.cursor() as cursor:
-#                 # execute the insert statement
-#                 cursor.execute(sql)
-#                 # commit the change
-#                 connection.commit()
-#     except cx_Oracle.Error as error:
-#         print(error)
-
-
-def oracle_conn():
-    connection = None
+def connection():
+    """
+    lager en db-connection for querryen vi kjører
+    :param sql:
+    :return:
+    """
+    #dsn_tns = cx_Oracle.makedsn(dsn_tns['host'], dsn_tns['port'], service_name = dsn_tns['service'])
+    dsn_tns_HardCode = cx_Oracle.makedsn(oracle_secrets['host'], 1521, service_name = oracle_secrets['service'])
     try:
-        connection = cx_Oracle.connect(user = oracle_secrets['user'], password = oracle_secrets['password'], dsn = dsn_tns_HardCode)
-
-        # show the version of the Oracle Database
-        print(connection.version)
-        return connection
+        # establish a new connection
+        with cx_Oracle.connect(user = oracle_secrets['user'],
+                            password = oracle_secrets['password'],
+                            dsn = dsn_tns_HardCode) as connection:
+            return connection
+            # create a cursor
+            # with connection.cursor() as cursor:
+            #     # execute the insert statement
+            #     #cursor.execute(sql)
+            #     # commit the change
+            #     #connection.commit()
+            #     return cursor
     except cx_Oracle.Error as error:
         print(error)
-    finally:
-        # release the connection
-        if connection:
-            connection.close()
+
+
+# def oracle_conn():
+#     connection = None
+#     try:
+#         connection = cx_Oracle.connect(user = oracle_secrets['user'], password = oracle_secrets['password'], dsn = dsn_tns_HardCode)
+
+#         # show the version of the Oracle Database
+#         print(connection.version)
+#         return connection
+#     except cx_Oracle.Error as error:
+#         print(error)
+#     finally:
+#         # release the connection
+#         if connection:
+#             connection.close()
 
 
 def get_periode():
@@ -136,7 +138,7 @@ def insert_data(conn):
 
 if __name__ == '__main__':
     #periode = get_periode()
-    conn = oracle_conn()
+    conn = connection()
     send_context(conn)
     delete_data(conn)
     #delete_data(periode)
