@@ -19,25 +19,37 @@ def oracle_secrets():
 oracle_secrets = oracle_secrets()
 #user_proxy = str(oracle_secrets['user'])+"[dvh_fam_ef]"
 
-def connection(sql):
-    """
-    lager en db-connection for querryen vi kjører
-    :param sql:
-    :return:
-    """
-    #dsn_tns = cx_Oracle.makedsn(dsn_tns['host'], dsn_tns['port'], service_name = dsn_tns['service'])
+# def connection(sql):
+#     """
+#     lager en db-connection for querryen vi kjører
+#     :param sql:
+#     :return:
+#     """
+#     #dsn_tns = cx_Oracle.makedsn(dsn_tns['host'], dsn_tns['port'], service_name = dsn_tns['service'])
+#     dsn_tns_HardCode = cx_Oracle.makedsn(oracle_secrets['host'], 1521, service_name = oracle_secrets['service'])
+#     try:
+#         # establish a new connection
+#         with cx_Oracle.connect(user = oracle_secrets['user'],
+#                             password = oracle_secrets['password'],
+#                             dsn = dsn_tns_HardCode) as connection:
+#             # create a cursor
+#             with connection.cursor() as cursor:
+#                 # execute the insert statement
+#                 cursor.execute(sql)
+#                 # commit the change
+#                 connection.commit()
+#     except cx_Oracle.Error as error:
+#         print(error)
+
+def oracle_conn():
+    conn = None
+    cur = None
     dsn_tns_HardCode = cx_Oracle.makedsn(oracle_secrets['host'], 1521, service_name = oracle_secrets['service'])
+
     try:
-        # establish a new connection
-        with cx_Oracle.connect(user = oracle_secrets['user'],
-                            password = oracle_secrets['password'],
-                            dsn = dsn_tns_HardCode) as connection:
-            # create a cursor
-            with connection.cursor() as cursor:
-                # execute the insert statement
-                cursor.execute(sql)
-                # commit the change
-                connection.commit()
+        conn = cx_Oracle.connect(user = oracle_secrets['user'], password = oracle_secrets['password'], dsn = dsn_tns_HardCode)
+        cur = conn.cursor()
+        return conn, cur
     except cx_Oracle.Error as error:
         print(error)
 
@@ -54,7 +66,7 @@ def get_periode():
 
     return lastMonth.strftime("%Y%m") # henter bare aar og maaned
 
-def send_context():
+def send_context(conn, cur):
     sql = ('''
         begin
             dbms_application_info.set_client_info( client_info => 'Klient_info Familie-Airflow');
@@ -62,7 +74,8 @@ def send_context():
                                             , action_name => 'delete/insert into dvh_fam_ef.fam_ef_stonad_arena' );
         end;
     ''')
-    connection(sql)
+    cur.execute(sql)
+    conn.commit()
 
 # def delete_data(periode):
 #     """
@@ -73,16 +86,17 @@ def send_context():
 #     sql = ('delete from dvh_fam_ef.fam_ef_stonad_arena where periode =: periode')
 #     connection(sql)
 
-def delete_data():
+def delete_data(conn, cur):
     """
     sletter data fra fam_ef_stonad_arena med periode som kriteriea.
     :param periode:
     :return:
     """
     sql = ('delete from dvh_fam_ef.fam_ef_stonad_arena where periode = 202207')
-    connection(sql)
+    cur.execute(sql)
+    conn.commit()
 
-def insert_data():
+def insert_data(conn, cur):
     """
     insert data fra ef_stonad_arena_final (view laget med dbt) into fam_ef_stonad_arena
     :param:
@@ -99,11 +113,13 @@ def insert_data():
             ,ANTBARN,ANTBU1,ANTBU3,ANTBU8,ANTBU10,ANTBU18,KILDESYSTEM,LASTET_DATO,OPPDATERT_DATO,FK_DIM_GEOGRAFI
             FROM dvh_fam_ef.ef_stonad_arena_final
         ''')
-    connection(sql)
+    cur.execute(sql)
+    conn.commit()
 
 if __name__ == '__main__':
     periode = get_periode()
-    send_context()
-    delete_data()
+    conn, cur  = oracle_conn()
+    send_context(conn, cur)
+    delete_data(conn, cur)
     #delete_data(periode)
-    insert_data()
+    insert_data(conn, cur)
