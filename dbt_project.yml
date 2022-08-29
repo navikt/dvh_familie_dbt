@@ -44,8 +44,8 @@ clean-targets:         # directories to be removed by `dbt clean`
 #     end;
 #     """
 
-# on-run-end:
-#   - "grant select, delete, update, insert, read on fam_ef_stonad_arena to DVH_FAM_AIRFLOW"
+on-run-end:
+  - "grant select, delete, update, insert, read on fam_ef_stonad_arena to DVH_FAM_AIRFLOW"
 
 models:
   post-hook: 'grant select, read on {{ this }} to DVH_FAM_AIRFLOW'
