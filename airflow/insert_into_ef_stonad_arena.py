@@ -17,11 +17,9 @@ def oracle_secrets():
   )
 
 oracle_secrets = oracle_secrets()
-#dsn_tns_HardCode = cx_Oracle.makedsn(oracle_secrets['host'], 1521, service_name = oracle_secrets['service'])
-
 #user_proxy = str(oracle_secrets['user'])+"[dvh_fam_ef]"
 
-def connection():
+def connection(sql):
     """
     lager en db-connection for querryen vi kjører
     :param sql:
@@ -34,32 +32,14 @@ def connection():
         with cx_Oracle.connect(user = oracle_secrets['user'],
                             password = oracle_secrets['password'],
                             dsn = dsn_tns_HardCode) as connection:
-            return connection
             # create a cursor
-            # with connection.cursor() as cursor:
-            #     # execute the insert statement
-            #     #cursor.execute(sql)
-            #     # commit the change
-            #     #connection.commit()
-            #     return cursor
+            with connection.cursor() as cursor:
+                # execute the insert statement
+                cursor.execute(sql)
+                # commit the change
+                connection.commit()
     except cx_Oracle.Error as error:
         print(error)
-
-
-# def oracle_conn():
-#     connection = None
-#     try:
-#         connection = cx_Oracle.connect(user = oracle_secrets['user'], password = oracle_secrets['password'], dsn = dsn_tns_HardCode)
-
-#         # show the version of the Oracle Database
-#         print(connection.version)
-#         return connection
-#     except cx_Oracle.Error as error:
-#         print(error)
-#     finally:
-#         # release the connection
-#         if connection:
-#             connection.close()
 
 
 def get_periode():
@@ -74,16 +54,7 @@ def get_periode():
 
     return lastMonth.strftime("%Y%m") # henter bare aar og maaned
 
-
-# def give_grant():
-#     sql = ('grant read on dvh_fam_ef.ef_stonad_arena_final to DVH_FAM_AIRFLOW')
-#     connection(sql)
-
-# def give_more_grants():
-#     sql = ('grant insert, delete, select, update, read on dvh_fam_ef.fam_ef_stonad_arena to DVH_FAM_AIRFLOW')
-#     connection(sql)
-
-def send_context(conn):
+def send_context():
     sql = ('''
         begin
             dbms_application_info.set_client_info( client_info => 'Klient_info Familie-Airflow');
@@ -91,9 +62,7 @@ def send_context(conn):
                                             , action_name => 'delete/insert into dvh_fam_ef.fam_ef_stonad_arena' );
         end;
     ''')
-    cursor = conn.cursor()
-    cursor.execute(sql)
-    conn.commit()
+    connection(sql)
 
 # def delete_data(periode):
 #     """
@@ -104,18 +73,16 @@ def send_context(conn):
 #     sql = ('delete from dvh_fam_ef.fam_ef_stonad_arena where periode =: periode')
 #     connection(sql)
 
-def delete_data(conn):
+def delete_data():
     """
     sletter data fra fam_ef_stonad_arena med periode som kriteriea.
     :param periode:
     :return:
     """
     sql = ('delete from dvh_fam_ef.fam_ef_stonad_arena where periode = 202207')
-    cursor = conn.cursor()
-    cursor.execute(sql)
-    conn.commit()
+    connection(sql)
 
-def insert_data(conn):
+def insert_data():
     """
     insert data fra ef_stonad_arena_final (view laget med dbt) into fam_ef_stonad_arena
     :param:
@@ -132,18 +99,11 @@ def insert_data(conn):
             ,ANTBARN,ANTBU1,ANTBU3,ANTBU8,ANTBU10,ANTBU18,KILDESYSTEM,LASTET_DATO,OPPDATERT_DATO,FK_DIM_GEOGRAFI
             FROM dvh_fam_ef.ef_stonad_arena_final
         ''')
-    cursor = conn.cursor()
-    cursor.execute(sql)
-    conn.commit()
+    connection(sql)
 
 if __name__ == '__main__':
-    #periode = get_periode()
-    conn = connection()
-    send_context(conn)
-    delete_data(conn)
+    periode = get_periode()
+    send_context()
+    delete_data()
     #delete_data(periode)
-    insert_data(conn)
-
-
-
-
+    insert_data()
