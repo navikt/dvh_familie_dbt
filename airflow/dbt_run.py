@@ -42,7 +42,7 @@ if __name__ == "__main__":
     os.environ["TZ"] = "Europe/Oslo"
     time.tzset()
     profiles_dir = str(sys.path[0])
-    command = os.environ["DBT_COMMAND"].split()
+    command = [c.replace('\\', '') for c in os.environ["DBT_COMMAND"].split()]
     log_level = os.getenv("LOG_LEVEL")
     schema = os.getenv("DB_SCHEMA")
 
