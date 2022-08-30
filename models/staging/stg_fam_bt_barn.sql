@@ -10,7 +10,7 @@ final as (
   fodsel_mnd_barn,
   stat_aarmnd
 
-  from stg_fam_bt_barn where stat_aarmnd = {{ var ("periode") }} 
+  from stg_fam_bt_barn where stat_aarmnd = '{{ var ("periode") }}'
 )
 
 select * from final

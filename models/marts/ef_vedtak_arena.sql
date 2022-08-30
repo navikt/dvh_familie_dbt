@@ -48,7 +48,7 @@ dim_vilkaar_type as (
 
 final as (
       SELECT
-			{{ var ("periode") }} AS PERIODE,
+			'{{ var ("periode") }}' AS PERIODE,
 		  FASV.LK_VEDTAK_ID,
 		  MKID.FODSELSNUMMER_GJELDENDE as "FNR",
       PERS.FK_PERSON1,
@@ -108,7 +108,7 @@ final as (
 
   WHERE
 	VFAKTA_INNFV.VEDTAK_FAKTA_KODE = 'INNVF'
-	AND VFAKTA_INNFV.VEDTAK_FAKTA_VERDI_DATO BETWEEN to_date({{ var ("periode") }}||'01','yyyymmdd') and last_day(to_date({{ var ("periode") }}||'01','yyyymmdd'))
+	AND VFAKTA_INNFV.VEDTAK_FAKTA_VERDI_DATO BETWEEN to_date('{{ var ("periode") }}'||'01','yyyymmdd') and last_day(to_date('{{ var ("periode") }}'||'01','yyyymmdd'))
 	and FASV.GYLDIG_TIL_DATO = to_date('31129999','ddmmyyyy')
 
 )

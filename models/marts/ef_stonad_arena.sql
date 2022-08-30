@@ -51,7 +51,7 @@ FINAL AS (
     SELECT
 
         --( SELECT to_char(ADD_MONTHS(SYSDATE, -1), 'YYYYMM') FROM dual) periode,
-        {{ var ("periode") }} AS periode,
+        '{{ var ("periode") }}' AS periode,
         fs.lk_postering_id,
         ald.alder,
         so.stonad_kode,
@@ -99,10 +99,10 @@ FINAL AS (
         JOIN dim_geo geo
         ON fs.fk_dim_geografi_bosted = geo.pk_dim_geografi
     WHERE
-        TRUNC(fs.postert_dato) >= TO_DATE({{ var ("periode") }} || '01', 'yyyymmdd')
+        TRUNC(fs.postert_dato) >= TO_DATE('{{ var ("periode") }}' || '01', 'yyyymmdd')
         AND TRUNC(
             fs.postert_dato
-        ) <= LAST_DAY(TO_DATE({{ var ("periode") }} || '01', 'yyyymmdd')))
+        ) <= LAST_DAY(TO_DATE('{{ var ("periode") }}' || '01', 'yyyymmdd')))
 
 
 SELECT * FROM FINAL
