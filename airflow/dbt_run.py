@@ -49,19 +49,19 @@ if __name__ == "__main__":
         command.append(s)
       else:
         command.append(c)
-        
+
     #[c.replace('\\', '') for c in os.environ["DBT_COMMAND"].split()]
     log_level = os.getenv("LOG_LEVEL")
     schema = os.getenv("DB_SCHEMA")
 
     set_secrets_as_envs()
 
-    if not log_level: log_level = 'DEBUG'
+    if not log_level: log_level = 'INFO'
     logger.setLevel(log_level)
     logger.addHandler(stream_handler)
 
-    logger.debug(f"dbt command: {command}")
-    logger.debug(f"db schema: {schema}")
+    #logger.debug(f"dbt command: {command}")
+    #logger.debug(f"db schema: {schema}")
 
     def dbt_logg(my_path) -> str:
       with open(my_path + "/logs/dbt.log") as log: return log.read()
