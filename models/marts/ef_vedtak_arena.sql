@@ -50,7 +50,7 @@ final as (
       SELECT
 			'{{ var ("periode") }}' AS PERIODE,
 		  FASV.LK_VEDTAK_ID,
-		  MKID.FODSELSNUMMER_GJELDENDE as "FNR",
+		  --MKID.FODSELSNUMMER_GJELDENDE as "FNR",
       PERS.FK_PERSON1,
 		  G.KOMMUNE_NR,
 		  G.BYDEL_NR,
