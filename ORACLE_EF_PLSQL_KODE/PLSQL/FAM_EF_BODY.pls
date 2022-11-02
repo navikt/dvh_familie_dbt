@@ -1,5 +1,5 @@
 create or replace PACKAGE BODY                                                                                                                         FAM_EF AS
-  procedure fam_ef_fk_person1(p_in_personident in varchar2, fk_person1 out varchar2) as
+  procedure fam_ef_fk_person1(p_in_gyldig_dato in date, p_in_personident in varchar2, fk_person1 out varchar2) as
     --l_error_melding varchar2(1000);
   begin
     select max(fk_person1) keep
@@ -7,6 +7,7 @@ create or replace PACKAGE BODY                                                  
     into fk_person1
     from dt_person.dvh_person_ident_off_id_ikke_skjermet
     where off_id = p_in_personident
+    and p_in_gyldig_dato between gyldig_fra_dato and gyldig_til_dato
     group by off_id;
   exception
     when others then
@@ -17,8 +18,11 @@ create or replace PACKAGE BODY                                                  
   v_pk_ef_fagsak number;
   v_pk_ef_utbetalinger number;
   v_pk_ef_vedtaksperioder number;
+  v_pk_ef_vedtaksperioder_skole number;
   v_pk_ef_person number;--Barn
   v_pk_ef_vilkaar number;
+  v_pk_ef_utgifter_skole number;
+  v_pk_ef_delperiode_skole number;
 
   v_fk_person1_mottaker number;
   v_fk_person1_barn number;
@@ -28,6 +32,7 @@ create or replace PACKAGE BODY                                                  
   l_error_melding varchar2(4000);
   l_commit number := 0;
   l_feil_kilde_navn varchar2(100) := null;
+
 
   cursor cur_ef_fagsak(p_offset in number) is
     with jdata as (
@@ -43,7 +48,7 @@ create or replace PACKAGE BODY                                                  
       --and fam_ef_fagsak.kafka_offset is null
     )
     select t.fagsak_id, t.behandlings_id, t.person_ident, t.relatert_behandlings_id
-          ,t.adressebeskyttelse
+          ,t.adressebeskyttelse, t.vedtaksbegrunnelse_skole
           ,cast(to_timestamp_tz(t.vedtaks_tidspunkt,'yyyy-mm-dd"T"hh24:mi:ss.ff+tzh:tzm')
                 at time zone 'europe/belgrade' as timestamp) as vedtaks_tidspunkt
           ,t.behandling_type, t.behandling_aarsak, t.vedtak_resultat
@@ -63,12 +68,14 @@ create or replace PACKAGE BODY                                                  
          ,adressebeskyttelse              varchar2 path '$.adressebeskyttelse'
          ,vedtaks_tidspunkt               varchar2 path '$.tidspunktVedtak'
          ,behandling_type                 varchar2 path '$.behandlingType'
-         ,behandling_aarsak               varchar2 path '$.behandling�rsak'
+         ,behandling_aarsak               varchar2 path '$.behandlingÅrsak'
          ,vedtak_resultat                 varchar2 path '$.vedtak'
          ,aktivitetsplikt_inntreffer_dato varchar2 path '$.aktivitetskrav.aktivitetspliktInntrefferDato'
          ,har_sagt_opp_arbeidsforhold     varchar2 path '$.aktivitetskrav.harSagtOppArbeidsforhold'
-         ,stonadstype                     varchar2 path '$.st�nadstype'
+         ,stonadstype                     varchar2 path '$.stønadstype'
          ,funksjonell_Id                  varchar2 path '$.funksjonellId'
+         ,vedtaksbegrunnelse_skole        varchar2 path '$.vedtaksbegrunnelse'
+
          )
         ) t;
 
@@ -94,7 +101,7 @@ create or replace PACKAGE BODY                                                  
          doc, '$'
          columns (
          nested path '$.utbetalinger[*]' columns (
-         belop              varchar2 path '$.bel�p'
+         belop              varchar2 path '$.beløp'
         ,samordningsfradrag varchar2 path '$.samordningsfradrag'
         ,inntekt            varchar2 path '$.inntekt'
         ,inntektsreduksjon  varchar2 path '$.inntektsreduksjon'
@@ -136,7 +143,8 @@ create or replace PACKAGE BODY                                                  
         )
         ) t;
 
-        cursor cur_ef_tilleggstonader_KONTANTST�TTE(p_offset in number) is
+
+        cursor cur_ef_tilleggstonader_KONTANTSTØTTE(p_offset in number) is
         with jdata as (
           select kafka_topic
                 ,kafka_offset
@@ -145,7 +153,7 @@ create or replace PACKAGE BODY                                                  
           from dvh_fam_ef.fam_ef_meta_data
           where kafka_offset = p_offset
         )
-        select 'KONTANTST�TTE' TYPE_TILLEGGS_STONAD
+        select 'KONTANTSTØTTE' TYPE_TILLEGGS_STONAD
             ,to_date(t.fra_og_med,'yyyy-mm-dd')  as fra_og_med
                 ,to_date(t.til_og_med,'yyyy-mm-dd')  as til_og_med
                     ,t.belop
@@ -155,10 +163,10 @@ create or replace PACKAGE BODY                                                  
             (
              doc, '$'
              columns (
-             nested path  '$.perioderKontantst�tte[*]' columns (
+             nested path  '$.perioderKontantstøtte[*]' columns (
             FRA_OG_MED varchar2 path '$.fraOgMed'
             ,TIL_OG_MED varchar2 path '$.tilOgMed'
-            ,BELOP number path '$.bel�p'
+            ,BELOP number path '$.beløp'
              )
             )
             ) t;
@@ -182,10 +190,10 @@ create or replace PACKAGE BODY                                                  
             (
              doc, '$'
              columns (
-             nested path  '$.perioderTilleggsst�nad[*]' columns (
+             nested path  '$.perioderTilleggsstønad[*]' columns (
             FRA_OG_MED varchar2 path '$.fraOgMed'
             ,TIL_OG_MED varchar2 path '$.tilOgMed'
-            ,BELOP number path '$.bel�p'
+            ,BELOP number path '$.beløp'
              )
             )
             ) t;
@@ -232,12 +240,88 @@ create or replace PACKAGE BODY                                                  
         (
          doc, '$'
          columns (
-         nested path  '$.vilk�rsvurderinger[*]' columns (
-         vilkaar      varchar2 path '$.vilk�r'
+         nested path  '$.vilkårsvurderinger[*]' columns (
+         vilkaar      varchar2 path '$.vilkår'
         ,resultat     varchar2 path '$.resultat'
          )
         )
         ) t;
+
+
+    -----------------Utpakking for Skolepeneger--------------------
+
+    cursor cur_ef_vedtaksperioder_skole(p_offset in number) is
+      with jdata as (
+        select kafka_offset
+            ,melding as doc
+      from dvh_fam_ef.fam_ef_meta_data
+      where kafka_offset = p_offset
+      )
+      select t.skoleaar
+        , t.maks_sats_for_skoleaar
+      from jdata
+          ,json_table
+          (
+          doc, '$'
+          columns (
+          nested path '$.vedtaksperioder[*]' columns (
+          skoleaar                  varchar2 path '$.skoleår'
+          ,maks_sats_for_skoleaar    varchar2 path '$.maksSatsForSkoleår'
+          )
+          )
+          ) t;
+
+
+    cursor cur_ef_utgifter_skole(p_offset in number) is
+      with jdata as (
+        select kafka_offset
+            ,melding as doc
+      from dvh_fam_ef.fam_ef_meta_data
+      where kafka_offset = p_offset
+      )
+      select to_date(t.utgiftsdato,'yyyy-mm-dd') as utgiftsdato
+        ,t.utgiftsbelop
+        , t.utbetaltbelop
+      from jdata
+          ,json_table
+          (
+          doc, '$'
+          columns(
+          nested path '$.vedtaksperioder[*]' columns (
+          nested path '$.utgifter[*]' columns (
+          utgiftsdato        varchar2 path '$.utgiftsdato'
+         ,utgiftsbelop       varchar2 path '$.utgiftsbeløp'
+         ,utbetaltbelop      varchar2 path '$.utbetaltBeløp'
+          )
+          )
+          )) t;
+
+    cursor cur_ef_delperiode_skole(p_offset in number) is
+      with jdata as (
+        select kafka_offset
+            ,melding as doc
+      from dvh_fam_ef.fam_ef_meta_data
+      where kafka_offset = p_offset
+      )
+      select t.studie_type
+        ,to_date(t.fra_og_med, 'yyyy-mm-dd') as fra_og_med
+        ,to_date(t.til_og_med, 'yyyy-mm-dd') as til_og_med
+        , t.studiebelastning
+      from jdata
+          ,json_table
+          (
+          doc, '$'
+          columns(
+          nested path '$.vedtaksperioder[*]' columns (
+          nested path '$.perioder[*]' columns (
+          studie_type           varchar2 path '$.studietype'
+         ,fra_og_med            varchar2 path '$.datoFra'
+         ,til_og_med            varchar2 path '$.datoTil'
+         ,studiebelastning      varchar2 path '$.studiebelastning'
+          )
+          )
+          )) t;
+
 
   begin
     for rec_fagsak in cur_ef_fagsak(p_in_offset) loop
@@ -248,7 +332,7 @@ create or replace PACKAGE BODY                                                  
           v_fk_person1_mottaker := -1;
           select dvh_famef_kafka.hibernate_sequence.nextval into v_pk_ef_fagsak from dual;
           --Hent fk_person1
-          fam_ef_fk_person1(rec_fagsak.person_ident, v_fk_person1_mottaker);
+          fam_ef_fk_person1(rec_fagsak.vedtaks_tidspunkt, rec_fagsak.person_ident, v_fk_person1_mottaker);
 
           insert into dvh_fam_ef.fam_ef_fagsak
           (
@@ -257,7 +341,12 @@ create or replace PACKAGE BODY                                                  
            ,fk_person1, behandling_type, behandlings_aarsak, vedtaks_status
            ,stonadstype, aktivitetsplikt_inntreffer_dato, har_sagt_opp_arbeidsforhold
            ,funksjonell_id, vedtaks_tidspunkt, kafka_topic, kafka_offset
-           ,kafka_partition, lastet_dato
+           ,kafka_partition, lastet_dato, vedtaksbegrunnelse_skole
+
+
+-- AKTIVITETSVILKAAR_BARNETILSYN
+
+
           )
           values
           (
@@ -266,7 +355,7 @@ create or replace PACKAGE BODY                                                  
            ,v_fk_person1_mottaker, rec_fagsak.behandling_type, rec_fagsak.behandling_aarsak
            ,rec_fagsak.vedtak_resultat, rec_fagsak.stonadstype, rec_fagsak.aktivitetsplikt_inntreffer_dato
            ,rec_fagsak.har_sagt_opp_arbeidsforhold, rec_fagsak.funksjonell_id, rec_fagsak.vedtaks_tidspunkt
-           ,rec_fagsak.kafka_topic, rec_fagsak.kafka_offset, rec_fagsak.kafka_partition, v_lastet_dato
+           ,rec_fagsak.kafka_topic, rec_fagsak.kafka_offset, rec_fagsak.kafka_partition, v_lastet_dato, rec_fagsak.vedtaksbegrunnelse_skole
           );
         exception
           when others then
@@ -284,7 +373,7 @@ create or replace PACKAGE BODY                                                  
             select dvh_famef_kafka.hibernate_sequence.nextval into v_pk_ef_utbetalinger from dual;
 
             --Hent fk_person1
-            fam_ef_fk_person1(rec_utbetalinger.person_ident, v_fk_person1_barn);
+            fam_ef_fk_person1(rec_utbetalinger.til_og_med, rec_utbetalinger.person_ident, v_fk_person1_barn);
 
             insert into dvh_fam_ef.fam_ef_utbetalinger
             (
@@ -342,6 +431,30 @@ create or replace PACKAGE BODY                                                  
           end;
         end loop;--Vedtaksperioder
 
+
+        --Vedtaksperioder_skole
+        for rec_vedtaksperioder_skole in cur_ef_vedtaksperioder_skole(rec_fagsak.kafka_offset) loop
+          begin
+            v_pk_ef_vedtaksperioder_skole := -1;
+            select dvh_famef_kafka.hibernate_sequence.nextval into v_pk_ef_vedtaksperioder_skole from dual;
+            insert into dvh_fam_ef.fam_ef_vedtaksperioder_skole
+            (
+              pk_ef_vedtaksperioder_skole, skoleaar, maks_sats_for_skoleaar, lastet_dato, fk_ef_fagsak
+            )
+            values
+            (
+              v_pk_ef_vedtaksperioder_skole, rec_vedtaksperioder_skole.skoleaar, rec_vedtaksperioder_skole.maks_sats_for_skoleaar
+              , v_lastet_dato, v_pk_ef_fagsak
+            );
+         exception
+            when others then
+              l_error_melding := substr(sqlcode||sqlerrm,1,1000);
+              l_feil_kilde_navn := 'FAM_EF_VEDTAKSPERIODER_SKOLE';
+              p_error_melding := l_error_melding;
+              rollback to do_insert; continue;
+          end;
+        end loop;--Vedtaksperioder_skole
+
         --Person
         for rec_person in cur_ef_person(rec_fagsak.kafka_offset) loop
           begin
@@ -349,7 +462,7 @@ create or replace PACKAGE BODY                                                  
             v_fk_person1_person := -1;
             select dvh_famef_kafka.hibernate_sequence.nextval into v_pk_ef_person from dual;
             --Hent fk_person1
-            fam_ef_fk_person1(rec_person.person_ident, v_fk_person1_person);
+            fam_ef_fk_person1(rec_fagsak.vedtaks_tidspunkt, rec_person.person_ident, v_fk_person1_person);
 
             insert into dvh_fam_ef.fam_ef_person
             (
@@ -385,7 +498,7 @@ create or replace PACKAGE BODY                                                  
 
             insert into dvh_fam_ef.fam_ef_vilkaar
             (
-              pk_ef_vilk�r, fk_ef_fagsak
+              pk_ef_vilkår, fk_ef_fagsak
              ,vilkaar, resultat, behandlings_id, kafka_topic, kafka_offset
              ,kafka_partition, lastet_dato
             )
@@ -407,6 +520,65 @@ create or replace PACKAGE BODY                                                  
           end;
         end loop;--Vilkaar
 
+        -------------------- Skolepenger---------------------
+
+
+        --Utgifter_skole
+        for rec_ugifter_skole in cur_ef_utgifter_skole(rec_fagsak.kafka_offset) loop
+         begin
+            v_pk_ef_utgifter_skole := -1;
+            select dvh_famef_kafka.hibernate_sequence.nextval into v_pk_ef_utgifter_skole from dual;
+            insert into dvh_fam_ef.fam_ef_utgifter_skole
+            (
+                pk_ef_utgifter_skole
+                , utgiftsdato
+                , utgiftsbelop, utbetaltbelop, lastet_dato, fk_ef_vedtaksperioder_skole
+            )
+            values
+            (
+               v_pk_ef_utgifter_skole
+               , rec_ugifter_skole.utgiftsdato
+               , rec_ugifter_skole.utgiftsbelop, rec_ugifter_skole.utbetaltbelop
+               , v_lastet_dato, v_pk_ef_vedtaksperioder_skole
+            );
+            exception
+            when others then
+              l_error_melding := substr(sqlcode||sqlerrm,1,1000);
+              l_feil_kilde_navn := 'FAM_EF_UTGIFTER_SKOLE';
+              p_error_melding := l_error_melding;
+              rollback to do_insert; continue;
+          end;
+        end loop;--Utgifter_skole
+
+        --Delperiode_skole
+        for rec_delperiode_skole in cur_ef_delperiode_skole(rec_fagsak.kafka_offset) loop
+         begin
+            v_pk_ef_delperiode_skole := -1;
+            select dvh_famef_kafka.hibernate_sequence.nextval into v_pk_ef_delperiode_skole from dual;
+            insert into dvh_fam_ef.fam_ef_delperiode_skole
+            (
+                pk_ef_delperiode_skole, studie_type, fra_og_med, til_og_med
+                , studiebelastning
+                , lastet_dato
+                , fk_ef_vedtaksperioder_skole
+            )
+            values
+            (
+               v_pk_ef_delperiode_skole, rec_delperiode_skole.studie_type, rec_delperiode_skole.fra_og_med, rec_delperiode_skole.til_og_med
+               ,
+               rec_delperiode_skole.studiebelastning, v_lastet_dato, v_pk_ef_vedtaksperioder_skole
+            );
+            exception
+            when others then
+              l_error_melding := substr(sqlcode||sqlerrm,1,1000);
+              l_feil_kilde_navn := 'FAM_EF_DELPERIODE_SKOLE';
+              p_error_melding := l_error_melding;
+              rollback to do_insert; continue;
+          end;
+        end loop;--Delperiode_skole
+
+
+
         l_commit := l_commit + 1;
         if l_commit >= 10000 then
           commit;
@@ -416,16 +588,16 @@ create or replace PACKAGE BODY                                                  
       exception
         when others then
           l_error_melding := substr(sqlcode||sqlerrm,1,1000);
-          insert into fk_sensitiv.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+          insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
           values(null, null, l_error_melding, sysdate, 'FAM_EF_UTPAKKING1');
           p_error_melding := substr(p_error_melding || l_error_melding || 'FAM_EF_UTPAKKING1', 1, 1000);
           l_error_melding := null;
-          --G� videre til neste rekord
+          --Gå videre til neste rekord
       end;
     end loop;--Fagsak
     commit;
     if l_error_melding is not null then
-      insert into fk_sensitiv.fp_xml_utbrett_error(id, error_msg, opprettet_tid, kilde)
+      insert into dvh_fam_fp.fp_xml_utbrett_error(id, error_msg, opprettet_tid, kilde)
       values(null, l_error_melding, sysdate, l_feil_kilde_navn);
       commit;
       p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
@@ -433,11 +605,13 @@ create or replace PACKAGE BODY                                                  
   exception
     when others then
       l_error_melding := sqlcode || ' ' || sqlerrm;
-      insert into fk_sensitiv.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+      insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
       values(null, null, l_error_melding, sysdate, 'FAM_EF_UTPAKKING2');
       commit;
       p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
   end fam_ef_utpakking_offset;
+
+
 
   procedure fam_ef_slett_offset(p_in_offset in varchar2, p_error_melding out varchar2) as
     v_temp_dml varchar2(4000);
@@ -448,9 +622,13 @@ create or replace PACKAGE BODY                                                  
                    as
                    select distinct fag.pk_ef_fagsak,
                           utb.pk_ef_utbetalinger,
+                          utif.pk_ef_utgifter_skole,
+                          del.pk_ef_delperiode_skole,
                           pers_utb.pk_ef_person,
                           vedtaksperioder.pk_ef_vedtaksperioder,
-                          vilkaar.pk_ef_vilk�r
+                          vedtaksperioder_skole.pk_ef_vedtaksperioder_skole,
+                          vilkaar.pk_ef_vilkår
+
                    from dvh_fam_ef.fam_ef_meta_data meta
 
                    join dvh_fam_ef.fam_ef_fagsak fag
@@ -458,6 +636,15 @@ create or replace PACKAGE BODY                                                  
 
                    left join dvh_fam_ef.fam_ef_utbetalinger utb
                    on fag.pk_ef_fagsak = utb.fk_ef_fagsak
+
+                   left join dvh_fam_ef.fam_ef_vedtaksperioder_skole vedtaksperioder_skole
+                   on fag.pk_ef_fagsak = vedtaksperioder_skole.fk_ef_fagsak
+
+                   left join dvh_fam_ef.fam_ef_utgifter_skole utif
+                   on utif.fk_ef_vedtaksperioder_skole = vedtaksperioder_skole.pk_ef_vedtaksperioder_skole
+
+                   left join dvh_fam_ef.fam_ef_delperiode_skole del
+                   on del.fk_ef_vedtaksperioder_skole = vedtaksperioder_skole.pk_ef_vedtaksperioder_skole
 
                    left join dvh_fam_ef.fam_ef_person pers_utb
                    on fag.pk_ef_fagsak = pers_utb.fk_ef_fagsak
@@ -475,7 +662,25 @@ create or replace PACKAGE BODY                                                  
     begin
       v_temp_dml := '
       DELETE FROM dvh_fam_ef.fam_ef_vilkaar
-      WHERE pk_ef_vilk�r IN (SELECT DISTINCT pk_ef_vilk�r FROM TEMP_TBL_SLETT)';
+      WHERE pk_ef_vilkår IN (SELECT DISTINCT pk_ef_vilkår FROM TEMP_TBL_SLETT)';
+      --dbms_output.put_line(v_temp_dml);
+      execute immediate v_temp_dml;
+
+      v_temp_dml := '
+      DELETE FROM dvh_fam_ef.fam_ef_delperiode_skole
+      WHERE pk_ef_delperiode_skole IN (SELECT DISTINCT pk_ef_delperiode_skole FROM TEMP_TBL_SLETT)';
+      --dbms_output.put_line(v_temp_dml);
+      execute immediate v_temp_dml;
+
+      v_temp_dml := '
+      DELETE FROM dvh_fam_ef.fam_ef_utgifter_skole
+      WHERE pk_ef_utgifter_skole IN (SELECT DISTINCT pk_ef_utgifter_skole FROM TEMP_TBL_SLETT)';
+      --dbms_output.put_line(v_temp_dml);
+      execute immediate v_temp_dml;
+
+      v_temp_dml := '
+      DELETE FROM dvh_fam_ef.fam_ef_vedtaksperioder_skole
+      WHERE pk_ef_vedtaksperioder_skole IN (SELECT DISTINCT pk_ef_vedtaksperioder_skole FROM TEMP_TBL_SLETT)';
       --dbms_output.put_line(v_temp_dml);
       execute immediate v_temp_dml;
 
@@ -503,12 +708,12 @@ create or replace PACKAGE BODY                                                  
       --dbms_output.put_line(v_temp_dml);
       execute immediate v_temp_dml;
 
-      commit;--Commit p� alle
+      commit;--Commit på alle
     exception
       when others then
         l_error_melding := sqlcode || ' ' || sqlerrm;
         rollback;
-        insert into fk_sensitiv.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+        insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
         values(null, null, l_error_melding, sysdate, 'FAM_EF_SLETT_OFFSET1');
         commit;
         p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
@@ -526,341 +731,353 @@ create or replace PACKAGE BODY                                                  
   exception
     when others then
       l_error_melding := sqlcode || ' ' || sqlerrm;
-      insert into fk_sensitiv.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+      insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
       values(null, null, l_error_melding, sysdate, 'FAM_EF_SLETT_OFFSET2');
       commit;
       p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
   end fam_ef_slett_offset;
 
- procedure fam_ef_stonad_insert(p_in_period in varchar2
-                                 ,p_in_gyldig_flagg in number default 0
-                                 ,p_out_error out varchar2) as
-     l_error_melding varchar2(1000);
-     l_commit number := 0;
-     l_dato_fom date;
-     l_dato_tom date;
+  procedure fam_ef_stonad_insert(p_in_period in varchar2
+                                ,p_in_gyldig_flagg in number default 0
+                                ,p_out_error out varchar2) as
+    l_error_melding varchar2(1000);
+    l_commit number := 0;
+    l_dato_fom date;
+    l_dato_tom date;
 
-     cursor cur_ef(p_dato_fom in date, p_dato_tom in date) is
-       with ur as
- 	  (
-         select ur.*
-         from dvh_fam_ef.fam_ef_ur_utbetaling ur
-         where trunc(posteringsdato,'dd') between p_dato_fom and p_dato_tom
-         and length(delytelse_id) > 1
-         and length(henvisning) > 1
-       ),
-       ur1 as
-       (
-         select fk_person1, henvisning, fagsystem_id, dato_utbet_fom, dato_utbet_tom
-         from ur
-         group by fk_person1, henvisning, fagsystem_id, dato_utbet_fom, dato_utbet_tom
-         having sum(belop_sign) != 0
-       ),
-       fam_ef_ur as
-       (
-         select ur.fk_person1
- 			  ,ur.HOVEDKONTONR
-               ,sum(ur.belop_sign) belop_totalt
-               ,to_number(to_char(ur.posteringsdato, 'yyyymm')) as periode
-               ,max(ur.posteringsdato) as max_posteringsdato
-               ,min(ur.dato_utbet_fom) as min_dato_utbet_fom
-               ,max(ur.dato_utbet_tom) as max_dato_utbet_tom
-               ,max(ur.henvisning) as max_henvisning
-               ,max(ur.delytelse_id) as max_delytelse_id
-               ,sum(case when ur.posteringsdato between ur.dato_utbet_fom and ur.dato_utbet_tom then ur.belop_sign
-                         else 0
-                    end) belop
-               --,max(case when tid.dato between tid_fom.dato and tid_tom.dato then henvisning
-                 --   end) henvisning
-               --,max(case when tid.dato between tid_fom.dato and tid_tom.dato then delytelse_id
-                 --   end) delytelse_id
-               ,count(case when ur.posteringsdato between ur.dato_utbet_fom and ur.dato_utbet_tom then ur.delytelse_id
-                      end) ant_delytelse_id
-         from ur
-         join ur1
-         on ur.fk_person1 = ur1.fk_person1
-         and ur.henvisning = ur1.henvisning
-         and ur.fagsystem_id = ur1.fagsystem_id
-         and ur.dato_utbet_fom = ur1.dato_utbet_fom
-         and ur.dato_utbet_tom = ur1.dato_utbet_tom
-         group by ur.fk_person1, ur.HOVEDKONTONR,to_number(to_char(ur.posteringsdato, 'yyyymm'))
-       ),
-       fagsak as
-       (
-         select fam_ef_ur.*, fagsak.fagsak_id
-               ,fagsak.pk_ef_fagsak, fagsak.behandling_type, fagsak.stonadstype, fagsak.aktivitetsvilkaar_barnetilsyn aktivitetskrav
-               ,fagsak.vedtaks_tidspunkt, fam_ef_utbetalinger.inntektsreduksjon inntfradrag
-               ,fam_ef_utbetalinger.samordningsfradrag
-               ,fam_ef_utbetalinger.inntekt innt
-               ,dim_person_mottaker.pk_dim_person
-               ,to_char(dim_person_mottaker.fodt_dato,'YYYY') fodsel_aar
-               ,to_char(dim_person_mottaker.fodt_dato,'MM') fodsel_mnd
-               ,dim_kjonn.kjonn_kode kjonn
-               ,floor(months_between(fam_ef_ur.max_posteringsdato, dim_person_mottaker.fodt_dato)/12) alder
-               ,case when vedtaks_perioder.periode_type = 'PERIODE_FØR_FØDSEL' then 1
-                     when fagsak.stonadstype = 'OVERGANGSSTØNAD' then aktivitet_type.overgkode
-                end overgkode
-               ,case when fagsak.stonadstype = 'OVERGANGSSTØNAD' then fam_ef_ur.belop
-                end ovgst
-               ,--case when fagsak.stonadstype = 'BARNETILSYN' then fam_ef_ur.belop
+    cursor cur_ef(p_dato_fom in date, p_dato_tom in date) is
+      with ur as
+	  (
+        select ur.*
+        from dvh_fam_ef.fam_ef_ur_utbetaling ur
+        where trunc(posteringsdato,'dd') between p_dato_fom and p_dato_tom
+        and length(delytelse_id) > 1
+        and length(henvisning) > 1
+      ),
+      ur1 as
+      (
+        select fk_person1, henvisning, fagsystem_id, dato_utbet_fom, dato_utbet_tom
+        from ur
+        group by fk_person1, henvisning, fagsystem_id, dato_utbet_fom, dato_utbet_tom
+        having sum(belop_sign) != 0
+      ),
+      fam_ef_ur as
+      (
+        select ur.fk_person1
+			  ,ur.HOVEDKONTONR
+              ,sum(ur.belop_sign) belop_totalt
+              ,to_number(to_char(ur.posteringsdato, 'yyyymm')) as periode
+              ,max(ur.posteringsdato) as max_posteringsdato
+              ,min(ur.dato_utbet_fom) as min_dato_utbet_fom
+              ,max(ur.dato_utbet_tom) as max_dato_utbet_tom
+              ,max(ur.henvisning) as max_henvisning
+              ,max(ur.delytelse_id) as max_delytelse_id
+              ,sum(case when ur.posteringsdato between ur.dato_utbet_fom and ur.dato_utbet_tom then ur.belop_sign
+                        else 0
+                   end) belop
+              --,max(case when tid.dato between tid_fom.dato and tid_tom.dato then henvisning
+                --   end) henvisning
+              --,max(case when tid.dato between tid_fom.dato and tid_tom.dato then delytelse_id
+                --   end) delytelse_id
+              ,count(case when ur.posteringsdato between ur.dato_utbet_fom and ur.dato_utbet_tom then ur.delytelse_id
+                     end) ant_delytelse_id
+        from ur
+        join ur1
+        on ur.fk_person1 = ur1.fk_person1
+        and ur.henvisning = ur1.henvisning
+        and ur.fagsystem_id = ur1.fagsystem_id
+        and ur.dato_utbet_fom = ur1.dato_utbet_fom
+        and ur.dato_utbet_tom = ur1.dato_utbet_tom
+        group by ur.fk_person1, ur.HOVEDKONTONR,to_number(to_char(ur.posteringsdato, 'yyyymm'))
+      ),
+      fagsak as
+      (
+        select fam_ef_ur.*, fagsak.fagsak_id
+              ,fagsak.pk_ef_fagsak, fagsak.behandling_type, fagsak.stonadstype, fagsak.aktivitetsvilkaar_barnetilsyn aktivitetskrav
+              ,fagsak.vedtaks_tidspunkt, fam_ef_utbetalinger.inntektsreduksjon inntfradrag
+              ,fam_ef_utbetalinger.samordningsfradrag
+              ,fam_ef_utbetalinger.inntekt innt
+              ,dim_person_mottaker.pk_dim_person
+              ,to_char(dim_person_mottaker.fodt_dato,'YYYY') fodsel_aar
+              ,to_char(dim_person_mottaker.fodt_dato,'MM') fodsel_mnd
+              ,dim_kjonn.kjonn_kode kjonn
+              ,floor(months_between(fam_ef_ur.max_posteringsdato, dim_person_mottaker.fodt_dato)/12) alder
+              ,case when vedtaks_perioder.periode_type = 'PERIODE_FØR_FØDSEL' then 1
+                    when fagsak.stonadstype = 'OVERGANGSSTØNAD' then aktivitet_type.overgkode
+               end overgkode
+              --,case when fagsak.stonadstype = 'OVERGANGSSTØNAD' then fam_ef_ur.belop
+              -- end ovgst
+              --case when fagsak.stonadstype = 'BARNETILSYN' then fam_ef_ur.belop
+              ,case when fam_ef_ur.hovedkontonr = '306' then fam_ef_ur.belop
+               end ovgst,
+              case when fam_ef_ur.hovedkontonr = '540' then fam_ef_ur.belop
+               end barntil,
+               case when fam_ef_ur.hovedkontonr = '542' then fam_ef_ur.belop
+               end skolepen
+             ,case when fam_ef_ur.hovedkontonr = '306' then fagsak.pk_ef_fagsak
+               end pk_ef_fagsak_ovgst
+             ,case when fam_ef_ur.hovedkontonr = '540' then fagsak.pk_ef_fagsak
+               end pk_ef_fagsak_barntil
+             ,case when fam_ef_ur.hovedkontonr = '542' then fagsak.pk_ef_fagsak
+               end pk_ef_fagsak_skolepen
+              ,(select min(utbet_forst.fra_og_med)
+                from dvh_fam_ef.fam_ef_utbetalinger utbet_forst
+                where utbet_forst.behandlings_id = fagsak.behandlings_id
+               ) virk
+              ,fam_ef_ur.belop + fam_ef_utbetalinger.inntektsreduksjon bruttobelop
+              ,dim_geografi.kommune_nr, dim_geografi.bydel_kommune_nr
+              ,dim_person_mottaker.statsborgerskap statsb, dim_person_mottaker.fodeland
+              ,dim_person_mottaker.fk_dim_geografi_bosted
+              ,sivilstatus.sivilstatus_kode sivst
+              ,vedtaks_perioder.periode_type
+              ,vedtaks_perioder.aktivitet
+			  ,case when fam_ef_ur.hovedkontonr = '540' then vedtaks_perioder.antallbarn
+               end Antbtg,
+               case when fam_ef_ur.hovedkontonr = '540' then vedtaks_perioder.utgifter
+               end Btdok
+              ,aktivitet_type.aktkode
+	          ,tilleggsstonader.belop belop_tillegg
+              ,kontantstøtte.belop belop_kontantstøtte
+              ,case when fam_ef_ur.hovedkontonr = '306' then fam_ef_ur.belop_totalt
+               end ovgst_totalt
+              ,case when fam_ef_ur.hovedkontonr = '540' then fam_ef_ur.belop_totalt
+               end barntil_totalt
+              ,case when fam_ef_ur.hovedkontonr = '542' then fam_ef_ur.belop_totalt
+               end skolepen_totalt
+              --,sysdate
+        from fam_ef_ur
+        left join dvh_fam_ef.fam_ef_fagsak fagsak
+        on fam_ef_ur.max_henvisning = fagsak.funksjonell_id
 
-               case when fam_ef_ur.hovedkontonr = '540' then fam_ef_ur.belop
-                end barntil,
-                 case when fam_ef_ur.hovedkontonr = '540' then fagsak.pk_ef_fagsak
-                end pk_ef_fagsak_barntil,
-                 case when fam_ef_ur.hovedkontonr = '306' then fagsak.pk_ef_fagsak
-                end pk_ef_fagsak_ovgst
-               ,(select min(utbet_forst.fra_og_med)
-                 from dvh_fam_ef.fam_ef_utbetalinger utbet_forst
-                 where utbet_forst.behandlings_id = fagsak.behandlings_id
-                ) virk
-               ,fam_ef_ur.belop + fam_ef_utbetalinger.inntektsreduksjon bruttobelop
-               ,dim_geografi.kommune_nr, dim_geografi.bydel_kommune_nr
-               ,dim_person_mottaker.statsborgerskap statsb, dim_person_mottaker.fodeland
-               ,dim_person_mottaker.fk_dim_geografi_bosted
-               ,sivilstatus.sivilstatus_kode sivst
-               ,vedtaks_perioder.periode_type
-               ,vedtaks_perioder.aktivitet
- 			  ,case when fam_ef_ur.hovedkontonr = '540' then vedtaks_perioder.antallbarn
-                end Antbtg,
-                case when fam_ef_ur.hovedkontonr = '540' then vedtaks_perioder.utgifter
-                end Btdok
-               ,aktivitet_type.aktkode
- 	          ,tilleggsstonader.belop belop_tillegg
-               ,kontantstøtte.belop belop_kontantstøtte
-               ,case when fam_ef_ur.hovedkontonr = '540' then fam_ef_ur.belop_totalt
-                end barntil_totalt
-               ,case when fam_ef_ur.hovedkontonr = '306' then fam_ef_ur.belop_totalt
-                end ovgst_totalt
-               --,sysdate
-         from fam_ef_ur
-         left join dvh_fam_ef.fam_ef_fagsak fagsak
-         on fam_ef_ur.max_henvisning = fagsak.funksjonell_id
+        left outer join dt_person.dim_person dim_person_mottaker
+        on dim_person_mottaker.fk_person1 = fagsak.fk_person1
+        /*and dim_person_mottaker.gyldig_fra_dato <= fagsak.vedtaks_tidspunkt
+        and dim_person_mottaker.gyldig_til_dato >= fagsak.vedtaks_tidspunkt*/
+        and dim_person_mottaker.gyldig_fra_dato <= fam_ef_ur.max_posteringsdato
+        and dim_person_mottaker.gyldig_til_dato >= fam_ef_ur.max_posteringsdato
 
-         left outer join dt_person.dim_person dim_person_mottaker
-         on dim_person_mottaker.fk_person1 = fagsak.fk_person1
-         /*and dim_person_mottaker.gyldig_fra_dato <= fagsak.vedtaks_tidspunkt
-         and dim_person_mottaker.gyldig_til_dato >= fagsak.vedtaks_tidspunkt*/
-         and dim_person_mottaker.gyldig_fra_dato <= fam_ef_ur.max_posteringsdato
-         and dim_person_mottaker.gyldig_til_dato >= fam_ef_ur.max_posteringsdato
+        left outer join dt_kodeverk.dim_sivilstatus sivilstatus
+        on sivilstatus.pk_dim_sivilstatus = dim_person_mottaker.fk_dim_sivilstatus
 
-         left outer join dt_kodeverk.dim_sivilstatus sivilstatus
-         on sivilstatus.pk_dim_sivilstatus = dim_person_mottaker.fk_dim_sivilstatus
+        left outer join dt_kodeverk.dim_kjonn
+        on dim_kjonn.pk_dim_kjonn = dim_person_mottaker.fk_dim_kjonn
 
-         left outer join dt_kodeverk.dim_kjonn
-         on dim_kjonn.pk_dim_kjonn = dim_person_mottaker.fk_dim_kjonn
+        left outer join dt_kodeverk.dim_geografi
+        on dim_person_mottaker.fk_dim_geografi_bosted = dim_geografi.pk_dim_geografi
 
-         left outer join dt_kodeverk.dim_geografi
-         on dim_person_mottaker.fk_dim_geografi_bosted = dim_geografi.pk_dim_geografi
+        left join dvh_fam_ef.fam_ef_utbetalinger
+        on fam_ef_utbetalinger.fk_ef_fagsak = fagsak.pk_ef_fagsak
+        --and fam_ef_ur.min_dato_utbet_fom between fam_ef_utbetalinger.fra_og_med and fam_ef_utbetalinger.til_og_med
+        and fam_ef_ur.max_dato_utbet_tom between fam_ef_utbetalinger.fra_og_med and fam_ef_utbetalinger.til_og_med
 
-         left join dvh_fam_ef.fam_ef_utbetalinger
-         on fam_ef_utbetalinger.fk_ef_fagsak = fagsak.pk_ef_fagsak
-         --and fam_ef_ur.min_dato_utbet_fom between fam_ef_utbetalinger.fra_og_med and fam_ef_utbetalinger.til_og_med
-         and fam_ef_ur.max_dato_utbet_tom between fam_ef_utbetalinger.fra_og_med and fam_ef_utbetalinger.til_og_med
+        left join dvh_fam_ef.fam_ef_vedtaksperioder vedtaks_perioder
+        on vedtaks_perioder.fk_ef_fagsak = fagsak.pk_ef_fagsak
+        --and fam_ef_ur.min_dato_utbet_fom between vedtaks_perioder.fra_og_med and vedtaks_perioder.til_og_med
+        and fam_ef_ur.max_dato_utbet_tom between vedtaks_perioder.fra_og_med and vedtaks_perioder.til_og_med
 
-         left join dvh_fam_ef.fam_ef_vedtaksperioder vedtaks_perioder
-         on vedtaks_perioder.fk_ef_fagsak = fagsak.pk_ef_fagsak
-         --and fam_ef_ur.min_dato_utbet_fom between vedtaks_perioder.fra_og_med and vedtaks_perioder.til_og_med
-         and fam_ef_ur.max_dato_utbet_tom between vedtaks_perioder.fra_og_med and vedtaks_perioder.til_og_med
+        left join dvh_fam_ef.fam_ef_aktivitet_type aktivitet_type
+        on vedtaks_perioder.aktivitet = aktivitet_type.aktivitet
 
-         left join dvh_fam_ef.fam_ef_aktivitet_type aktivitet_type
-         on vedtaks_perioder.aktivitet = aktivitet_type.aktivitet
-
- 		left join dvh_fam_ef.fam_ef_tilleggsstonader tilleggsstonader
-         on tilleggsstonader.fk_ef_fagsak = fagsak.pk_ef_fagsak
-         --and fam_ef_ur.min_dato_utbet_fom between tilleggsstonader.fra_og_med and tilleggsstonader.til_og_med
-         and fam_ef_ur.max_dato_utbet_tom between tilleggsstonader.fra_og_med and tilleggsstonader.til_og_med
-         and tilleggsstonader.TYPE_TILLEGGS_STONAD = 'TILLEGG'
+		left join dvh_fam_ef.fam_ef_tilleggsstonader tilleggsstonader
+        on tilleggsstonader.fk_ef_fagsak = fagsak.pk_ef_fagsak
+        --and fam_ef_ur.min_dato_utbet_fom between tilleggsstonader.fra_og_med and tilleggsstonader.til_og_med
+        and fam_ef_ur.max_dato_utbet_tom between tilleggsstonader.fra_og_med and tilleggsstonader.til_og_med
+        and tilleggsstonader.TYPE_TILLEGGS_STONAD = 'TILLEGG'
 
 
-         left join dvh_fam_ef.fam_ef_tilleggsstonader kontantstøtte
-         on kontantstøtte.fk_ef_fagsak = fagsak.pk_ef_fagsak
-         --and fam_ef_ur.min_dato_utbet_fom between kontantstøtte.fra_og_med and kontantstøtte.til_og_med
-         and fam_ef_ur.max_dato_utbet_tom between kontantstøtte.fra_og_med and kontantstøtte.til_og_med
-         and kontantstøtte.TYPE_TILLEGGS_STONAD = 'KONTANTSTØTTE'
+        left join dvh_fam_ef.fam_ef_tilleggsstonader kontantstøtte
+        on kontantstøtte.fk_ef_fagsak = fagsak.pk_ef_fagsak
+        --and fam_ef_ur.min_dato_utbet_fom between kontantstøtte.fra_og_med and kontantstøtte.til_og_med
+        and fam_ef_ur.max_dato_utbet_tom between kontantstøtte.fra_og_med and kontantstøtte.til_og_med
+        and kontantstøtte.TYPE_TILLEGGS_STONAD = 'KONTANTSTØTTE'
 
-       ),
+      ),
 
-       barn as
-       (
-         select fagsak.periode, fagsak.fk_person1, fagsak.pk_ef_fagsak, fagsak.pk_ef_fagsak_barntil, fagsak.pk_ef_fagsak_ovgst
-               ,count(distinct person.fk_person1) antbarn
-               ,min(nvl(case when floor(months_between(fagsak.max_posteringsdato, dim_person.fodt_dato)/12) < 0 then 0
-                             else floor(months_between(fagsak.max_posteringsdato, dim_person.fodt_dato)/12)
-                        end, 0)) ybarn
-               ,count(distinct case when floor(months_between(fagsak.max_posteringsdato, dim_person.fodt_dato)/12) < 1
-                                         then dim_person.fk_person1
-                                    else null
-                               end) antbu1
-               ,count(distinct case when floor(months_between(fagsak.max_posteringsdato, dim_person.fodt_dato)/12) < 3
-                                         then dim_person.fk_person1
-                                    else null
-                               end) antbu3
-               ,count(distinct case when floor(months_between(fagsak.max_posteringsdato, dim_person.fodt_dato)/12) < 8
-                                         then dim_person.fk_person1
-                                    else null
-                               end) antbu8
-               ,count(distinct case when floor(months_between(fagsak.max_posteringsdato, dim_person.fodt_dato)/12) < 10
-                                         then dim_person.fk_person1
-                                    else null
-                               end) antbu10
+      barn as
+      (
+        select fagsak.periode, fagsak.fk_person1, fagsak.pk_ef_fagsak, fagsak.pk_ef_fagsak_barntil, fagsak.pk_ef_fagsak_ovgst
+              ,count(distinct person.fk_person1) antbarn
+              ,min(nvl(case when floor(months_between(fagsak.max_posteringsdato, dim_person.fodt_dato)/12) < 0 then 0
+                            else floor(months_between(fagsak.max_posteringsdato, dim_person.fodt_dato)/12)
+                       end, 0)) ybarn
+              ,count(distinct case when floor(months_between(fagsak.max_posteringsdato, dim_person.fodt_dato)/12) < 1
+                                        then dim_person.fk_person1
+                                   else null
+                              end) antbu1
+              ,count(distinct case when floor(months_between(fagsak.max_posteringsdato, dim_person.fodt_dato)/12) < 3
+                                        then dim_person.fk_person1
+                                   else null
+                              end) antbu3
+              ,count(distinct case when floor(months_between(fagsak.max_posteringsdato, dim_person.fodt_dato)/12) < 8
+                                        then dim_person.fk_person1
+                                   else null
+                              end) antbu8
+              ,count(distinct case when floor(months_between(fagsak.max_posteringsdato, dim_person.fodt_dato)/12) < 10
+                                        then dim_person.fk_person1
+                                   else null
+                              end) antbu10
 
-         from fagsak
-         left outer join dvh_fam_ef.fam_ef_person person
-         on fagsak.pk_ef_fagsak = person.fk_ef_fagsak
-         and person.relasjon = 'BARN'
+        from fagsak
+        left outer join dvh_fam_ef.fam_ef_person person
+        on fagsak.pk_ef_fagsak = person.fk_ef_fagsak
+        and person.relasjon = 'BARN'
 
-         left outer join dt_person.dim_person
-         on dim_person.fk_person1 = person.fk_person1
-         /*and dim_person.gyldig_fra_dato <= fagsak.vedtaks_tidspunkt
-         and dim_person.gyldig_til_dato >= fagsak.vedtaks_tidspunkt*/
-         and dim_person.gyldig_fra_dato <= fagsak.max_posteringsdato
-         and dim_person.gyldig_til_dato >= fagsak.max_posteringsdato
+        left outer join dt_person.dim_person
+        on dim_person.fk_person1 = person.fk_person1
+        /*and dim_person.gyldig_fra_dato <= fagsak.vedtaks_tidspunkt
+        and dim_person.gyldig_til_dato >= fagsak.vedtaks_tidspunkt*/
+        and dim_person.gyldig_fra_dato <= fagsak.max_posteringsdato
+        and dim_person.gyldig_til_dato >= fagsak.max_posteringsdato
 
-         group by fagsak.periode, fagsak.fk_person1, fagsak.pk_ef_fagsak, fagsak.pk_ef_fagsak_barntil, fagsak.pk_ef_fagsak_ovgst
-       ),
+        group by fagsak.periode, fagsak.fk_person1, fagsak.pk_ef_fagsak, fagsak.pk_ef_fagsak_barntil, fagsak.pk_ef_fagsak_ovgst
+      ),
 
-       fagsak_barn as (
-           select fagsak.fk_person1, fagsak.kjonn, fagsak.alder, fagsak.overgkode, fagsak.ovgst overgst
-                 ,fagsak.barntil barntil
-                 ,fagsak.fagsak_id
-                 ,fagsak.virk, fagsak.innt, fagsak.bruttobelop, fagsak.belop nettobelop
-                 ,fagsak.belop_totalt
-                 ,fagsak.barntil_totalt
-                 ,fagsak.ovgst_totalt
-                 ,fagsak.aktivitetskrav
-                 ,fagsak.inntfradrag, fagsak.samordningsfradrag
+      fagsak_barn as (
+          select fagsak.fk_person1, fagsak.kjonn, fagsak.alder, fagsak.overgkode, fagsak.ovgst overgst
+                ,fagsak.barntil barntil
+                ,fagsak.skolepen skolepen
+                ,fagsak.fagsak_id
+                ,fagsak.virk, fagsak.innt, fagsak.bruttobelop, fagsak.belop nettobelop
+                ,fagsak.belop_totalt
+                ,fagsak.barntil_totalt
+                ,fagsak.ovgst_totalt
+                ,fagsak.skolepen_totalt
+                ,fagsak.aktivitetskrav
+                ,fagsak.inntfradrag, fagsak.samordningsfradrag
 
-                 ,fagsak.sivst, fagsak.periode, fagsak.kommune_nr bosted_kommune_nr
-                 ,fagsak.bydel_kommune_nr, fagsak.aktivitet, fagsak.btdok, fagsak.antbtg, fagsak.statsb
-                 ,fagsak.pk_dim_person, fagsak.fodeland, fagsak.fk_dim_geografi_bosted
-                 ,fagsak.periode_type, fagsak.aktkode
-                 ,antbarn, ybarn, antbu1, antbu3, antbu8, antbu10, 'EF' kildesystem
-                 ,fagsak.pk_ef_fagsak, fagsak.pk_ef_fagsak_barntil, fagsak.pk_ef_fagsak_ovgst
-                 ,fagsak.belop_tillegg
-                 ,fagsak.belop_kontantstøtte
-                 --,sysdate lastet_dato
-           from fagsak
-           left join barn
-           on barn.periode = fagsak.periode
-           and barn.fk_person1 = fagsak.fk_person1
-           and barn.pk_ef_fagsak = fagsak.pk_ef_fagsak),
+                ,fagsak.sivst, fagsak.periode, fagsak.kommune_nr bosted_kommune_nr
+                ,fagsak.bydel_kommune_nr, fagsak.aktivitet, fagsak.btdok, fagsak.antbtg, fagsak.statsb
+                ,fagsak.pk_dim_person, fagsak.fodeland, fagsak.fk_dim_geografi_bosted
+                ,fagsak.periode_type, fagsak.aktkode
+                ,antbarn, ybarn, antbu1, antbu3, antbu8, antbu10, 'EF' kildesystem
+                ,fagsak.pk_ef_fagsak, fagsak.pk_ef_fagsak_barntil, fagsak.pk_ef_fagsak_ovgst, pk_ef_fagsak_skolepen
+                ,fagsak.belop_tillegg
+                ,fagsak.belop_kontantstøtte
+                --,sysdate lastet_dato
+          from fagsak
+          left join barn
+          on barn.periode = fagsak.periode
+          and barn.fk_person1 = fagsak.fk_person1
+          and barn.pk_ef_fagsak = fagsak.pk_ef_fagsak),
 
-         resultat as (
-           select fk_person1, max(kjonn) as kjonn, max(alder) alder, max(overgkode) overgkode, max(overgst) overgst
-                ,max(barntil) barntil, max(antbtg) antbtg
-                 ,max(virk) virk, max(innt) innt
-                 ,max(nvl(overgst,0))+max(nvl(barntil,0))+max(nvl(inntfradrag,0)) bruttobelop
-                 ,max(nvl(overgst,0))+max(nvl(barntil,0)) nettobelop
-                 --,sum(nettobelop) nettobelop
-                 --, nettobelop
-                 ,sum(belop_totalt) belop_totalt
-                 ,max(inntfradrag) inntfradrag, max(samordningsfradrag) samordningsfradrag
-                 ,max(btdok) btdok
-                 ,max(sivst) sivst, max(periode) periode, max(bosted_kommune_nr) bosted_kommune_nr
-                 ,max(bydel_kommune_nr) bydel_kommune_nr, max(aktivitet) aktivitet, max(statsb) statsb
-                 ,max(pk_dim_person) pk_dim_person, max(fodeland) fodeland, max(fk_dim_geografi_bosted) fk_dim_geografi_bosted
-                 ,max(periode_type) periode_type, max(aktkode) aktkode
-                 ,max(antbarn) antbarn, max(ybarn) ybarn, max(antbu1) antbu1, max(antbu3) antbu3, max(antbu8) antbu8, max(antbu10) antbu10, max(kildesystem) kildesystem
-                 ,max(pk_ef_fagsak_ovgst) pk_ef_fagsak_ovgst
-                 ,max(pk_ef_fagsak_barntil) pk_ef_fagsak_barntil
-                 ,max(ovgst_totalt) ovgst_totalt
-                 ,max(barntil_totalt) barntil_totalt
-                 ,max(belop_tillegg) belop_tillegg
-                 ,max(aktivitetskrav) aktivitetskrav
-                 ,max(belop_kontantstøtte) belop_kontantstøtte
-                 from fagsak_barn
- 				--where fk_person1 = 1800681045--1292606586
- 				--where fagsak.fk_person1 = '1109359276'--'1347119395' '1109359276' '1786191366'
- 				group by fk_person1
-           )
-         select /*+ PARALLEL(8) */ resultat.*
-             ,'EF' as nivaa_01
-             ,case when barntil > 0 and overgst is null then 'BT' else 'OG'
-                 end nivaa_02
-             ,case when barntil > 0 and overgst is null then 'OR' else 'NY'
-                 end nivaa_03
-         from resultat;
+        resultat as (
+          select fk_person1, max(kjonn) as kjonn, max(alder) alder, max(overgkode) overgkode, max(overgst) overgst
+               ,max(barntil) barntil, max(skolepen) skolepen,max(antbtg) antbtg
+                ,max(virk) virk, max(innt) innt
+                ,max(nvl(overgst,0))+max(nvl(barntil,0))+max(nvl(skolepen,0))+max(nvl(inntfradrag,0)) bruttobelop
+                ,max(nvl(overgst,0))+max(nvl(barntil,0))+max(nvl(skolepen,0)) nettobelop
+                --,sum(nettobelop) nettobelop
+                --, nettobelop
+                ,sum(belop_totalt) belop_totalt
+                ,max(inntfradrag) inntfradrag, max(samordningsfradrag) samordningsfradrag
+                ,max(btdok) btdok
+                ,max(sivst) sivst, max(periode) periode, max(bosted_kommune_nr) bosted_kommune_nr
+                ,max(bydel_kommune_nr) bydel_kommune_nr, max(aktivitet) aktivitet, max(statsb) statsb
+                ,max(pk_dim_person) pk_dim_person, max(fodeland) fodeland, max(fk_dim_geografi_bosted) fk_dim_geografi_bosted
+                ,max(periode_type) periode_type, max(aktkode) aktkode
+                ,max(antbarn) antbarn, max(ybarn) ybarn, max(antbu1) antbu1, max(antbu3) antbu3, max(antbu8) antbu8, max(antbu10) antbu10, max(kildesystem) kildesystem
+                ,max(pk_ef_fagsak_ovgst) pk_ef_fagsak_ovgst
+                ,max(pk_ef_fagsak_barntil) pk_ef_fagsak_barntil
+                ,max(pk_ef_fagsak_skolepen) pk_ef_fagsak_skolepen
+                ,max(ovgst_totalt) ovgst_totalt
+                ,max(barntil_totalt) barntil_totalt
+                ,max(skolepen_totalt) skolepen_totalt
+                ,max(belop_tillegg) belop_tillegg
+                ,max(aktivitetskrav) aktivitetskrav
+                ,max(belop_kontantstøtte) belop_kontantstøtte
+                from fagsak_barn
+				--where fk_person1 = 1019431763 --1292606586 --1800681045--
+				--where fagsak.fk_person1 = '1109359276'--'1347119395' '1109359276' '1786191366'
+				group by fk_person1
+          )
+        select /*+ PARALLEL(8) */ resultat.*
+            ,'EF' as nivaa_01
+            ,case when barntil > 0 and overgst is null then 'BT' else 'OG'
+                end nivaa_02
+            ,case when barntil > 0 and overgst is null then 'OR' else 'NY'
+                end nivaa_03
+        from resultat;
 
-   begin
-     l_dato_fom := to_date(p_in_period || '01', 'yyyymmdd');
-     l_dato_tom := last_day(to_date(p_in_period, 'yyyymm'));
-     dbms_output.put_line(l_dato_fom||'-'||l_dato_tom);--TEST!!!
+  begin
+    l_dato_fom := to_date(p_in_period || '01', 'yyyymmdd');
+    l_dato_tom := last_day(to_date(p_in_period, 'yyyymm'));
+    dbms_output.put_line(l_dato_fom||'-'||l_dato_tom);--TEST!!!
 
-     -- Slett vedtak from dvh_fam_ef.fam_ef_stonad for aktuell periode
-     begin
-       delete from dvh_fam_ef.fam_ef_stonad
-       where kildesystem = 'EF'
-       and periode = p_in_period
-       and gyldig_flagg = p_in_gyldig_flagg;
-       commit;
-     exception
-       when others then
-         l_error_melding := substr(sqlcode || ' ' || sqlerrm, 1, 1000);
-         insert into fk_sensitiv.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
-         values(null, null, l_error_melding, sysdate, 'FAM_EF_STONAD_INSERT1');
-         commit;
-         p_out_error := l_error_melding;
-         l_error_melding := null;
-     end;
+    -- Slett vedtak from dvh_fam_ef.fam_ef_stonad for aktuell periode
+    begin
+      delete from dvh_fam_ef.fam_ef_stonad
+      where kildesystem = 'EF'
+      and periode = p_in_period
+      and gyldig_flagg = p_in_gyldig_flagg;
+      commit;
+    exception
+      when others then
+        l_error_melding := substr(sqlcode || ' ' || sqlerrm, 1, 1000);
+        insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+        values(null, null, l_error_melding, sysdate, 'FAM_EF_STONAD_INSERT1');
+        commit;
+        p_out_error := l_error_melding;
+        l_error_melding := null;
+    end;
 
-     for rec_ef in cur_ef(l_dato_fom, l_dato_tom) loop
-       begin
-         insert into dvh_fam_ef.fam_ef_stonad
-         (fk_person1, fk_dim_person, kjonn, alder, overgkode, ovgst, barntil, antbtg, virk, innt, bruttobelop
-         ,nettobelop, inntfradrag, btdok, sivst, periode, bosted_kommune_nr, bydel_kommmune_nr
-         ,aktkode, statsb, fodeland, aktivitet, vedtaks_periode_type
-         ,ybarn, antbarn, antbu1, antbu3, antbu8, antbu10
-         ,kildesystem, lastet_dato
-         ,nivaa_01, nivaa_02, nivaa_03
-         ,samordnings_belop, belop_totalt, fk_dim_geografi, fk_ef_fagsak_ovgst, fk_ef_fagsak_barntil, belop_tillegg, belop_kontantstøtte,gyldig_flagg
-         ,ovgst_totalt, barntil_totalt, aktivitetskrav
-         )
-         values
-         (rec_ef.fk_person1, rec_ef.pk_dim_person, rec_ef.kjonn, rec_ef.alder, rec_ef.overgkode, rec_ef.overgst
-         ,rec_ef.barntil
-         ,rec_ef.antbtg, rec_ef.virk, rec_ef.innt, rec_ef.bruttobelop
-         ,rec_ef.nettobelop, rec_ef.inntfradrag, rec_ef.btdok, rec_ef.sivst, rec_ef.periode, rec_ef.bosted_kommune_nr
-         ,rec_ef.bydel_kommune_nr, rec_ef.aktkode, rec_ef.statsb, rec_ef.fodeland, rec_ef.aktivitet
-         ,rec_ef.periode_type
-         ,rec_ef.ybarn, rec_ef.antbarn, rec_ef.antbu1, rec_ef.antbu3, rec_ef.antbu8, rec_ef.antbu10
-         ,rec_ef.kildesystem, sysdate
-         ,rec_ef.nivaa_01, rec_ef.nivaa_02, rec_ef.nivaa_03
-         ,rec_ef.samordningsfradrag, rec_ef.belop_totalt, rec_ef.fk_dim_geografi_bosted
-         ,rec_ef.pk_ef_fagsak_ovgst, rec_ef.pk_ef_fagsak_barntil,rec_ef.belop_tillegg, rec_ef.belop_kontantstøtte,p_in_gyldig_flagg
-         ,rec_ef.ovgst_totalt, rec_ef.barntil_totalt, rec_ef.aktivitetskrav);
-         l_commit := l_commit + 1;
-       exception
-         when others then
-           l_error_melding := substr(sqlcode || ' ' || sqlerrm, 1, 1000);
-           insert into fk_sensitiv.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
-           values(null, null, l_error_melding, sysdate, 'FAM_EF_STONAD_INSERT2');
-           l_commit := l_commit + 1;--Gå videre til neste rekord
-           p_out_error := substr(p_out_error || l_error_melding, 1, 1000);
-           l_error_melding := null;
-       end;
-       if l_commit >= 100000 then
-           commit;
-           l_commit := 0;
-       end if;
-     end loop;
-     commit;
-     if l_error_melding is not null then
-       insert into fk_sensitiv.fp_xml_utbrett_error(id, error_msg, opprettet_tid, kilde)
-       values(null, l_error_melding, sysdate, 'FAM_EF_STONAD_INSERT3');
-       commit;
-       p_out_error := substr(p_out_error || l_error_melding, 1, 1000);
-     end if;
-   exception
-     when others then
-       l_error_melding := substr(sqlcode || ' ' || sqlerrm, 1, 1000);
-       insert into fk_sensitiv.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
-       values(null, null, l_error_melding, sysdate, 'FAM_EF_STONAD_INSERT4');
-       commit;
-       p_out_error := substr(p_out_error || l_error_melding, 1, 1000);
-   end fam_ef_stonad_insert;
+    for rec_ef in cur_ef(l_dato_fom, l_dato_tom) loop
+      begin
+        insert into dvh_fam_ef.fam_ef_stonad
+        (fk_person1, fk_dim_person, kjonn, alder, overgkode, ovgst, barntil--,skolepen
+        , antbtg, virk, innt, bruttobelop
+        ,nettobelop, inntfradrag, btdok, sivst, periode, bosted_kommune_nr, bydel_kommmune_nr
+        ,aktkode, statsb, fodeland, aktivitet, vedtaks_periode_type
+        ,ybarn, antbarn, antbu1, antbu3, antbu8, antbu10
+        ,kildesystem, lastet_dato
+        ,nivaa_01, nivaa_02, nivaa_03
+        ,samordnings_belop, belop_totalt, fk_dim_geografi, fk_ef_fagsak_ovgst, fk_ef_fagsak_barntil, fk_ef_fagsak_skolepen, belop_tillegg, belop_kontantstøtte,gyldig_flagg
+        ,ovgst_totalt, barntil_totalt, utd, aktivitetskrav
+        )
+        values
+        (rec_ef.fk_person1, rec_ef.pk_dim_person, rec_ef.kjonn, rec_ef.alder, rec_ef.overgkode, rec_ef.overgst
+        ,rec_ef.barntil--, rec_ef.skolepen
+        ,rec_ef.antbtg, rec_ef.virk, rec_ef.innt, rec_ef.bruttobelop
+        ,rec_ef.nettobelop, rec_ef.inntfradrag, rec_ef.btdok, rec_ef.sivst, rec_ef.periode, rec_ef.bosted_kommune_nr
+        ,rec_ef.bydel_kommune_nr, rec_ef.aktkode, rec_ef.statsb, rec_ef.fodeland, rec_ef.aktivitet
+        ,rec_ef.periode_type
+        ,rec_ef.ybarn, rec_ef.antbarn, rec_ef.antbu1, rec_ef.antbu3, rec_ef.antbu8, rec_ef.antbu10
+        ,rec_ef.kildesystem, sysdate
+        ,rec_ef.nivaa_01, rec_ef.nivaa_02, rec_ef.nivaa_03
+        ,rec_ef.samordningsfradrag, rec_ef.belop_totalt, rec_ef.fk_dim_geografi_bosted
+        ,rec_ef.pk_ef_fagsak_ovgst, rec_ef.pk_ef_fagsak_barntil, rec_ef.pk_ef_fagsak_skolepen, rec_ef.belop_tillegg, rec_ef.belop_kontantstøtte,p_in_gyldig_flagg
+        ,rec_ef.ovgst_totalt, rec_ef.barntil_totalt, rec_ef.skolepen_totalt ,rec_ef.aktivitetskrav);
+        l_commit := l_commit + 1;
+      exception
+        when others then
+          l_error_melding := substr(sqlcode || ' ' || sqlerrm, 1, 1000);
+          insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+          values(null, null, l_error_melding, sysdate, 'FAM_EF_STONAD_INSERT2');
+          l_commit := l_commit + 1;--Gå videre til neste rekord
+          p_out_error := substr(p_out_error || l_error_melding, 1, 1000);
+          l_error_melding := null;
+      end;
+      if l_commit >= 100000 then
+          commit;
+          l_commit := 0;
+      end if;
+    end loop;
+    commit;
+    if l_error_melding is not null then
+      insert into dvh_fam_fp.fp_xml_utbrett_error(id, error_msg, opprettet_tid, kilde)
+      values(null, l_error_melding, sysdate, 'FAM_EF_STONAD_INSERT3');
+      commit;
+      p_out_error := substr(p_out_error || l_error_melding, 1, 1000);
+    end if;
+  exception
+    when others then
+      l_error_melding := substr(sqlcode || ' ' || sqlerrm, 1, 1000);
+      insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+      values(null, null, l_error_melding, sysdate, 'FAM_EF_STONAD_INSERT4');
+      commit;
+      p_out_error := substr(p_out_error || l_error_melding, 1, 1000);
+  end fam_ef_stonad_insert;
 
-procedure fam_ef_stonad_vedtak_insert(p_in_vedtak_periode_yyyymm in number
+  procedure fam_ef_stonad_vedtak_insert(p_in_vedtak_periode_yyyymm in number
                                        ,p_in_max_vedtaksperiode_yyyymm in number
                                        ,p_in_forskyvninger_dag_dd in number
                                        ,p_in_gyldig_flagg in number default 0
@@ -904,10 +1121,14 @@ procedure fam_ef_stonad_vedtak_insert(p_in_vedtak_periode_yyyymm in number
                end ovgst
               ,case when fagsak.stonadstype = 'BARNETILSYN' then utbet.belop
                end barntil
+              ,case when fagsak.stonadstype = 'SKOLEPENGER' then utbet.belop
+               end skolepen
               ,case when fagsak.stonadstype = 'OVERGANGSSTØNAD' then fagsak.pk_ef_fagsak
                end pk_ef_fagsak_ovgst
               ,case when fagsak.stonadstype = 'BARNETILSYN' then fagsak.pk_ef_fagsak
                end pk_ef_fagsak_barntil
+              ,case when fagsak.stonadstype = 'SKOLEPENGER' then fagsak.pk_ef_fagsak
+               end pk_ef_fagsak_skolepen
               ,(select min(utbet_forst.fra_og_med)
                 from dvh_fam_ef.fam_ef_utbetalinger utbet_forst
                 where utbet_forst.behandlings_id = fagsak.behandlings_id
@@ -976,7 +1197,8 @@ procedure fam_ef_stonad_vedtak_insert(p_in_vedtak_periode_yyyymm in number
       ),
       barn as
       (
-        select fagsak.periode, fagsak.fk_person1, fagsak.pk_ef_fagsak, fagsak.pk_ef_fagsak_barntil, fagsak.pk_ef_fagsak_ovgst
+        select fagsak.periode, fagsak.fk_person1, fagsak.pk_ef_fagsak, fagsak.pk_ef_fagsak_barntil
+              ,fagsak.pk_ef_fagsak_ovgst, fagsak.pk_ef_fagsak_skolepen
               ,count(distinct person.fk_person1) antbarn
               ,min(nvl(case when floor(months_between(p_dato_tom, dim_person.fodt_dato)/12) < 0 then 0
                             else floor(months_between(p_dato_tom, dim_person.fodt_dato)/12)
@@ -1008,13 +1230,14 @@ procedure fam_ef_stonad_vedtak_insert(p_in_vedtak_periode_yyyymm in number
         and dim_person.gyldig_fra_dato <= fagsak.vedtaks_tidspunkt
         and dim_person.gyldig_til_dato >= fagsak.vedtaks_tidspunkt
 
-        group by fagsak.periode, fagsak.fk_person1, fagsak.pk_ef_fagsak, fagsak.pk_ef_fagsak_barntil, fagsak.pk_ef_fagsak_ovgst
+        group by fagsak.periode, fagsak.fk_person1, fagsak.pk_ef_fagsak, fagsak.pk_ef_fagsak_barntil
+        ,fagsak.pk_ef_fagsak_ovgst, fagsak.pk_ef_fagsak_skolepen
       ),
 
 
       fagsak_barn as (
           select fagsak.fk_person1, fagsak.kjonn, fagsak.alder, fagsak.overgkode, fagsak.ovgst overgst
-                ,fagsak.barntil barntil
+                ,fagsak.barntil barntil, fagsak.skolepen skolepen
                 ,fagsak.fagsak_id
                 ,fagsak.aktivitetskrav
                 ,fagsak.virk, fagsak.innt, fagsak.bruttobelop, fagsak.belop nettobelop
@@ -1026,7 +1249,7 @@ procedure fam_ef_stonad_vedtak_insert(p_in_vedtak_periode_yyyymm in number
                 ,fagsak.pk_dim_person, fagsak.fodeland, fagsak.fk_dim_geografi_bosted
                 ,fagsak.periode_type, fagsak.aktkode,fagsak.max_vedtaksdato,fagsak.vedtaks_tidspunkt
                 ,antbarn, ybarn, antbu1, antbu3, antbu8, antbu10, 'EF_VEDTAK' kildesystem
-                ,fagsak.pk_ef_fagsak, fagsak.pk_ef_fagsak_barntil, fagsak.pk_ef_fagsak_ovgst
+                ,fagsak.pk_ef_fagsak, fagsak.pk_ef_fagsak_barntil, fagsak.pk_ef_fagsak_ovgst, fagsak.pk_ef_fagsak_skolepen
 
                 ,fagsak.belop_tillegg
                 ,fagsak.belop_kontantstøtte
@@ -1040,10 +1263,10 @@ procedure fam_ef_stonad_vedtak_insert(p_in_vedtak_periode_yyyymm in number
 
      resultat as (
           select fk_person1, max(kjonn) as kjonn, max(alder) alder, max(overgkode) overgkode, max(overgst) overgst
-                ,max(barntil) barntil, max(antbtg) antbtg, max(aktivitetskrav) aktivitetskrav
+                ,max(barntil) barntil, max(skolepen) skolepen, max(antbtg) antbtg, max(aktivitetskrav) aktivitetskrav
                 ,max(virk) virk, max(innt) innt
-                ,max(nvl(overgst,0))+max(nvl(barntil,0))+max(nvl(inntfradrag,0)) bruttobelop
-                ,max(nvl(overgst,0))+max(nvl(barntil,0)) nettobelop
+                ,max(nvl(overgst,0))+max(nvl(barntil,0))+max(nvl(skolepen,0))+max(nvl(inntfradrag,0)) bruttobelop
+                ,max(nvl(overgst,0))+max(nvl(barntil,0))+max(nvl(skolepen,0)) nettobelop
                 --,sum(nettobelop) nettobelop
                 --,max(nettobelop) belop_totalt
                 ,max(inntfradrag) inntfradrag, max(samordningsfradrag) samordningsfradrag
@@ -1056,6 +1279,7 @@ procedure fam_ef_stonad_vedtak_insert(p_in_vedtak_periode_yyyymm in number
                 ,max(pk_ef_fagsak) pk_ef_fagsak
                 ,max(pk_ef_fagsak_ovgst) pk_ef_fagsak_ovgst
                 ,max(pk_ef_fagsak_barntil) pk_ef_fagsak_barntil
+                ,max(pk_ef_fagsak_skolepen) pk_ef_fagsak_skolepen
                 ,max(belop_tillegg) belop_tillegg
                 ,max(belop_kontantstøtte) belop_kontantstøtte
                 from fagsak_barn
@@ -1084,7 +1308,7 @@ procedure fam_ef_stonad_vedtak_insert(p_in_vedtak_periode_yyyymm in number
     exception
       when others then
         l_error_melding := substr(sqlcode || ' ' || sqlerrm, 1, 1000);
-        insert into fk_sensitiv.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+        insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
         values(null, null, l_error_melding, sysdate, 'FAM_EF_STONAD_VEDTAK_INSERT1');
         commit;
         p_out_error := l_error_melding;
@@ -1094,7 +1318,8 @@ procedure fam_ef_stonad_vedtak_insert(p_in_vedtak_periode_yyyymm in number
     for rec_ef in cur_ef(l_dato_fom, l_dato_tom) loop
       begin
          insert into dvh_fam_ef.fam_ef_stonad
-        (fk_person1, fk_dim_person, kjonn, alder, overgkode, ovgst, barntil, antbtg, virk, innt, bruttobelop
+        (fk_person1, fk_dim_person, kjonn, alder, overgkode, ovgst, barntil--, skolepen
+        ,antbtg, virk, innt, bruttobelop
         ,nettobelop, inntfradrag, btdok, sivst, periode, bosted_kommune_nr, bydel_kommmune_nr
         ,fk_dim_geografi
         ,aktkode, statsb, fodeland, aktivitet, vedtaks_periode_type
@@ -1103,12 +1328,12 @@ procedure fam_ef_stonad_vedtak_insert(p_in_vedtak_periode_yyyymm in number
         ,ybarn, antbarn, antbu1, antbu3, antbu8, antbu10
         ,kildesystem, lastet_dato, vedtaks_dato, max_vedtaksdato
         ,gyldig_flagg, fk_ef_fagsak
-		,fk_ef_fagsak_ovgst, fk_ef_fagsak_barntil, belop_tillegg, belop_kontantstøtte
-        ,aktivitetskrav, belop_totalt, barntil_totalt, ovgst_totalt
+		,fk_ef_fagsak_ovgst, fk_ef_fagsak_barntil, fk_ef_fagsak_skolepen, belop_tillegg, belop_kontantstøtte
+        ,aktivitetskrav, belop_totalt, barntil_totalt, ovgst_totalt, utd
         )
         values
         (rec_ef.fk_person1, rec_ef.pk_dim_person, rec_ef.kjonn, rec_ef.alder, rec_ef.overgkode, rec_ef.overgst
-        ,rec_ef.barntil
+        ,rec_ef.barntil--, rec_ef.skolepen
         ,rec_ef.antbtg, rec_ef.virk, rec_ef.innt, rec_ef.bruttobelop
         ,rec_ef.nettobelop, rec_ef.inntfradrag, rec_ef.btdok, rec_ef.sivst, rec_ef.periode, rec_ef.bosted_kommune_nr
         ,rec_ef.bydel_kommune_nr, rec_ef.fk_dim_geografi_bosted
@@ -1119,14 +1344,14 @@ procedure fam_ef_stonad_vedtak_insert(p_in_vedtak_periode_yyyymm in number
         ,rec_ef.kildesystem, sysdate
         ,rec_ef.vedtaks_tidspunkt, rec_ef.max_vedtaksdato
         ,p_in_gyldig_flagg, rec_ef.pk_ef_fagsak
-		,rec_ef.pk_ef_fagsak_ovgst, rec_ef.pk_ef_fagsak_barntil
+		,rec_ef.pk_ef_fagsak_ovgst, rec_ef.pk_ef_fagsak_barntil, rec_ef.pk_ef_fagsak_skolepen
         ,rec_ef.belop_tillegg, rec_ef.belop_kontantstøtte
-        ,rec_ef.aktivitetskrav, rec_ef.nettobelop, rec_ef.barntil, rec_ef.overgst);
+        ,rec_ef.aktivitetskrav, rec_ef.nettobelop, rec_ef.barntil, rec_ef.overgst, rec_ef.skolepen);
         l_commit := l_commit + 1;
       exception
         when others then
           l_error_melding := substr(sqlcode || ' ' || sqlerrm, 1, 1000);
-          insert into fk_sensitiv.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+          insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
           values(null, rec_ef.pk_ef_fagsak, l_error_melding, sysdate, 'FAM_EF_STONAD_VEDTAK_INSERT2');
           l_commit := l_commit + 1;--Gå videre til neste rekord
           p_out_error := substr(p_out_error || l_error_melding, 1, 1000);
@@ -1139,7 +1364,7 @@ procedure fam_ef_stonad_vedtak_insert(p_in_vedtak_periode_yyyymm in number
     end loop;
     commit;
     if l_error_melding is not null then
-      insert into fk_sensitiv.fp_xml_utbrett_error(id, error_msg, opprettet_tid, kilde)
+      insert into dvh_fam_fp.fp_xml_utbrett_error(id, error_msg, opprettet_tid, kilde)
       values(null, l_error_melding, sysdate, 'FAM_EF_STONAD_VEDTAK_INSERT3');
       commit;
       p_out_error := substr(p_out_error || l_error_melding, 1, 1000);
@@ -1147,7 +1372,7 @@ procedure fam_ef_stonad_vedtak_insert(p_in_vedtak_periode_yyyymm in number
   exception
     when others then
       l_error_melding := substr(sqlcode || ' ' || sqlerrm, 1, 1000);
-      insert into fk_sensitiv.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+      insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
       values(null, null, l_error_melding, sysdate, 'FAM_EF_STONAD_VEDTAK_INSERT4');
       commit;
       p_out_error := substr(p_out_error || l_error_melding, 1, 1000);
@@ -1310,9 +1535,9 @@ procedure fam_ef_stonad_vedtak_insert(p_in_vedtak_periode_yyyymm in number
       exception
         when others then
           l_error_melding := substr(sqlcode || ' ' || sqlerrm, 1, 1000);
-          insert into fk_sensitiv.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+          insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
           values(null, rec_infotrygd.fk_person1, l_error_melding, sysdate, 'FAM_EF_PATCH_INFOTRYGD_ARENA1');
-          l_commit := l_commit + 1;--G� videre til neste rekord
+          l_commit := l_commit + 1;--Gå videre til neste rekord
           p_out_error := substr(p_out_error || l_error_melding, 1, 1000);
       end;
 
@@ -1342,9 +1567,9 @@ procedure fam_ef_stonad_vedtak_insert(p_in_vedtak_periode_yyyymm in number
       exception
         when others then
           l_error_melding := substr(sqlcode || ' ' || sqlerrm, 1, 1000);
-          insert into fk_sensitiv.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+          insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
           values(null, rec_arena.fk_person1, l_error_melding, sysdate, 'FAM_EF_PATCH_INFOTRYGD_ARENA2');
-          l_commit := l_commit + 1;--G� videre til neste rekord
+          l_commit := l_commit + 1;--Gå videre til neste rekord
           p_out_error := substr(p_out_error || l_error_melding, 1, 1000);
       end;
 
@@ -1357,7 +1582,7 @@ procedure fam_ef_stonad_vedtak_insert(p_in_vedtak_periode_yyyymm in number
   exception
     when others then
       l_error_melding := substr(sqlcode || ' ' || sqlerrm, 1, 1000);
-      insert into fk_sensitiv.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+      insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
       values(null, null, l_error_melding, sysdate, 'FAM_EF_PATCH_INFOTRYGD_ARENA3');
       commit;
       p_out_error := substr(p_out_error || l_error_melding, 1, 1000);
@@ -1454,7 +1679,7 @@ procedure fam_ef_stonad_vedtak_insert(p_in_vedtak_periode_yyyymm in number
       exception
         when others then
           v_error := substr(sqlcode || sqlerrm, 1, 1000);
-          insert into fk_sensitiv.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+          insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
           values(null, rec_stonad.fk_person1, v_error, sysdate, 'FAM_EF_PATCH_MIGRERING_VEDTAK1');
           p_out_error := substr(p_out_error || v_error, 1, 1000);
       end;
@@ -1463,7 +1688,7 @@ procedure fam_ef_stonad_vedtak_insert(p_in_vedtak_periode_yyyymm in number
   exception
     when others then
       v_error := substr(sqlcode || sqlerrm, 1, 1000);
-      insert into fk_sensitiv.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+      insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
       values(null, null, v_error, sysdate, 'FAM_EF_PATCH_MIGRERING_VEDTAK2');
       p_out_error := substr(p_out_error || v_error, 1, 1000);
   end fam_ef_patch_migrering_vedtak;
