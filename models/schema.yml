@@ -44,6 +44,13 @@ sources:
       - name: fam_bt_barn
         description: 'inneholder informasjon om brukere og barn, fodsel_aar, kjonn, fodsel_aar_barn, kjonn_barn'
 
+  - name: fam_ef
+  schema: dvh_fam_ef
+  tables:
+    - name: kafka_ny_løsning_test
+      description: 'inneholder data (hentet bare for testing) lest fra kafka_topicen for EF'
+
+
 
 
 
