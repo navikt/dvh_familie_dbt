@@ -1,3 +1,8 @@
+{{config(
+    materialized='view',
+    tags="ef_kafka_test"
+)}}
+
 with kafka_ny_løsning as (
   select * from {{ source ('fam_ef', 'kafka_ny_løsning_test') }}
 ),
