@@ -48,7 +48,7 @@ if __name__ == "__main__":
 
     set_secrets_as_envs()
 
-    if not log_level: log_level = 'INFO'
+    if not log_level: log_level = 'DEBUG'
     logger.setLevel(log_level)
     logger.addHandler(stream_handler)
 
