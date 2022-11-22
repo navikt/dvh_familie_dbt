@@ -20,4 +20,4 @@ k.kafka_message.tidspunktVedtak
 from KAFKA_NY_LØSNING_TEST k
 )
 
-select * from final;
+select * from final
