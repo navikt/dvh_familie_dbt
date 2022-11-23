@@ -17,7 +17,7 @@ k.kafka_message.fagsakId,
 k.kafka_message.behandlingId,
 k.kafka_message.relatertBehandlingId,
 k.kafka_message.tidspunktVedtak
-from KAFKA_NY_LØSNING_TEST k
+from kafka_ny_løsning k
 )
 
 select * from final
