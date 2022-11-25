@@ -1860,6 +1860,7 @@ create or replace PACKAGE BODY                                                  
           ,S.stønadtom
           ,S.klassekode
           ,S.delytelse_id
+          ,S.ytelse_type
           ,S.utbetalt_pr_mnd
           ,S.stonad_fom
           ,S.personident
@@ -1893,6 +1894,7 @@ create or replace PACKAGE BODY                                                  
           COLUMNS (
           klassekode                VARCHAR2 PATH '$.klassekode'
          ,delytelse_id              VARCHAR2 PATH '$.delytelseId'
+         ,ytelse_type               VARCHAR2 PATH '$.ytelseType'
          ,utbetalt_pr_mnd           VARCHAR2 PATH '$..utbetaltPrMnd'
          ,stonad_fom                VARCHAR2 PATH '$.stonad_fom'
          ,personident               VARCHAR2 PATH '$.personV2[*].personIdent'
@@ -2189,6 +2191,7 @@ create or replace PACKAGE BODY                                                  
                   pk_bt_utbet_det
                  ,klassekode
                  ,delytelse_id
+                 ,ytelse_type
                  ,utbetalt_pr_mnd
                  ,lastet_dato
                  ,fk_bt_person
@@ -2202,6 +2205,7 @@ create or replace PACKAGE BODY                                                  
                   --v_pk_bt_utbet_det
                  ,rec_utbet_det.klassekode
                  ,rec_utbet_det.delytelse_id
+                 ,rec_utbet_det.ytelse_type
                  ,rec_utbet_det.utbetalt_pr_mnd
                  ,rec_utbet_det.lastet_dato
                  ,v_pk_person_utb
