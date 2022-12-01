@@ -2,7 +2,7 @@
   tags = ["ef_kafka_test"]
 ) }}
 
-WITH kafka_ny_l ø sning AS (
+WITH kafka_ny_losning AS (
 
   SELECT
     *
