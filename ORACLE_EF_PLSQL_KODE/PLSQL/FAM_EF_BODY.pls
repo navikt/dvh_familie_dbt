@@ -14,7 +14,7 @@ create or replace PACKAGE BODY                                                  
       fk_person1:= -1;
   end fam_ef_fk_person1;
 
-  procedure fam_ef_utpakking_offset(p_in_offset in number, p_error_melding out varchar2) as
+   procedure fam_ef_utpakking_offset(p_in_offset in number, p_error_melding out varchar2) as
   v_pk_ef_fagsak number;
   v_pk_ef_utbetalinger number;
   v_pk_ef_vedtaksperioder number;
@@ -48,6 +48,7 @@ create or replace PACKAGE BODY                                                  
       --and fam_ef_fagsak.kafka_offset is null
     )
     select t.fagsak_id, t.behandlings_id, t.person_ident, t.relatert_behandlings_id
+          ,t.krav_mottatt, t.årsak_revurderings_kilde, t.revurderings_årsak
           ,t.adressebeskyttelse, t.vedtaksbegrunnelse_skole
           ,cast(to_timestamp_tz(t.vedtaks_tidspunkt,'yyyy-mm-dd"T"hh24:mi:ss.ff+tzh:tzm')
                 at time zone 'europe/belgrade' as timestamp) as vedtaks_tidspunkt
@@ -75,8 +76,12 @@ create or replace PACKAGE BODY                                                  
          ,stonadstype                     varchar2 path '$.stønadstype'
          ,funksjonell_Id                  varchar2 path '$.funksjonellId'
          ,vedtaksbegrunnelse_skole        varchar2 path '$.vedtaksbegrunnelse'
-
+         ,krav_mottatt                    varchar2 path '$.kravMottatt'
+         ,nested path '$.årsakRevurdering' columns (
+         årsak_revurderings_kilde         varchar2 path '$.opplysningskilde'
+         ,revurderings_årsak              varchar2 path '$.årsak'
          )
+        )
         ) t;
 
   cursor cur_ef_utbetalinger(p_offset in number) is
@@ -337,6 +342,7 @@ create or replace PACKAGE BODY                                                  
           insert into dvh_fam_ef.fam_ef_fagsak
           (
             pk_ef_fagsak, fk_ef_meta_data, fagsak_id, behandlings_id, relatert_behandlings_id
+            ,krav_mottatt, årsak_revurderings_kilde, revurderings_årsak
            ,adressebeskyttelse
            ,fk_person1, behandling_type, behandlings_aarsak, vedtaks_status
            ,stonadstype, aktivitetsplikt_inntreffer_dato, har_sagt_opp_arbeidsforhold
@@ -351,7 +357,8 @@ create or replace PACKAGE BODY                                                  
           values
           (
             v_pk_ef_fagsak, rec_fagsak.pk_ef_meta_data, rec_fagsak.fagsak_id, rec_fagsak.behandlings_id
-           ,rec_fagsak.relatert_behandlings_id, rec_fagsak.adressebeskyttelse
+           ,rec_fagsak.relatert_behandlings_id, rec_fagsak.krav_mottatt, rec_fagsak.årsak_revurderings_kilde, rec_fagsak.revurderings_årsak
+           ,rec_fagsak.adressebeskyttelse
            ,v_fk_person1_mottaker, rec_fagsak.behandling_type, rec_fagsak.behandling_aarsak
            ,rec_fagsak.vedtak_resultat, rec_fagsak.stonadstype, rec_fagsak.aktivitetsplikt_inntreffer_dato
            ,rec_fagsak.har_sagt_opp_arbeidsforhold, rec_fagsak.funksjonell_id, rec_fagsak.vedtaks_tidspunkt

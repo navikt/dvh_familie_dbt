@@ -55,5 +55,4 @@ models:
       +materialized: view
     staging:
       +materialized: view
-    test:
-      +materialized: view
+
