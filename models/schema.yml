@@ -47,7 +47,7 @@ sources:
   - name: fam_ef
     schema: dvh_fam_ef
     tables:
-      - name: kafka_ny_løsning_test
+      - name: kafka_ny_losning_test
         description: 'inneholder data (hentet bare for testing) lest fra kafka_topicen for EF'
 
 

@@ -9,6 +9,7 @@ dvh_familie:
       host: dm07-scan.adeo.no
       port: 1521
       service: dwhu1
+      database: "dwh"
       schema: "{{env_var('DBT_DB_SCHEMA')}}"
       threads: 4
     dwhr:
