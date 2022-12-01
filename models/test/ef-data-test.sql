@@ -23,7 +23,7 @@ FINAL AS (
     k.kafka_message.relatertBehandlingId,
     k.kafka_message.tidspunktVedtak
   FROM
-    kafka_ny_l ø sning k
+    kafka_ny_losning k
 )
 SELECT
   *
