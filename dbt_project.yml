@@ -55,4 +55,3 @@ models:
       +materialized: view
     staging:
       +materialized: view
-
