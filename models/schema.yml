@@ -44,11 +44,11 @@ sources:
       - name: fam_bt_barn
         description: 'inneholder informasjon om brukere og barn, fodsel_aar, kjonn, fodsel_aar_barn, kjonn_barn'
 
-  - name: fam_ef
-    schema: dvh_fam_ef
+  - name: fam_ks
+    schema: dvh_fam_ks
     tables:
-      - name: kafka_ny_losning_test
-        description: 'inneholder data (hentet bare for testing) lest fra kafka_topicen for EF'
+      - name: FAM_KS_META_DATA
+        description: 'inneholder meta_data for kontantstøtte'
 
 
 
