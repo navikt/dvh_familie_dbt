@@ -3,7 +3,7 @@
 ) }}
 
 with kafka_ny_losning as (
-  select * from {{ source ('fam_ks', 'FAM_KS_META_DATA') }}
+  select * from {{ source ('fam_ks', 'fam_ks_meta_data') }}
 ),
 
 
