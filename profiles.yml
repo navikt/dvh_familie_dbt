@@ -9,7 +9,7 @@ dvh_familie:
       host: dm07-scan.adeo.no
       port: 1521
       service: dwhu1
-      database: "dwh"
+      database: "dwhu1"
       schema: "{{env_var('DBT_DB_SCHEMA')}}"
       threads: 4
     dwhr:
@@ -21,7 +21,7 @@ dvh_familie:
       port: 1521
       service: dwhr
       schema: "{{env_var('DBT_DB_SCHEMA')}}"
-      database: "dwh"
+      database: "dwhr"
       threads: 4
     dwhq0:
       type: oracle
@@ -32,6 +32,7 @@ dvh_familie:
       port: 1521
       service: dwhq0
       schema: "{{env_var('DBT_DB_SCHEMA')}}"
+      database: "dwhq0"
       threads: 4
     prod:
       type: oracle
@@ -42,6 +43,7 @@ dvh_familie:
       port: 1521
       service: dwh_ha
       schema: "{{env_var('DBT_DB_SCHEMA')}}"
+      database: "dwh_ha"
       threads: 4
 config:
   send_anonymous_usage_stats: False
