@@ -15,8 +15,9 @@ k.kafka_partisjon,
 k.kafka_hash,
 k.melding.fagsakId as fagsakId,
 k.melding.behandlingId as behandlingId,
+k.melding.relatertBehandlingId as relatertBehandlingId,
 k.melding.tidspunktVedtak as tidspunktVedtak,
-k.melding.person.rolle as rolle,
+k.melding.person.rolle as rolle
 from kafka_ny_losning k
 )
 
