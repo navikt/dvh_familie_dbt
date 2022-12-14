@@ -13,12 +13,10 @@ k.kafka_offset,
 k.kafka_topic,
 k.kafka_partisjon,
 k.kafka_hash,
-k.melding.fagsakId,
-k.melding.behandlingId,
-k.melding.relatertBehandlingId,
-k.melding.tidspunktVedtak,
-k.melding.person.rolle,
-k.melding.person.statsborgerskap
+k.melding.fagsakId as fagsakId,
+k.melding.behandlingId as behandlingId,
+k.melding.tidspunktVedtak as tidspunktVedtak,
+k.melding.person.rolle as rolle,
 from kafka_ny_losning k
 )
 
