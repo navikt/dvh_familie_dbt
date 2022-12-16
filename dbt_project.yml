@@ -50,7 +50,6 @@ clean-targets:         # directories to be removed by `dbt clean`
 models:
   post-hook: 'grant select, read on {{ this }} to DVH_FAM_AIRFLOW'
   dvh_familie:
-    # Config indicated by + and applies to all files under models/staging & models.marts
     marts:
       +materialized: view
     staging:
