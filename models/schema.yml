@@ -50,6 +50,11 @@ sources:
       - name: fam_ks_meta_data
         description: 'inneholder meta_data for kontantstøtte'
 
+  - name: kode_verk
+    schema: dt_kodeverk
+    tables:
+     - name: dim_alder
+
 
 
 
