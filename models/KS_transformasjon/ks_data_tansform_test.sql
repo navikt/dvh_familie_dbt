@@ -1,7 +1,3 @@
-{{ config(
-    tags=["ks_kafka_test"]
-) }}
-
 with kafka_ny_losning as (
   select * from {{ source ('fam_ks', 'fam_ks_meta_data') }}
 ),
