@@ -4,12 +4,12 @@ with kafka_ny_losning as (
 
 final as (
 select
-k.melding.person.personIdent as person_ident,
-k.melding.person.rolle as rolle
-k.melding.person.bostedland as bostedland,
-k.melding.person.delingsprosentYtelse as delingsprosent_ytelse
-  from kafka_ny_losning k
+  k.melding.person.personIdent as person_ident,
+  k.melding.person.rolle as rolle,
+  k.melding.person.bostedsland as bostedsland,
+  k.melding.person.delingsprosentYtelse as delingsprosent_ytelse
+from
+  kafka_ny_losning k
 )
-
 
 select * from final
