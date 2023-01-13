@@ -1,7 +1,18 @@
 import os, time, json, sys, logging, subprocess
 from typing import List
-#from dataverk_vault import api as vault_api
-from dataverk_vault.api import set_secrets_as_envs
+from google.cloud import secretmanager
+
+def set_secrets_as_envs():
+  secrets = secretmanager.SecretManagerServiceClient()
+  resource_name = f"{os.environ['KNADA_TEAM_SECRET']}/versions/latest"
+  secret = secrets.access_secret_version(name=resource_name)
+  secret_str = secret.payload.data.decode('UTF-8')
+  secrets = json.loads(secret_str)
+  os.environ.update(secrets)
+
+
+
+
 
 # we pass a list of dictionary parameter, and write a json output to the file (xcom_file). This file doesn't exist but will be created when the dag runs
 def write_to_xcom_push_file(content: List[dict]):
@@ -49,8 +60,10 @@ if __name__ == "__main__":
   schema = os.getenv("DB_SCHEMA")
   os.environ["TZ"] = "Europe/Oslo"
   time.tzset()
+  set_secrets_as_envs() #get secrets from gcp
 
-  set_secrets_as_envs() #get secrets from vault
+
+  #set_secrets_as_envs() #get secrets from vault
 
   profiles_dir = str(sys.path[0]) #dvh_familie_dbt/airflow (directory containing the profiles.yml)
   logger = logging.getLogger(__name__)

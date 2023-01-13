@@ -5,8 +5,15 @@ import json
 import sys
 import logging
 from typing import List
-from dataverk_vault import api as vault_api
-from dataverk_vault.api import set_secrets_as_envs
+from google.cloud import secretmanager
+
+def set_secrets_as_envs():
+  secrets = secretmanager.SecretManagerServiceClient()
+  resource_name = f"{os.environ['KNADA_TEAM_SECRET']}/versions/latest"
+  secret = secrets.access_secret_version(name=resource_name)
+  secret_str = secret.payload.data.decode('UTF-8')
+  secrets = json.loads(secret_str)
+  os.environ.update(secrets)
 
 
 def write_to_xcom_push_file(content: List[dict]):
@@ -54,7 +61,7 @@ if __name__ == "__main__":
     log_level = os.getenv("LOG_LEVEL")
     schema = os.getenv("DB_SCHEMA")
 
-    set_secrets_as_envs()
+    set_secrets_as_envs() #get secrets from gcp
 
     if not log_level: log_level = 'INFO'
     logger.setLevel(log_level)
