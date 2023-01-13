@@ -4,7 +4,7 @@ with kafka_ny_losning as (
 
 final as (
 select
-  dvh_fam_ks.HIBERNATE_SEQUENCE.nextval pk_fam_ks_fagsak,
+  --dvh_fam_ks.HIBERNATE_SEQUENCE.nextval pk_fam_ks_fagsak,
   k.kafka_offset,
   k.melding.fagsakId as fagsak_id,
   k.melding.behandlingId as behandling_id,
@@ -17,7 +17,7 @@ select
   k.melding.person.rolle,
   k.pk_ks_meta_data as fk_ks_meta_data
 from
-  kafka_ny_losning as k
+  kafka_ny_losning k
 )
 
 select * from final
