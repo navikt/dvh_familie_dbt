@@ -1,17 +1,27 @@
 with kafka_ny_losning as (
-  select * from {{ source ('fam_ks', 'fam_ks_meta_data') }}
+  select kafka_offset , melding from {{ source ('fam_ks', 'fam_ks_meta_data') }}
+),
+
+pre_final as (
+select *  from kafka_ny_losning,
+  json_table(melding, '$.utbetalingsperioder[*]'
+  columns (
+    hjemmel path '$.hjemmel',
+    utbetalt_per_mnd path '$.utbetaltPerMnd',
+    stonad_fom     path '$.stønadFom',
+    stonad_tom     path '$.stønadTom'
+    )
+  ) j
 ),
 
 final as (
 select
-  --dvh_fam_ks.HIBERNATE_SEQUENCE.nextval pk_fam_ks_fagsak,
-  k.kafka_offset,
-  k.melding.utbetalingsperioder.Hjemmel as Hjemmel,
-  k.melding.utbetalingsperioder.utbetaltPerMnd,
-  k.melding.utbetalingsperioder.stønadFom Stonad_Fom,
-  k.melding.utbetalingsperioder.stønadTom Stonad_Tom
-from
-  kafka_ny_losning k
+  kafka_offset,
+  hjemmel,
+  utbetalt_per_mnd,
+  stonad_fom,
+  stonad_tom
+from pre_final
 )
 
 select * from final
