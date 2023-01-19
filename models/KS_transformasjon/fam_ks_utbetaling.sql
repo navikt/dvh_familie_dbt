@@ -4,14 +4,18 @@ with kafka_ny_losning as (
 
 pre_final as (
 select *  from kafka_ny_losning,
-  json_table(melding, '$.utbetalingsperioder[*]'
-  columns (
-    hjemmel path '$.hjemmel',
-    utbetalt_per_mnd path '$.utbetaltPerMnd',
-    stonad_fom     path '$.stønadFom',
-    stonad_tom     path '$.stønadTom'
-    )
-  ) j
+  json_table(melding, '$'
+    columns(
+        fagsak_id  path  '$.fagsakId',
+          nested path '$.utbetalingsperioder[*]'
+          columns(
+            hjemmel path '$.hjemmel',
+            utbetalt_per_mnd path '$.utbetaltPerMnd',
+            stonad_fom     path '$.stønadFom',
+            stonad_tom     path '$.stønadTom'
+        )
+      )
+    ) j
 ),
 
 final as (
@@ -20,7 +24,8 @@ select
   hjemmel,
   utbetalt_per_mnd,
   stonad_fom,
-  stonad_tom
+  stonad_tom,
+  fagsak_id as fk_fam_ks_fagsak
 from pre_final
 )
 

@@ -7,7 +7,7 @@ select *  from kafka_ny_losning,
 json_table(melding, '$.utbetalingsperioder.utbetalingsDetaljer[*]'
   columns (
     klassekode path '$.klassekode',
-    utbetalt_per_mnd path '$.utbetaltPerMnd',
+    utbetalt_per_mnd path '$.utbetaltPrMnd',
     delytelse_id     path '$.delytelseId'
     )
   ) j
@@ -15,7 +15,11 @@ json_table(melding, '$.utbetalingsperioder.utbetalingsDetaljer[*]'
 
 final as (
 select
-kafka_offset, klassekode, utbetalt_per_mnd, delytelse_id
+delytelse_id as pk_fam_ks_utbet_det,
+kafka_offset,
+klassekode,
+utbetalt_per_mnd,
+delytelse_id
 from pre_final
 )
 
