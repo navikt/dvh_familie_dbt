@@ -51,12 +51,12 @@ kafka_mottatt_dato,
 sysdate lastet_dato,
 behandlings_id || stonad_fom || stonad_tom as fk_ks_utbetaling
 from pre_final
-)
-
-select * from final
-
 {% if is_incremental() %}
 
   where kafka_mottatt_dato > (select max(kafka_mottatt_dato) from {{ this }})
 
 {% endif %}
+)
+
+select * from final
+

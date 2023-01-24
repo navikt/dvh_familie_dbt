@@ -38,12 +38,12 @@ select
   sysdate lastet_dato,
   behandlings_id as fk_fam_ks_fagsak
 from pre_final
-)
-
-select * from final
-
 {% if is_incremental() %}
 
   where kafka_mottatt_dato > (select max(kafka_mottatt_dato) from {{ this }})
 
 {% endif %}
+)
+
+select * from final
+

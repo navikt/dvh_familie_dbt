@@ -52,12 +52,14 @@ final as (
     pk_ks_meta_data as fk_ks_meta_data
   from
     pre_final
+
+  {% if is_incremental() %}
+
+  where kafka_mottatt_dato > (select max(kafka_mottatt_dato) from {{ this }})
+
+  {% endif %}
 )
 
 select * from final
 
-{% if is_incremental() %}
 
-  where kafka_mottatt_dato > (select max(kafka_mottatt_dato) from {{ this }})
-
-{% endif %}
