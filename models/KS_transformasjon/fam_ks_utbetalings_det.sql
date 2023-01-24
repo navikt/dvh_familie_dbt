@@ -1,11 +1,3 @@
-{{
-    config(
-        materialized='incremental',
-        unique_key='pk_fam_ks_utbet_det',
-        on_schema_change='append_new_columns'
-    )
-}}
-
 with kafka_ny_losning as (
   select kafka_offset, kafka_mottatt_dato, melding from {{ source ('fam_ks', 'fam_ks_meta_data') }}
 ),
@@ -51,12 +43,6 @@ kafka_mottatt_dato,
 sysdate lastet_dato,
 behandlings_id || stonad_fom || stonad_tom as fk_ks_utbetaling
 from pre_final
-{% if is_incremental() %}
-
-  where kafka_mottatt_dato > (select max(kafka_mottatt_dato) from {{ this }})
-
-{% endif %}
 )
 
 select * from final
-
