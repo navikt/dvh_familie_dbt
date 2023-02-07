@@ -6,8 +6,8 @@ name: 'dvh_familie'
 version: '1.0.0'
 config-version: 2
 
-# vars:
-#   periode: 202207
+#vars:
+#  periode: 202209
 # This setting configures which "profile" dbt uses for this project.
 profile: 'dvh_familie'
 
@@ -54,5 +54,5 @@ models:
       +materialized: view
     staging:
       +materialized: view
-    test:
+    KS_transformasjon:
       +materialized: view
