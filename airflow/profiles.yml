@@ -8,7 +8,7 @@ dvh_familie:
       pass: "{{env_var('DBT_ORCL_PASS')}}"
       host: "{{env_var('DBT_ORCL_HOST')}}"
       port: 1521
-      database: "dwhu1" #"{{env_var('DBT_ORCL_DB')}}"
+      database: "dwh"#"{{env_var('DBT_ORCL_DB')}}"
       service: "{{env_var('DBT_ORCL_SERVICE')}}"
       schema: "{{env_var('DBT_ORCL_SCHEMA')}}"
       threads: 4
