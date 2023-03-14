@@ -1,6 +1,5 @@
 {{
     config(
-      pre_hook = 'grant select, read, update, delete, insert on {{ this }} to DVH_FAM_DBT',
       materialized = 'incremental',
       unique_key = 'pk_ks_fagsak'
     )
