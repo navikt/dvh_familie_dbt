@@ -1,7 +1,7 @@
 {{
     config(
-      materialized = 'incremental',
-      unique_key = 'pk_ks_fagsak'
+        materialized='incremental',
+        unique_key='pk_ks_fagsak'
     )
 }}
 
