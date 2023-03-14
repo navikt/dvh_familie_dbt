@@ -38,7 +38,7 @@ utbetalt_per_mnd,
 delytelse_id,
 hjemmel,
 person_ident,
---b.fk_person1,
+nvl(b.fk_person1, -1) fk_person1,
 rolle,
 stonad_fom,
 stonad_tom,
@@ -50,13 +50,11 @@ behandlings_id as fk_fam_ks_fagsak,
 behandlings_id || stonad_fom || stonad_tom as fk_ks_utbetaling
 from
   pre_final
-/*
-join dt_person.ident_off_id_til_fk_person1 b on
+left outer join dt_person.ident_off_id_til_fk_person1 b on
   pre_final.person_ident=b.off_id
   and b.gyldig_fra_dato<=pre_final.kafka_mottatt_dato
   and b.gyldig_til_dato>=kafka_mottatt_dato
   and b.skjermet_kode=0
-*/
 )
 
 select
@@ -69,7 +67,7 @@ select
   kafka_mottatt_dato,
   lastet_dato,
   delytelse_id
-  --fk_person1,
+  fk_person1,
   fk_ks_utbetaling,
   fk_fam_ks_fagsak
 from final

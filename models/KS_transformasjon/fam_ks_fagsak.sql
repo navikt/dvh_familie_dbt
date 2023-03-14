@@ -36,7 +36,7 @@ final as (
     funksjonell_id,
     behandling_aarsak,
     person_ident,
-    --b.fk_person1,
+    nvl(b.fk_person1, -1) fk_person1,
     rolle,
     bosteds_land,
     delingsprosent_ytelse,
@@ -45,13 +45,11 @@ final as (
     pk_ks_meta_data as fk_ks_meta_data
   from
     pre_final
-    /*
-  join dt_person.ident_off_id_til_fk_person1 b on
+  left outer join dt_person.ident_off_id_til_fk_person1 b on
     pre_final.person_ident=b.off_id
     and b.gyldig_fra_dato<=pre_final.kafka_mottatt_dato
     and b.gyldig_til_dato>=kafka_mottatt_dato
     and b.skjermet_kode=0
-    */
 )
 
 select
@@ -64,7 +62,7 @@ select
   behandling_type,
   funksjonell_id,
   behandling_aarsak,
-  --fk_person1,
+  fk_person1,
   rolle,
   bosteds_land,
   delingsprosent_ytelse,
