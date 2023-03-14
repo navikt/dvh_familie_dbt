@@ -1,7 +1,7 @@
 {{
     config(
       materialized = 'incremental',
-      unique_key = 'behandlings_id'
+      unique_key = 'pk_ks_fagsak'
     )
 }}
 
