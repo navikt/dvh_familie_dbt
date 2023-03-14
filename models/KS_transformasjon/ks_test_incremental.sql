@@ -1,7 +1,8 @@
 {{
     config(
-        materialized='incremental',
-        unique_key='pk_ks_fagsak'
+      pre_hook = 'grant select, read on {{ this }} to DVH_FAM_DBT',
+      materialized = 'incremental',
+      unique_key = 'pk_ks_fagsak'
     )
 }}
 
