@@ -1,12 +1,3 @@
-/*
-{{
-    config(
-        materialized='incremental',
-        unique_key='pk_ks_fagsak'
-    )
-}}
-*/
-
 with kafka_ny_losning as (
   select pk_ks_meta_data, kafka_offset, kafka_mottatt_dato, melding from {{ source ('fam_ks', 'fam_ks_meta_data') }}
 ),
@@ -80,12 +71,5 @@ select
   fk_ks_meta_data
 from final
 
-/*
-{% if is_incremental() %}
-
-  where kafka_mottatt_dato > (select max(kafka_mottatt_dato) from {{ this }})
-
-{% endif %}
-*/
 
 
