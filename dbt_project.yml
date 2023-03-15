@@ -55,4 +55,4 @@ models:
     staging:
       +materialized: view
     KS_transformasjon:
-      +materialized: view
+      +materialized: table
