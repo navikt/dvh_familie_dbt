@@ -5,11 +5,11 @@ dvh_familie:
       type: oracle
       user: "{{env_var('DBT_DB_USER')}}"
       pass: "{{env_var('DBT_DB_PASS')}}"
-      protocol: tcp
+      protocol: "tcp"
       host: dm07-scan.adeo.no
       port: 1521
       service: dwhu1
-      database: "dwhu1"
+      database: dwh
       schema: "{{env_var('DBT_DB_SCHEMA')}}"
       threads: 4
     dwhr:
@@ -21,7 +21,7 @@ dvh_familie:
       port: 1521
       service: dwhr
       schema: "{{env_var('DBT_DB_SCHEMA')}}"
-      database: "dwh"
+      database: dwhr
       threads: 4
     dwhq0:
       type: oracle

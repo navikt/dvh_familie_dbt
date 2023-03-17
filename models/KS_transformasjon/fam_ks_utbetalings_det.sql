@@ -71,4 +71,3 @@ select
   fk_ks_utbetaling,
   fk_fam_ks_fagsak
 from final
-

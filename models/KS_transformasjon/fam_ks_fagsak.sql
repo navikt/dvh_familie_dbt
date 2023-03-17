@@ -20,7 +20,7 @@ select * from kafka_ny_losning,
             bosteds_land path '$.bostedsland',
             delingsprosent_ytelse path '$.delingsprosentYtelse'
         )
-      )
+    )
     ) j
 ),
 
@@ -70,6 +70,4 @@ select
   kafka_mottatt_dato,
   fk_ks_meta_data
 from final
-
-
 
