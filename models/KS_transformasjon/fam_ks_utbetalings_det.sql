@@ -73,7 +73,7 @@ select
   stonad_tom,
   kafka_mottatt_dato,
   lastet_dato,
-  delytelse_id
+  delytelse_id,
   fk_person1,
   fk_ks_utbetaling,
   fk_fam_ks_fagsak
