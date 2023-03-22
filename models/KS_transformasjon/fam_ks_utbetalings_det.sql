@@ -1,7 +1,7 @@
 {{
     config(
         materialized='incremental',
-        unique_key='pk_fam_ks_utbet_det'
+        unique_key='pk_ks_utbet_det'
     )
 }}
 
@@ -38,7 +38,7 @@ select *  from kafka_ny_losning,
 
 final as (
 select
-behandlings_id || stonad_fom || stonad_tom || delytelse_ID as pk_fam_ks_utbet_det,
+behandlings_id || stonad_fom || stonad_tom || delytelse_ID as pk_ks_utbet_det,
 kafka_offset,
 klassekode,
 utbetalt_per_mnd,
@@ -47,13 +47,13 @@ hjemmel,
 person_ident,
 nvl(b.fk_person1, -1) fk_person1,
 rolle,
-stonad_fom,
-stonad_tom,
+to_date(stonad_fom, 'yyyy-mm-dd') stonad_fom,
+to_date(stonad_tom,'yyyy-mm-dd') stonad_tom,
 bosteds_land,
 delingsprosent_ytelse,
 kafka_mottatt_dato,
 sysdate lastet_dato,
-behandlings_id as fk_fam_ks_fagsak,
+behandlings_id as fk_ks_fagsak,
 behandlings_id || stonad_fom || stonad_tom as fk_ks_utbetaling
 from
   pre_final
@@ -65,7 +65,7 @@ left outer join dt_person.ident_off_id_til_fk_person1 b on
 )
 
 select
-  pk_fam_ks_utbet_det,
+  pk_ks_utbet_det,
   kafka_offset,
   hjemmel,
   utbetalt_per_mnd,
@@ -74,9 +74,9 @@ select
   kafka_mottatt_dato,
   lastet_dato,
   delytelse_id,
-  fk_person1,
+  fk_person1_barn,
   fk_ks_utbetaling,
-  fk_fam_ks_fagsak
+  fk_ks_fagsak
 from final
 
 {% if is_incremental() %}

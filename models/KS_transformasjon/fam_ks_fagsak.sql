@@ -69,7 +69,7 @@ select
   behandling_type,
   funksjonell_id,
   behandling_aarsak,
-  fk_person1,
+  fk_person1_mottaker,
   rolle,
   bosteds_land,
   delingsprosent_ytelse,

@@ -31,11 +31,11 @@ select
   kafka_offset,
   hjemmel,
   utbetalt_per_mnd,
-  stonad_fom,
-  stonad_tom,
+  to_date(stonad_fom, 'yyyy-mm-dd') stonad_fom,
+  to_date(stonad_tom,'yyyy-mm-dd') stonad_tom,
   kafka_mottatt_dato,
   sysdate lastet_dato,
-  behandlings_id as fk_fam_ks_fagsak
+  behandlings_id as fk_ks_fagsak
 from pre_final
 )
 
