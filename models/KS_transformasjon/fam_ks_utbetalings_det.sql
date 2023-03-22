@@ -38,7 +38,7 @@ select *  from kafka_ny_losning,
 
 final as (
 select
-delytelse_id as pk_fam_ks_utbet_det,
+behandlings_id || stonad_fom || stonad_tom || delytelse_ID as pk_fam_ks_utbet_det,
 kafka_offset,
 klassekode,
 utbetalt_per_mnd,
