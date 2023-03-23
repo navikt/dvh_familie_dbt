@@ -47,7 +47,6 @@ final as (
     rolle,
     bosteds_land,
     delingsprosent_ytelse,
-    sysdate lastet_dato,
     kafka_mottatt_dato,
     pk_ks_meta_data as fk_ks_meta_data
   from
@@ -73,7 +72,6 @@ select
   rolle,
   bosteds_land,
   delingsprosent_ytelse,
-  lastet_dato,
   kafka_mottatt_dato,
   fk_ks_meta_data
 from final
