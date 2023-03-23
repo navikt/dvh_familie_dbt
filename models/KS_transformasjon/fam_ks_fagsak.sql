@@ -43,7 +43,7 @@ final as (
     funksjonell_id,
     behandling_aarsak,
     person_ident,
-    nvl(b.fk_person1, -1) fk_person1,
+    nvl(b.fk_person1, -1) fk_person1_mottaker,
     rolle,
     bosteds_land,
     delingsprosent_ytelse,
