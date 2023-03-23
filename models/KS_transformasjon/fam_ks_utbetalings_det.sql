@@ -52,6 +52,7 @@ to_date(stonad_tom,'yyyy-mm-dd') stonad_tom,
 bosteds_land,
 delingsprosent_ytelse,
 kafka_mottatt_dato,
+sysdate lastet_dato,
 behandlings_id as fk_ks_fagsak,
 behandlings_id || stonad_fom || stonad_tom as fk_ks_utbetaling
 from
@@ -71,6 +72,7 @@ select
   stonad_fom,
   stonad_tom,
   kafka_mottatt_dato,
+  lastet_dato,
   delytelse_id,
   fk_person1_barn,
   fk_ks_utbetaling,

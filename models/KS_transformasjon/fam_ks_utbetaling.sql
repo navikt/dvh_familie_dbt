@@ -34,6 +34,7 @@ select
   to_date(stonad_fom, 'yyyy-mm-dd') stonad_fom,
   to_date(stonad_tom,'yyyy-mm-dd') stonad_tom,
   kafka_mottatt_dato,
+  sysdate lastet_dato,
   behandlings_id as fk_ks_fagsak
 from pre_final
 )

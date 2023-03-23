@@ -43,10 +43,11 @@ final as (
     funksjonell_id,
     behandling_aarsak,
     person_ident,
-    nvl(b.fk_person1, -1) fk_person1_mottaker,
+    nvl(b.fk_person1, -1) fk_person1,
     rolle,
     bosteds_land,
     delingsprosent_ytelse,
+    sysdate lastet_dato,
     kafka_mottatt_dato,
     pk_ks_meta_data as fk_ks_meta_data
   from
@@ -72,6 +73,7 @@ select
   rolle,
   bosteds_land,
   delingsprosent_ytelse,
+  lastet_dato,
   kafka_mottatt_dato,
   fk_ks_meta_data
 from final
