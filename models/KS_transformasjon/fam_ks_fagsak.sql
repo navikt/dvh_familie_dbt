@@ -1,10 +1,3 @@
-{{
-    config(
-        materialized='incremental',
-        unique_key='pk_ks_fagsak'
-    )
-}}
-
 with kafka_ny_losning as (
   select pk_ks_meta_data, kafka_offset, kafka_mottatt_dato, melding from {{ source ('fam_ks', 'fam_ks_meta_data') }}
 ),
@@ -64,7 +57,7 @@ select
   kafka_offset,
   fagsak_id,
   behandlings_id,
-  CAST(to_timestamp_tz(T.tidspunkt_vedtak, 'FXYYYY-MM-DD"T"HH24:MI:SS.FXFF3TZH:TZM') AT TIME ZONE 'Europe/Belgrade' AS TIMESTAMP) AS tidspunkt_vedtak,
+  CAST(to_timestamp_tz(tidspunkt_vedtak, 'FXYYYY-MM-DD"T"HH24:MI:SS.FXFF3TZH:TZM') AT TIME ZONE 'Europe/Belgrade' AS TIMESTAMP) AS tidspunkt_vedtak,
   kategori,
   behandling_type,
   funksjonell_id,
@@ -78,9 +71,4 @@ select
   fk_ks_meta_data
 from final
 
-{% if is_incremental() %}
-
-  where kafka_mottatt_dato > (select max(kafka_mottatt_dato) from {{ this }})
-
-{% endif %}
 
