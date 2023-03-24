@@ -1,10 +1,3 @@
-{{
-    config(
-        materialized='incremental',
-        unique_key='pk_ks_utbetaling'
-    )
-}}
-
 with kafka_ny_losning as (
   select kafka_offset, kafka_mottatt_dato, melding from {{ source ('fam_ks', 'fam_ks_meta_data') }}
 ),
@@ -41,8 +34,4 @@ from pre_final
 
 select * from final
 
-{% if is_incremental() %}
 
-  where kafka_mottatt_dato > (select max(kafka_mottatt_dato) from {{ this }})
-
-{% endif %}
