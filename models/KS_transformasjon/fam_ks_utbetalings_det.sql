@@ -6,7 +6,7 @@
 }}
 
 with kafka_ny_losning as (
-  select kafka_offset, kafka_mottatt_dato, melding from {{ source ('fam_ks', 'fam_ks_meta_data') }} where KAFKA_OFFSET != 260
+  select kafka_offset, kafka_mottatt_dato, melding from {{ source ('fam_ks', 'fam_ks_meta_data') }}
 ),
 
 pre_final as (
