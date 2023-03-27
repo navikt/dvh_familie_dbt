@@ -6,7 +6,7 @@
 }}
 
 with kafka_ny_losning as (
-  select pk_ks_meta_data, kafka_offset, kafka_mottatt_dato, melding from {{ source ('fam_ks', 'fam_ks_meta_data') }}
+  select pk_ks_meta_data, kafka_offset, kafka_mottatt_dato, melding from {{ source ('fam_ks', 'fam_ks_meta_data') }} where KAFKA_OFFSET != 260
 ),
 
 pre_final as (
@@ -76,7 +76,7 @@ select
   lastet_dato,
   kafka_mottatt_dato,
   fk_ks_meta_data
-from final where KAFKA_OFFSET != 260
+from final
 
 {% if is_incremental() %}
 
