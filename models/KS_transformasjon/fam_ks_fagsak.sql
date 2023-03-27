@@ -76,7 +76,7 @@ select
   lastet_dato,
   kafka_mottatt_dato,
   fk_ks_meta_data
-from final
+from final where KAFKA_OFFSET != 260
 
 {% if is_incremental() %}
 

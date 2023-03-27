@@ -75,7 +75,7 @@ select
   fk_person1_barn,
   fk_ks_utbetaling,
   fk_ks_fagsak
-from final
+from final where KAFKA_OFFSET != 260
 
 {% if is_incremental() %}
 

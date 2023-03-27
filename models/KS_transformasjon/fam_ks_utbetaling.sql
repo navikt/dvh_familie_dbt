@@ -36,7 +36,7 @@ select
   kafka_mottatt_dato,
   sysdate lastet_dato,
   behandlings_id as fk_ks_fagsak
-from pre_final
+from pre_final where KAFKA_OFFSET != 260
 )
 
 select * from final
