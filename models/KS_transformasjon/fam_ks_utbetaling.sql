@@ -39,7 +39,7 @@ select
 from pre_final
 )
 
-select * from final
+select * from final where utbetalt_per_mnd is not null
 
 {% if is_incremental() %}
 
