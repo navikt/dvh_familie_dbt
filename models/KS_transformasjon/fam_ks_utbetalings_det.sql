@@ -79,6 +79,6 @@ from final
 
 {% if is_incremental() %}
 
-  where kafka_mottatt_dato > (select max(kafka_mottatt_dato) from {{ this }})
+  where kafka_mottatt_dato > (select max(kafka_mottatt_dato) from {{ this }}) and utbetalt_per_mnd is not null
 
 {% endif %}
