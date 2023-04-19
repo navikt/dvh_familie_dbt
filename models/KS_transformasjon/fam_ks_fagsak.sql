@@ -64,7 +64,10 @@ select
   kafka_offset,
   fagsak_id,
   behandlings_id,
-  CAST(to_timestamp_tz(tidspunkt_vedtak, 'FXYYYY-MM-DD"T"HH24:MI:SS.FXFF3TZH:TZM') AT TIME ZONE 'Europe/Belgrade' AS TIMESTAMP) AS tidspunkt_vedtak,
+  CASE
+    WHEN LENGTH(tidspunkt_vedtak) = 29 THEN CAST(to_timestamp_tz(tidspunkt_vedtak, 'FXYYYY-MM-DD"T"HH24:MI:SS.FXFF3TZH:TZM') AT TIME ZONE 'Europe/Belgrade' AS TIMESTAMP)
+    WHEN LENGTH(tidspunkt_vedtak) = 25 THEN CAST(to_timestamp_tz(tidspunkt_vedtak, 'yyyy-mm-dd"T"hh24:mi:ss TZH:TZM') AT TIME ZONE 'Europe/Belgrade' AS TIMESTAMP)
+    END tidspunkt_vedtak,  kategori,
   kategori,
   behandling_type,
   funksjonell_id,

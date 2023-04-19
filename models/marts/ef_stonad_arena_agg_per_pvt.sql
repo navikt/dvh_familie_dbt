@@ -39,7 +39,11 @@ trans_ef_arena AS (
         fk_person1
       FROM
         ef_stonad_arena_agg_pr_person_
+<<<<<<< HEAD
     ) pivot(SUM(postert_belop) for stonad_kode IN ('TSOBOUTG' AS tsoboutg, 'TSODAGREIS' AS tsodagreis, 'TSOFLYTT' AS tsoflytt, 'TSOLMIDLER' AS tsolmidler, 'TSOREISAKT' AS tsoreisakt, 'TSOREISARB' AS tsoreisarb, 'TSOREISOBL' AS tsoreisobl, 'TSOTILBARN' AS tsotilbarn, 'TSOTILFAM' AS tsotilfam))
+=======
+    ) pivot(sum(postert_belop) for stonad_kode IN ('TSOBOUTG' AS tsoboutg, 'TSODAGREIS' AS tsodagreis, 'TSOFLYTT' AS tsoflytt, 'TSOLMIDLER' AS tsolmidler, 'TSOREISAKT' AS tsoreisakt, 'TSOREISARB' AS tsoreisarb, 'TSOREISOBL' AS tsoreisobl, 'TSOTILBARN' AS tsotilbarn, 'TSOTILFAM' AS tsotilfam))
+>>>>>>> 589b342c1d619b0297257e9d6a25e5869f3e430d
 ),
 FINAL AS (
   SELECT
