@@ -10,4 +10,5 @@ create or replace package fam_ef authid current_user as
                                        ,p_out_error out varchar2);
   procedure fam_ef_patch_infotrygd_arena(p_in_periode_yyyymm in number ,p_out_error out varchar2);
   procedure fam_ef_patch_migrering_vedtak(p_in_periode_yyyymm in number ,p_out_error out varchar2);
+  procedure fam_ef_slett_offset(p_in_offset in varchar2, p_error_melding out varchar2);
 end fam_ef;

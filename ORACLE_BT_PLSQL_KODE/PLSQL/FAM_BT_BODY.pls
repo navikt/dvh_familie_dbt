@@ -1,2013 +1,1373 @@
-CREATE OR REPLACE PACKAGE BODY FAM_BT AS
-  PROCEDURE FAM_BT_INFOTRYGD_MOTTAKER_UPDATE(
-    P_IN_PERIOD IN VARCHAR2,
-    P_ERROR_MELDING OUT VARCHAR2
-  ) AS
- --v_aar_start VARCHAR2(6):= substr(p_in_period,1,4) || '01';
-    V_STOREDATE     DATE := SYSDATE;
-    L_ERROR_MELDING VARCHAR2(1000);
-    L_COMMIT        NUMBER := 0;
-    CURSOR CUR_MOTTAKER IS
+create or replace PACKAGE BODY                                                                                                                                                                                                                                                                                                                                                                                                                                 fam_bt AS
+
+  PROCEDURE fam_bt_infotrygd_mottaker_update(p_in_period IN VARCHAR2, p_error_melding OUT VARCHAR2) AS
+    --v_aar_start VARCHAR2(6):= substr(p_in_period,1,4) || '01';
+    v_storedate DATE := sysdate;
+    l_error_melding VARCHAR2(1000);
+
+    l_commit NUMBER := 0;
+
+    CURSOR cur_mottaker IS
       SELECT /*+ PARALLEL(8) */
-        INFOTRYGD.FK_PERSON1,
-        INFOTRYGD.PK_BT_MOTTAKER,
-        NVL(MAX(DIM_PERSON_MOTTAKER.BOSTED_KOMMUNE_NR),
-        -1) AS BOSTED_KOMMUNE_NR,
-        NVL(MAX(DIM_GEOGRAFI.BYDEL_KOMMUNE_NR),
-        -1) AS BYDEL_KOMMUNE_NR,
-        NVL(MAX(DIM_PERSON_MOTTAKER.PK_DIM_PERSON),
-        -1) AS FK_DIM_PERSON,
-        NVL(MAX(DIM_PERSON_MOTTAKER.FK_DIM_GEOGRAFI_BOSTED),
-        -1) AS FK_DIM_GEOGRAFI_BOSTED
-      FROM
-        DVH_FAM_BT.FAM_BT_MOTTAKER INFOTRYGD
-        LEFT OUTER JOIN DT_KODEVERK.DIM_TID FAM_BT_PERIODE
-        ON INFOTRYGD.STAT_AARMND = FAM_BT_PERIODE.AAR_MAANED
-        AND FAM_BT_PERIODE.DIM_NIVAA = 3
-        AND FAM_BT_PERIODE.GYLDIG_FLAGG = 1
-        LEFT OUTER JOIN DT_PERSON.DIM_PERSON DIM_PERSON_MOTTAKER
-        ON DIM_PERSON_MOTTAKER.FK_PERSON1 = INFOTRYGD.FK_PERSON1
-        AND DIM_PERSON_MOTTAKER.GYLDIG_FRA_DATO <= FAM_BT_PERIODE.SISTE_DATO_I_PERIODEN
-        AND DIM_PERSON_MOTTAKER.GYLDIG_TIL_DATO >= FAM_BT_PERIODE.SISTE_DATO_I_PERIODEN
-        LEFT OUTER JOIN DT_KODEVERK.DIM_GEOGRAFI DIM_GEOGRAFI
-        ON DIM_PERSON_MOTTAKER.FK_DIM_GEOGRAFI_BOSTED = DIM_GEOGRAFI.PK_DIM_GEOGRAFI
-      WHERE
-        INFOTRYGD.KILDE = 'INFOTRYGD'
-        AND INFOTRYGD.STAT_AARMND = P_IN_PERIOD
-        AND INFOTRYGD.FK_DIM_GEOGRAFI_BOSTED IS NULL
-      GROUP BY
-        INFOTRYGD.FK_PERSON1,
-        INFOTRYGD.PK_BT_MOTTAKER;
+             infotrygd.fk_person1, infotrygd.pk_bt_mottaker,
+             nvl(MAX(dim_person_mottaker.bosted_kommune_nr),-1) AS bosted_kommune_nr,
+             nvl(MAX(dim_geografi.bydel_kommune_nr),-1) AS bydel_kommune_nr,
+             nvl(max(dim_person_mottaker.pk_dim_person),-1) as fk_dim_person,
+             nvl(max(dim_person_mottaker.fk_dim_geografi_bosted),-1) as fk_dim_geografi_bosted
+      FROM dvh_fam_bt.fam_bt_mottaker infotrygd
+
+      LEFT OUTER JOIN dt_kodeverk.dim_tid fam_bt_periode
+      ON infotrygd.stat_aarmnd = fam_bt_periode.aar_maaned
+      AND fam_bt_periode.dim_nivaa = 3
+      AND fam_bt_periode.gyldig_flagg = 1
+
+      LEFT OUTER JOIN dt_person.dim_person dim_person_mottaker
+      ON dim_person_mottaker.fk_person1 = infotrygd.fk_person1
+      AND dim_person_mottaker.gyldig_fra_dato <= fam_bt_periode.siste_dato_i_perioden
+      AND dim_person_mottaker.gyldig_til_dato >= fam_bt_periode.siste_dato_i_perioden
+
+      LEFT OUTER JOIN dt_kodeverk.dim_geografi dim_geografi
+      ON dim_person_mottaker.fk_dim_geografi_bosted = dim_geografi.pk_dim_geografi
+
+      WHERE infotrygd.kilde = 'INFOTRYGD'
+      AND infotrygd.stat_aarmnd = p_in_period
+      and infotrygd.fk_dim_geografi_bosted is null
+      GROUP BY infotrygd.fk_person1, infotrygd.pk_bt_mottaker;
   BEGIN
-    FOR REC_MOTTAKER IN CUR_MOTTAKER LOOP
+    FOR rec_mottaker IN cur_mottaker LOOP
       BEGIN
-        UPDATE DVH_FAM_BT.FAM_BT_MOTTAKER
-        SET
-          BOSTED_KOMMUNE_NR = REC_MOTTAKER.BOSTED_KOMMUNE_NR,
-          BOSTED_BYDEL_KOMMUNE_NR = REC_MOTTAKER.BYDEL_KOMMUNE_NR,
-          FK_DIM_PERSON = REC_MOTTAKER.FK_DIM_PERSON,
-          FK_DIM_GEOGRAFI_BOSTED = REC_MOTTAKER.FK_DIM_GEOGRAFI_BOSTED
-        WHERE
-          PK_BT_MOTTAKER = REC_MOTTAKER.PK_BT_MOTTAKER;
-        L_COMMIT := L_COMMIT + 1;
+        UPDATE dvh_fam_bt.fam_bt_mottaker
+        SET bosted_kommune_nr = rec_mottaker.bosted_kommune_nr,
+            bosted_bydel_kommune_nr = rec_mottaker.bydel_kommune_nr,
+            fk_dim_person = rec_mottaker.fk_dim_person,
+            fk_dim_geografi_bosted = rec_mottaker.fk_dim_geografi_bosted
+        WHERE pk_bt_mottaker = rec_mottaker.pk_bt_mottaker;
+        l_commit := l_commit + 1;
       EXCEPTION
         WHEN OTHERS THEN
-          L_ERROR_MELDING := SUBSTR(SQLCODE
-            || ' '
-            || SQLERRM, 1, 1000);
-          INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
-            MIN_LASTET_DATO,
-            ID,
-            ERROR_MSG,
-            OPPRETTET_TID,
-            KILDE
-          ) VALUES(
-            NULL,
-            REC_MOTTAKER.PK_BT_MOTTAKER,
-            L_ERROR_MELDING,
-            V_STOREDATE,
-            'FAM_BT_INFOTRYGD_MOTTAKER_UPDATE1'
-          );
-          L_COMMIT := L_COMMIT + 1; --Gå videre til neste rekord
-          P_ERROR_MELDING := SUBSTR(P_ERROR_MELDING
-            || L_ERROR_MELDING, 1, 1000);
-          L_ERROR_MELDING := NULL;
+          l_error_melding := substr(SQLCODE || ' ' || sqlerrm, 1, 1000);
+          INSERT INTO dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, ID, error_msg, opprettet_tid, kilde)
+          VALUES(NULL, rec_mottaker.pk_bt_mottaker, l_error_melding, v_storedate, 'FAM_BT_INFOTRYGD_MOTTAKER_UPDATE1');
+          l_commit := l_commit + 1;--Gå videre til neste rekord
+          p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
+          l_error_melding := NULL;
       END;
-      IF L_COMMIT >= 100000 THEN
-        COMMIT;
-        L_COMMIT := 0;
+      IF l_commit >= 100000 THEN
+          COMMIT;
+          l_commit := 0;
       END IF;
     END LOOP;
     COMMIT;
-    IF L_ERROR_MELDING IS NOT NULL THEN
-      INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
-        ID,
-        ERROR_MSG,
-        OPPRETTET_TID,
-        KILDE
-      ) VALUES(
-        NULL,
-        L_ERROR_MELDING,
-        V_STOREDATE,
-        'FAM_BT_INFOTRYGD_MOTTAKER_UPDATE2'
-      );
+    IF l_error_melding IS NOT NULL THEN
+      INSERT INTO dvh_fam_fp.fp_xml_utbrett_error(ID, error_msg, opprettet_tid, kilde)
+      VALUES(NULL, l_error_melding, v_storedate, 'FAM_BT_INFOTRYGD_MOTTAKER_UPDATE2');
       COMMIT;
-      P_ERROR_MELDING := SUBSTR(P_ERROR_MELDING
-        || L_ERROR_MELDING, 1, 1000);
+      p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
     END IF;
   EXCEPTION
     WHEN OTHERS THEN
-      L_ERROR_MELDING := SUBSTR(SQLCODE
-        || ' '
-        || SQLERRM, 1, 1000);
-      INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
-        MIN_LASTET_DATO,
-        ID,
-        ERROR_MSG,
-        OPPRETTET_TID,
-        KILDE
-      ) VALUES(
-        NULL,
-        NULL,
-        L_ERROR_MELDING,
-        V_STOREDATE,
-        'FAM_BT_INFOTRYGD_MOTTAKER_UPDATE3'
-      );
+      l_error_melding := substr(SQLCODE || ' ' || sqlerrm, 1, 1000);
+      INSERT INTO dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, ID, error_msg, opprettet_tid, kilde)
+      VALUES(NULL, NULL, l_error_melding, v_storedate, 'FAM_BT_INFOTRYGD_MOTTAKER_UPDATE3');
       COMMIT;
-      P_ERROR_MELDING := SUBSTR(P_ERROR_MELDING
-        || L_ERROR_MELDING, 1, 1000);
-  END FAM_BT_INFOTRYGD_MOTTAKER_UPDATE;
-  PROCEDURE FAM_BT_MOTTAKER_INSERT_2(
-    P_IN_PERIOD IN VARCHAR2,
-    P_IN_GYLDIG_FLAGG IN NUMBER DEFAULT 0,
-    P_ERROR_MELDING OUT VARCHAR2
-  ) AS
-    V_AAR_START     VARCHAR2(6):= SUBSTR(P_IN_PERIOD, 1, 4)
-      || '01';
-    V_KILDE         VARCHAR2(10) := 'BT';
- --v_storedate DATE := sysdate;
-    L_ERROR_MELDING VARCHAR2(1000);
-    L_COMMIT        NUMBER := 0;
-    CURSOR CUR_MOTTAKER IS
-      SELECT /*+ PARALLEL(8) */
-        DATA.*,
-        BELOPE + BELOPHIE_B AS BELOPHIE,
-        BELOP + BELOPHIT_B AS BELOPHIT,
-        BELOP_UTVIDET + BELOPHIT_UTVIDET_B AS BELOPHIT_UTVIDET,
-        CASE
-          WHEN UNDERKATEGORI = 'ORDINÆR' THEN
-            1
-          WHEN UNDERKATEGORI = 'UTVIDET' THEN
-            2
-          WHEN UNDERKATEGORI = 'INSTITUSJON' THEN
-            4
-        END STATUSK
+      p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
+  END fam_bt_infotrygd_mottaker_update;
+
+  PROCEDURE fam_bt_mottaker_insert_2(p_in_period IN VARCHAR2
+                                  ,p_in_gyldig_flagg in number default 0
+                                  ,p_error_melding OUT VARCHAR2) AS
+    v_aar_start VARCHAR2(6):= substr(p_in_period,1,4) || '01';
+    v_kilde VARCHAR2(10) := 'BT';
+    --v_storedate DATE := sysdate;
+    l_error_melding VARCHAR2(1000);
+
+    l_commit NUMBER := 0;
+
+    CURSOR cur_mottaker IS
+      SELECT /*+ PARALLEL(8) */ data.*,
+             belope + belophie_b as belophie,
+             belop + belophit_b as belophit
+            ,belop_utvidet + belophit_utvidet_b as belophit_utvidet
+            ,case when underkategori = 'ORDINÆR' then 1
+                  when underkategori = 'UTVIDET' then 2
+                  when underkategori = 'INSTITUSJON' then 4
+             end statusk
       FROM
+      (
+        SELECT ur.gjelder_mottaker,
+               --to_char(ur.posteringsdato,'YYYYMM') periode,
+               SUM(ur.belop_sign) belop,
+               dim_kjonn_mottaker.kjonn_kode kjonn,
+               SUM(CASE WHEN to_char(ur.posteringsdato,'YYYYMM') > to_char(ur.dato_utbet_fom,'YYYYMM') THEN
+                             ur.belop_sign
+                        ELSE 0.0
+                   END) belope,
+               EXTRACT( YEAR FROM dim_person_mottaker.fodt_dato) fodsel_aar,
+               to_char(dim_person_mottaker.fodt_dato,'MM') fodsel_mnd,
+               dim_person_mottaker.tknr,
+               dim_person_mottaker.bosted_kommune_nr,
+               dim_geografi.bydel_kommune_nr,
+               fagsak.fagsak_id,
+               --fagsak.fagsak_type,
+               max(fagsak.pk_bt_fagsak) keep (dense_rank first order by fagsak.tidspunkt_vedtak desc) as pk_bt_fagsak,
+               max(fagsak.behandling_årsak) keep (dense_rank first order by fagsak.tidspunkt_vedtak desc) as behandling_årsak,
+               max(fagsak.underkategori) keep (dense_rank first order by fagsak.tidspunkt_vedtak desc) as underkategori,
+               --fagsak.enslig_forsørger,
+               dim_person_mottaker.pk_dim_person,
+               dim_person_mottaker.fk_dim_kjonn,
+               dim_person_mottaker.fk_dim_sivilstatus,
+               dim_person_mottaker.fk_dim_land_fodt,
+               dim_person_mottaker.fk_dim_geografi_bosted,
+               dim_person_mottaker.fk_dim_land_statsborgerskap,
+               fam_bt_periode.pk_dim_tid,
+               fam_bt_periode.siste_dato_i_perioden,
+               dim_alder.pk_dim_alder,
+               barn.fkby_person1,
+               barn.antbarn, barn.delingsprosent_ytelse,
+               TRUNC(months_between(fam_bt_periode.siste_dato_i_perioden,dim_person_barn.fodt_dato)/12) alderyb,
+               dim_land_barn.land_ssb_kode ssb_kode,
+               nvl(belop.belophie,0) belophie_b,
+               nvl(belop.belophit,0) belophit_b
+              ,sum((case when utvidet_barnetrygd.delytelse_id is not null then 1
+                         else 0
+                    end) * ur.belop_sign) belop_utvidet
+              ,nvl(belophit_utvidet.belophit_utvidet,0) belophit_utvidet_b
+        FROM dvh_fam_bt.fam_bt_ur_utbetaling ur
+        LEFT JOIN dvh_fam_bt.fam_bt_fagsak fagsak
+        ON fagsak.behandlings_id = ur.henvisning
+
+        LEFT OUTER JOIN dt_kodeverk.dim_tid fam_bt_periode
+        ON to_char(ur.posteringsdato,'YYYYMM') = fam_bt_periode.aar_maaned
+        AND fam_bt_periode.dim_nivaa = 3
+        AND fam_bt_periode.gyldig_flagg = 1
+
+        LEFT OUTER JOIN dt_person.dim_person dim_person_mottaker
+        ON dim_person_mottaker.fk_person1 = ur.gjelder_mottaker
+        AND dim_person_mottaker.gyldig_fra_dato <= fam_bt_periode.siste_dato_i_perioden
+        AND dim_person_mottaker.gyldig_til_dato >= fam_bt_periode.siste_dato_i_perioden
+        LEFT OUTER JOIN dt_kodeverk.dim_geografi dim_geografi
+        ON dim_person_mottaker.fk_dim_geografi_bosted = dim_geografi.pk_dim_geografi
+        LEFT OUTER JOIN dt_kodeverk.dim_kjonn dim_kjonn_mottaker
+        ON dim_person_mottaker.fk_dim_kjonn = dim_kjonn_mottaker.pk_dim_kjonn
+
+        LEFT OUTER JOIN dt_kodeverk.dim_alder
+        ON floor(months_between(sysdate, dim_person_mottaker.fodt_dato)/12) = dim_alder.alder
+        AND dim_alder.gyldig_fra_dato <= fam_bt_periode.siste_dato_i_perioden
+        AND dim_alder.gyldig_til_dato >= fam_bt_periode.siste_dato_i_perioden
+
+        LEFT JOIN
         (
-          SELECT
-            UR.GJELDER_MOTTAKER,
- --to_char(ur.posteringsdato,'YYYYMM') periode,
-            SUM(UR.BELOP_SIGN) BELOP,
-            DIM_KJONN_MOTTAKER.KJONN_KODE KJONN,
-            SUM(CASE
-              WHEN TO_CHAR(UR.POSTERINGSDATO, 'YYYYMM') > TO_CHAR(UR.DATO_UTBET_FOM, 'YYYYMM') THEN
-                UR.BELOP_SIGN
-              ELSE
-                0.0
-            END) BELOPE,
-            EXTRACT( YEAR
-          FROM
-            DIM_PERSON_MOTTAKER.FODT_DATO) FODSEL_AAR,
-            TO_CHAR(DIM_PERSON_MOTTAKER.FODT_DATO,
-            'MM') FODSEL_MND,
-            DIM_PERSON_MOTTAKER.TKNR,
-            DIM_PERSON_MOTTAKER.BOSTED_KOMMUNE_NR,
-            DIM_GEOGRAFI.BYDEL_KOMMUNE_NR,
-            FAGSAK.FAGSAK_ID,
- --fagsak.fagsak_type,
-            MAX(FAGSAK.PK_BT_FAGSAK) KEEP (DENSE_RANK FIRST ORDER BY FAGSAK.TIDSPUNKT_VEDTAK DESC) AS PK_BT_FAGSAK,
-            MAX(FAGSAK.BEHANDLING_ÅRSAK) KEEP (DENSE_RANK FIRST ORDER BY FAGSAK.TIDSPUNKT_VEDTAK DESC) AS BEHANDLING_ÅRSAK,
-            MAX(FAGSAK.UNDERKATEGORI) KEEP (DENSE_RANK FIRST ORDER BY FAGSAK.TIDSPUNKT_VEDTAK DESC) AS UNDERKATEGORI,
- --fagsak.enslig_forsørger,
-            DIM_PERSON_MOTTAKER.PK_DIM_PERSON,
-            DIM_PERSON_MOTTAKER.FK_DIM_KJONN,
-            DIM_PERSON_MOTTAKER.FK_DIM_SIVILSTATUS,
-            DIM_PERSON_MOTTAKER.FK_DIM_LAND_FODT,
-            DIM_PERSON_MOTTAKER.FK_DIM_GEOGRAFI_BOSTED,
-            DIM_PERSON_MOTTAKER.FK_DIM_LAND_STATSBORGERSKAP,
-            FAM_BT_PERIODE.PK_DIM_TID,
-            FAM_BT_PERIODE.SISTE_DATO_I_PERIODEN,
-            DIM_ALDER.PK_DIM_ALDER,
-            BARN.FKBY_PERSON1,
-            BARN.ANTBARN,
-            BARN.DELINGSPROSENT_YTELSE,
-            TRUNC(MONTHS_BETWEEN(FAM_BT_PERIODE.SISTE_DATO_I_PERIODEN,
-            DIM_PERSON_BARN.FODT_DATO)/12) ALDERYB,
-            DIM_LAND_BARN.LAND_SSB_KODE SSB_KODE,
-            NVL(BELOP.BELOPHIE,
-            0) BELOPHIE_B,
-            NVL(BELOP.BELOPHIT,
-            0) BELOPHIT_B,
-            SUM((
-              CASE
-                WHEN UTVIDET_BARNETRYGD.DELYTELSE_ID IS NOT NULL THEN
-                  1
-                ELSE
-                  0
-              END) * UR.BELOP_SIGN) BELOP_UTVIDET,
-            NVL(BELOPHIT_UTVIDET.BELOPHIT_UTVIDET,
-            0) BELOPHIT_UTVIDET_B
-          FROM
-            DVH_FAM_BT.FAM_BT_UR_UTBETALING UR
-            LEFT JOIN DVH_FAM_BT.FAM_BT_FAGSAK FAGSAK
-            ON FAGSAK.BEHANDLINGS_ID = UR.HENVISNING
-            LEFT OUTER JOIN DT_KODEVERK.DIM_TID FAM_BT_PERIODE
-            ON TO_CHAR(UR.POSTERINGSDATO,
-            'YYYYMM') = FAM_BT_PERIODE.AAR_MAANED
-            AND FAM_BT_PERIODE.DIM_NIVAA = 3
-            AND FAM_BT_PERIODE.GYLDIG_FLAGG = 1
-            LEFT OUTER JOIN DT_PERSON.DIM_PERSON DIM_PERSON_MOTTAKER
-            ON DIM_PERSON_MOTTAKER.FK_PERSON1 = UR.GJELDER_MOTTAKER
-            AND DIM_PERSON_MOTTAKER.GYLDIG_FRA_DATO <= FAM_BT_PERIODE.SISTE_DATO_I_PERIODEN
-            AND DIM_PERSON_MOTTAKER.GYLDIG_TIL_DATO >= FAM_BT_PERIODE.SISTE_DATO_I_PERIODEN
-            LEFT OUTER JOIN DT_KODEVERK.DIM_GEOGRAFI DIM_GEOGRAFI
-            ON DIM_PERSON_MOTTAKER.FK_DIM_GEOGRAFI_BOSTED = DIM_GEOGRAFI.PK_DIM_GEOGRAFI
-            LEFT OUTER JOIN DT_KODEVERK.DIM_KJONN DIM_KJONN_MOTTAKER
-            ON DIM_PERSON_MOTTAKER.FK_DIM_KJONN = DIM_KJONN_MOTTAKER.PK_DIM_KJONN
-            LEFT OUTER JOIN DT_KODEVERK.DIM_ALDER
-            ON FLOOR(MONTHS_BETWEEN(SYSDATE,
-            DIM_PERSON_MOTTAKER.FODT_DATO)/12) = DIM_ALDER.ALDER
-            AND DIM_ALDER.GYLDIG_FRA_DATO <= FAM_BT_PERIODE.SISTE_DATO_I_PERIODEN
-            AND DIM_ALDER.GYLDIG_TIL_DATO >= FAM_BT_PERIODE.SISTE_DATO_I_PERIODEN
-            LEFT JOIN (
-              SELECT
-                FK_PERSON1,
-                SUBSTR(MAX(FODSEL_AAR_BARN||FODSEL_MND_BARN||'-'||FKB_PERSON1),
-                8) FKBY_PERSON1,
-                MAX(DELINGSPROSENT_YTELSE) AS DELINGSPROSENT_YTELSE,
-                COUNT(DISTINCT FKB_PERSON1) ANTBARN
-              FROM
-                DVH_FAM_BT.FAM_BT_BARN
-              WHERE
-                KILDE = V_KILDE
-                AND STAT_AARMND = P_IN_PERIOD
-                AND GYLDIG_FLAGG = P_IN_GYLDIG_FLAGG
-              GROUP BY
-                FK_PERSON1
-            ) BARN
-            ON UR.GJELDER_MOTTAKER = BARN.FK_PERSON1
-            LEFT JOIN DT_PERSON.DIM_PERSON DIM_PERSON_BARN
-            ON DIM_PERSON_BARN.FK_PERSON1 = BARN.FKBY_PERSON1
-            AND DIM_PERSON_BARN.GYLDIG_FRA_DATO <= FAM_BT_PERIODE.SISTE_DATO_I_PERIODEN
-            AND DIM_PERSON_BARN.GYLDIG_TIL_DATO >= FAM_BT_PERIODE.SISTE_DATO_I_PERIODEN
-            LEFT OUTER JOIN DT_KODEVERK.DIM_LAND DIM_LAND_BARN
-            ON DIM_PERSON_BARN.FK_DIM_LAND_BOSTED = DIM_LAND_BARN.PK_DIM_LAND
- --AND dim_land.gyldig_fra_dato <= fam_bt_periode.siste_dato_i_perioden
- --AND dim_land.gyldig_til_dato >= fam_bt_periode.siste_dato_i_perioden
-            LEFT JOIN (
-              SELECT
-                FK_PERSON1,
-                SUM(NVL(BELOP,
-                0)) BELOPHIT,
-                SUM(NVL(BELOPE,
-                0)) BELOPHIE
-              FROM
-                DVH_FAM_BT.FAM_BT_MOTTAKER
-              WHERE
-                STAT_AARMND >= V_AAR_START
-                AND STAT_AARMND < P_IN_PERIOD
-                AND GYLDIG_FLAGG = P_IN_GYLDIG_FLAGG
-              GROUP BY
-                FK_PERSON1
-            ) BELOP
-            ON UR.GJELDER_MOTTAKER = BELOP.FK_PERSON1
- --Utvidet barnetrygd
-            LEFT JOIN (
-              SELECT
-                UTBET.BEHANDLINGS_ID,
-                UTBET.DELYTELSE_ID,
-                UTBETALING.STØNAD_FOM,
-                UTBETALING.STØNAD_TOM
-              FROM
-                DVH_FAM_BT.FAM_BT_UTBET_DET UTBET
-                JOIN DVH_FAM_BT.FAM_BT_PERSON PERSON
-                ON UTBET.FK_BT_PERSON = PERSON.PK_BT_PERSON
-                AND PERSON.ROLLE = 'SØKER' JOIN DVH_FAM_BT.FAM_BT_UTBETALING UTBETALING
-                ON UTBET.FK_BT_UTBETALING = UTBETALING.PK_BT_UTBETALING
-                JOIN DVH_FAM_BT.FAM_BT_FAGSAK FAGSAK
-                ON UTBETALING.BEHANDLINGS_ID = FAGSAK.BEHANDLINGS_ID
-                AND FAGSAK.ENSLIG_FORSØRGER = 1
-            ) UTVIDET_BARNETRYGD
-            ON UR.HENVISNING = UTVIDET_BARNETRYGD.BEHANDLINGS_ID
-            AND UR.DELYTELSE_ID = UTVIDET_BARNETRYGD.DELYTELSE_ID
-            AND UTVIDET_BARNETRYGD.STØNAD_FOM <= FAM_BT_PERIODE.SISTE_DATO_I_PERIODEN
-            AND UTVIDET_BARNETRYGD.STØNAD_TOM >= FAM_BT_PERIODE.SISTE_DATO_I_PERIODEN
-            LEFT JOIN (
-              SELECT
-                FK_PERSON1,
-                SUM(NVL(BELOP_UTVIDET,
-                0)) BELOPHIT_UTVIDET
-              FROM
-                DVH_FAM_BT.FAM_BT_MOTTAKER
-              WHERE
-                STAT_AARMND >= V_AAR_START
-                AND STAT_AARMND < P_IN_PERIOD
-                AND GYLDIG_FLAGG = P_IN_GYLDIG_FLAGG
-              GROUP BY
-                FK_PERSON1
-            ) BELOPHIT_UTVIDET
-            ON UR.GJELDER_MOTTAKER = BELOPHIT_UTVIDET.FK_PERSON1
-          WHERE
-            UR.HOVEDKONTONR = 800 --in (800, 214, 216, 215)-- = 800 Test!!!
-            AND TO_CHAR(UR.POSTERINGSDATO,
-            'YYYYMM') = P_IN_PERIOD
- --AND LENGTH(ur.delytelse_id) < 14
-          GROUP BY
-            UR.GJELDER_MOTTAKER,
-            TO_CHAR(UR.POSTERINGSDATO,
-            'YYYYMM'),
-            DIM_KJONN_MOTTAKER.KJONN_KODE,
-            FAM_BT_PERIODE.SISTE_DATO_I_PERIODEN,
-            EXTRACT( YEAR FROM DIM_PERSON_MOTTAKER.FODT_DATO),
-            TO_CHAR(DIM_PERSON_MOTTAKER.FODT_DATO,
-            'MM'),
-            DIM_PERSON_MOTTAKER.TKNR,
-            DIM_PERSON_MOTTAKER.BOSTED_KOMMUNE_NR,
-            DIM_GEOGRAFI.KOMMUNE_NR,
-            DIM_GEOGRAFI.BYDEL_KOMMUNE_NR,
-            FAGSAK.FAGSAK_ID,
-            DIM_PERSON_MOTTAKER.PK_DIM_PERSON,
-            DIM_PERSON_MOTTAKER.FK_DIM_KJONN,
-            DIM_PERSON_MOTTAKER.FK_DIM_SIVILSTATUS,
-            DIM_PERSON_MOTTAKER.FK_DIM_LAND_FODT,
-            DIM_PERSON_MOTTAKER.FK_DIM_GEOGRAFI_BOSTED,
-            DIM_PERSON_MOTTAKER.FK_DIM_LAND_STATSBORGERSKAP,
-            FAM_BT_PERIODE.PK_DIM_TID,
-            DIM_ALDER.PK_DIM_ALDER,
-            BARN.FKBY_PERSON1,
-            BARN.ANTBARN,
-            BARN.DELINGSPROSENT_YTELSE,
-            TRUNC(MONTHS_BETWEEN(FAM_BT_PERIODE.SISTE_DATO_I_PERIODEN,
-            DIM_PERSON_BARN.FODT_DATO)/12),
-            DIM_LAND_BARN.LAND_SSB_KODE,
-            NVL(BELOP.BELOPHIE,
-            0),
-            NVL(BELOP.BELOPHIT,
-            0),
-            NVL(BELOPHIT_UTVIDET.BELOPHIT_UTVIDET,
-            0)
-          HAVING
-            SUM(UR.BELOP_SIGN) != 0
-        ) DATA;
-  BEGIN
- -- Slett mottakere dvh_fam_fp.fam_bt_mottaker_hist for aktuell periode
-    BEGIN
-      DELETE FROM DVH_FAM_BT.FAM_BT_MOTTAKER --r152241.test_drp
-      WHERE
-        KILDE = V_KILDE
-        AND STAT_AARMND= P_IN_PERIOD
-        AND GYLDIG_FLAGG = P_IN_GYLDIG_FLAGG;
-      COMMIT;
-    EXCEPTION
-      WHEN OTHERS THEN
-        L_ERROR_MELDING := SUBSTR(SQLCODE
-          || ' '
-          || SQLERRM, 1, 1000);
-        INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
-          MIN_LASTET_DATO,
-          ID,
-          ERROR_MSG,
-          OPPRETTET_TID,
-          KILDE
-        ) VALUES(
-          NULL,
-          NULL,
-          L_ERROR_MELDING,
-          SYSDATE,
-          'FAM_BT_MOTTAKER_INSERT_WITH1'
-        );
-        COMMIT;
-        P_ERROR_MELDING := SUBSTR(P_ERROR_MELDING
-          || L_ERROR_MELDING, 1, 1000);
-        L_ERROR_MELDING := NULL;
-    END;
-    FOR REC_MOTTAKER IN CUR_MOTTAKER LOOP
- --INSERT INTO dvh_fam_fp.fam_bt_mottaker
-      BEGIN
-        INSERT INTO DVH_FAM_BT.FAM_BT_MOTTAKER --R152241.test_drp
- (
-          FK_PERSON1,
-          BELOP,
-          KJONN,
-          BELOPE,
-          FODSEL_AAR,
-          FODSEL_MND,
-          TKNR,
-          BOSTED_KOMMUNE_NR,
-          BOSTED_BYDEL_KOMMUNE_NR,
-          FAGSAK_ID,
-          FK_DIM_PERSON,
-          FK_DIM_KJONN,
-          FK_DIM_SIVILSTATUS,
-          FK_DIM_LAND_FODT,
-          FK_DIM_GEOGRAFI_BOSTED,
-          FK_DIM_LAND_STATSBORGERSKAP,
-          FK_DIM_TID_MND,
-          FK_DIM_ALDER,
-          FKBY_PERSON1,
-          ANTBARN,
-          BELOPHIE,
-          BELOPHIT,
-          YBARN,
-          EOYBLAND,
-          KILDE,
-          STAT_AARMND,
-          LASTET_DATO,
-          PROSENT,
-          STATUSK,
-          BELOP_UTVIDET,
-          BELOPHIT_UTVIDET,
-          FK_BT_FAGSAK,
-          BEHANDLING_ÅRSAK,
-          GYLDIG_FLAGG
-        ) VALUES (
-          REC_MOTTAKER.GJELDER_MOTTAKER,
-          REC_MOTTAKER.BELOP,
-          REC_MOTTAKER.KJONN,
-          REC_MOTTAKER.BELOPE,
-          REC_MOTTAKER.FODSEL_AAR,
-          REC_MOTTAKER.FODSEL_MND,
-          REC_MOTTAKER.TKNR,
-          REC_MOTTAKER.BOSTED_KOMMUNE_NR,
-          REC_MOTTAKER.BYDEL_KOMMUNE_NR,
-          REC_MOTTAKER.FAGSAK_ID,
-          REC_MOTTAKER.PK_DIM_PERSON,
-          REC_MOTTAKER.FK_DIM_KJONN,
-          REC_MOTTAKER.FK_DIM_SIVILSTATUS,
-          REC_MOTTAKER.FK_DIM_LAND_FODT,
-          REC_MOTTAKER.FK_DIM_GEOGRAFI_BOSTED,
-          REC_MOTTAKER.FK_DIM_LAND_STATSBORGERSKAP,
-          REC_MOTTAKER.PK_DIM_TID,
-          REC_MOTTAKER.PK_DIM_ALDER,
-          REC_MOTTAKER.FKBY_PERSON1,
-          REC_MOTTAKER.ANTBARN,
-          REC_MOTTAKER.BELOPHIE,
-          REC_MOTTAKER.BELOPHIT,
-          REC_MOTTAKER.ALDERYB,
-          REC_MOTTAKER.SSB_KODE,
-          V_KILDE,
-          P_IN_PERIOD,
-          SYSDATE,
-          REC_MOTTAKER.DELINGSPROSENT_YTELSE,
-          REC_MOTTAKER.STATUSK,
-          REC_MOTTAKER.BELOP_UTVIDET,
-          REC_MOTTAKER.BELOPHIT_UTVIDET,
-          REC_MOTTAKER.PK_BT_FAGSAK,
-          REC_MOTTAKER.BEHANDLING_ÅRSAK,
-          P_IN_GYLDIG_FLAGG
-        );
-        L_COMMIT := L_COMMIT + 1;
-      EXCEPTION
-        WHEN OTHERS THEN
-          L_ERROR_MELDING := SUBSTR(SQLCODE
-            || ' '
-            || SQLERRM, 1, 1000);
-          INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
-            MIN_LASTET_DATO,
-            ID,
-            ERROR_MSG,
-            OPPRETTET_TID,
-            KILDE
-          ) VALUES(
-            NULL,
-            REC_MOTTAKER.FAGSAK_ID,
-            L_ERROR_MELDING,
-            SYSDATE,
-            'FAM_BT_MOTTAKER_INSERT_WITH2'
-          );
-          L_COMMIT := L_COMMIT + 1; --Gå videre til neste rekord
-          P_ERROR_MELDING := SUBSTR(P_ERROR_MELDING
-            || L_ERROR_MELDING, 1, 1000);
-          L_ERROR_MELDING := NULL;
-      END;
-      IF L_COMMIT >= 100000 THEN
-        COMMIT;
-        L_COMMIT := 0;
-      END IF;
-    END LOOP;
-    COMMIT;
-    IF L_ERROR_MELDING IS NOT NULL THEN
-      INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
-        ID,
-        ERROR_MSG,
-        OPPRETTET_TID,
-        KILDE
-      ) VALUES(
-        NULL,
-        L_ERROR_MELDING,
-        SYSDATE,
-        'FAM_BT_MOTTAKER_INSERT_WITH3'
-      );
-      COMMIT;
-      P_ERROR_MELDING := SUBSTR(P_ERROR_MELDING
-        || L_ERROR_MELDING, 1, 1000);
-    END IF;
-  EXCEPTION
-    WHEN OTHERS THEN
-      L_ERROR_MELDING := SUBSTR(SQLCODE
-        || ' '
-        || SQLERRM, 1, 1000);
-      INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
-        MIN_LASTET_DATO,
-        ID,
-        ERROR_MSG,
-        OPPRETTET_TID,
-        KILDE
-      ) VALUES(
-        NULL,
-        NULL,
-        L_ERROR_MELDING,
-        SYSDATE,
-        'FAM_BT_MOTTAKER_INSERT_WITH4'
-      );
-      COMMIT;
-      P_ERROR_MELDING := SUBSTR(P_ERROR_MELDING
-        || L_ERROR_MELDING, 1, 1000);
-  END FAM_BT_MOTTAKER_INSERT_2;
-  PROCEDURE FAM_BT_MOTTAKER_INSERT(
-    P_IN_PERIOD IN VARCHAR2,
-    P_IN_GYLDIG_FLAGG IN NUMBER DEFAULT 0,
-    P_ERROR_MELDING OUT VARCHAR2
-  ) AS
-    V_AAR_START     VARCHAR2(6):= SUBSTR(P_IN_PERIOD, 1, 4)
-      || '01';
-    V_KILDE         VARCHAR2(10) := 'BT';
- --v_storedate DATE := sysdate;
-    L_ERROR_MELDING VARCHAR2(1000);
-    L_COMMIT        NUMBER := 0;
-    CURSOR CUR_MOTTAKER IS
-      SELECT /*+ PARALLEL(8) */
-        DATA.*,
-        BELOPE + BELOPHIE_B AS BELOPHIE,
-        BELOP + BELOPHIT_B AS BELOPHIT,
-        BELOP_UTVIDET + BELOPHIT_UTVIDET_B AS BELOPHIT_UTVIDET,
-        CASE
-          WHEN UNDERKATEGORI = 'ORDINÆR' THEN
-            1
-          WHEN UNDERKATEGORI = 'UTVIDET' THEN
-            2
-          WHEN FAGSAK_TYPE = 'INSTITUSJON' THEN
-            4
-        END STATUSK
-      FROM
+          SELECT fk_person1,
+                 substr(MAX(fodsel_aar_barn||fodsel_mnd_barn||'-'||fkb_person1),8) fkby_person1,
+                 max(delingsprosent_ytelse) as delingsprosent_ytelse,
+                 COUNT(DISTINCT fkb_person1) antbarn
+          FROM dvh_fam_bt.fam_bt_barn
+          WHERE kilde = v_kilde
+          AND stat_aarmnd = p_in_period
+          and gyldig_flagg = p_in_gyldig_flagg
+          GROUP BY fk_person1
+        ) barn
+        ON ur.gjelder_mottaker = barn.fk_person1
+
+        LEFT JOIN dt_person.dim_person dim_person_barn
+        ON dim_person_barn.fk_person1 = barn.fkby_person1
+        AND dim_person_barn.gyldig_fra_dato <= fam_bt_periode.siste_dato_i_perioden
+        AND dim_person_barn.gyldig_til_dato >= fam_bt_periode.siste_dato_i_perioden
+        LEFT OUTER JOIN dt_kodeverk.dim_land dim_land_barn
+        ON dim_person_barn.fk_dim_land_bosted = dim_land_barn.pk_dim_land
+        --AND dim_land.gyldig_fra_dato <= fam_bt_periode.siste_dato_i_perioden
+        --AND dim_land.gyldig_til_dato >= fam_bt_periode.siste_dato_i_perioden
+
+        LEFT JOIN
         (
-          SELECT
-            UR.GJELDER_MOTTAKER,
- --to_char(ur.posteringsdato,'YYYYMM') periode,
-            SUM(UR.BELOP_SIGN) BELOP,
-            DIM_KJONN_MOTTAKER.KJONN_KODE KJONN,
-            SUM(CASE
-              WHEN TO_CHAR(UR.POSTERINGSDATO, 'YYYYMM') > TO_CHAR(UR.DATO_UTBET_FOM, 'YYYYMM') THEN
-                UR.BELOP_SIGN
-              ELSE
-                0.0
-            END) BELOPE,
-            EXTRACT( YEAR
-          FROM
-            DIM_PERSON_MOTTAKER.FODT_DATO) FODSEL_AAR,
-            TO_CHAR(DIM_PERSON_MOTTAKER.FODT_DATO,
-            'MM') FODSEL_MND,
-            DIM_PERSON_MOTTAKER.TKNR,
-            DIM_PERSON_MOTTAKER.BOSTED_KOMMUNE_NR,
-            DIM_GEOGRAFI.BYDEL_KOMMUNE_NR,
-            FAGSAK.FAGSAK_ID,
-            MAX(FAGSAK.PK_BT_FAGSAK) KEEP (DENSE_RANK FIRST ORDER BY FAGSAK.TIDSPUNKT_VEDTAK DESC) AS PK_BT_FAGSAK,
-            MAX(FAGSAK.BEHANDLING_ÅRSAK) KEEP (DENSE_RANK FIRST ORDER BY FAGSAK.TIDSPUNKT_VEDTAK DESC) AS BEHANDLING_ÅRSAK,
-            MAX(FAGSAK.UNDERKATEGORI) KEEP (DENSE_RANK FIRST ORDER BY FAGSAK.TIDSPUNKT_VEDTAK DESC) AS UNDERKATEGORI,
-            MAX(FAGSAK.FAGSAK_TYPE) KEEP (DENSE_RANK FIRST ORDER BY FAGSAK.TIDSPUNKT_VEDTAK DESC) AS FAGSAK_TYPE,
- --fagsak.enslig_forsørger,
-            DIM_PERSON_MOTTAKER.PK_DIM_PERSON,
-            DIM_PERSON_MOTTAKER.FK_DIM_KJONN,
-            DIM_PERSON_MOTTAKER.FK_DIM_SIVILSTATUS,
-            DIM_PERSON_MOTTAKER.FK_DIM_LAND_FODT,
-            DIM_PERSON_MOTTAKER.FK_DIM_GEOGRAFI_BOSTED,
-            DIM_PERSON_MOTTAKER.FK_DIM_LAND_STATSBORGERSKAP,
-            FAM_BT_PERIODE.PK_DIM_TID,
-            FAM_BT_PERIODE.SISTE_DATO_I_PERIODEN,
-            DIM_ALDER.PK_DIM_ALDER,
-            BARN.FKBY_PERSON1,
-            BARN.ANTBARN,
-            BARN.DELINGSPROSENT_YTELSE,
-            TRUNC(MONTHS_BETWEEN(FAM_BT_PERIODE.SISTE_DATO_I_PERIODEN,
-            DIM_PERSON_BARN.FODT_DATO)/12) ALDERYB,
-            DIM_LAND_BARN.LAND_SSB_KODE SSB_KODE,
-            NVL(BELOP.BELOPHIE,
-            0) BELOPHIE_B,
-            NVL(BELOP.BELOPHIT,
-            0) BELOPHIT_B,
-            SUM((
-              CASE
-                WHEN UTVIDET_BARNETRYGD.DELYTELSE_ID IS NOT NULL THEN
-                  1
-                ELSE
-                  0
-              END) * UR.BELOP_SIGN) BELOP_UTVIDET,
-            NVL(BELOPHIT_UTVIDET.BELOPHIT_UTVIDET,
-            0) BELOPHIT_UTVIDET_B,
-            MAX(FAM_BT_KOMPETANSE_PERIODER.SOKERSAKTIVITET) SOKERS_AKTIVITET,
-            MAX(FAM_BT_KOMPETANSE_PERIODER.ANNENFORELDER_AKTIVITET) ANNENFORELDER_AKTIVITET,
-            MAX(FAM_BT_KOMPETANSE_PERIODER.KOMPETANSE_RESULTAT) KOMPETANSE_RESULTAT,
-            MIN(
-              CASE
-                WHEN FAM_BT_KOMPETANSE_PERIODER.KOMPETANSE_RESULTAT= 'NORGE_ER_PRIMÆRLAND' THEN
-                  '000'
-                WHEN FAM_BT_KOMPETANSE_PERIODER.KOMPETANSE_RESULTAT= 'NORGE_ER_SEKUNDÆRLAND' THEN
-                  DIM_LAND_ANNEN_FORELDER_AKTIVITET.LAND_SSB_KODE
-                ELSE
-                  NULL
-              END) EOKLAND,
-            MIN(
-              CASE
-                WHEN FAM_BT_KOMPETANSE_PERIODER.KOMPETANSE_RESULTAT= 'NORGE_ER_PRIMÆRLAND' THEN
-                  DIM_LAND_ANNEN_FORELDER_AKTIVITET.LAND_SSB_KODE
-                WHEN FAM_BT_KOMPETANSE_PERIODER.KOMPETANSE_RESULTAT= 'NORGE_ER_SEKUNDÆRLAND' THEN
-                  '000'
-                ELSE
-                  NULL
-              END) EODLAND,
-            DIM_PERSON_MOTTAKER.GT_VERDI PERSON_GT_VERDI,
-            MAX(FAM_BT_KOMPETANSE_PERIODER.BARNETS_BOSTEDSLAND) BARNETS_BOSTEDSLAND,
-            MAX(FAM_BT_KOMPETANSE_PERIODER.PK_BT_KOMPETANSE_PERIODER) FK_BT_KOMPETANSE_PERIODER
-          FROM
-            DVH_FAM_BT.FAM_BT_UR_UTBETALING UR
-            LEFT JOIN DVH_FAM_BT.FAM_BT_FAGSAK FAGSAK
-            ON FAGSAK.BEHANDLINGS_ID = UR.HENVISNING
-            LEFT OUTER JOIN DT_KODEVERK.DIM_TID FAM_BT_PERIODE
-            ON TO_CHAR(UR.POSTERINGSDATO,
-            'YYYYMM') = FAM_BT_PERIODE.AAR_MAANED
-            AND FAM_BT_PERIODE.DIM_NIVAA = 3
-            AND FAM_BT_PERIODE.GYLDIG_FLAGG = 1
-            LEFT OUTER JOIN DT_PERSON.DIM_PERSON DIM_PERSON_MOTTAKER
-            ON DIM_PERSON_MOTTAKER.FK_PERSON1 = UR.GJELDER_MOTTAKER
-            AND DIM_PERSON_MOTTAKER.GYLDIG_FRA_DATO <= FAM_BT_PERIODE.SISTE_DATO_I_PERIODEN
-            AND DIM_PERSON_MOTTAKER.GYLDIG_TIL_DATO >= FAM_BT_PERIODE.SISTE_DATO_I_PERIODEN
-            LEFT OUTER JOIN DT_KODEVERK.DIM_GEOGRAFI DIM_GEOGRAFI
-            ON DIM_PERSON_MOTTAKER.FK_DIM_GEOGRAFI_BOSTED = DIM_GEOGRAFI.PK_DIM_GEOGRAFI
-            LEFT OUTER JOIN DT_KODEVERK.DIM_KJONN DIM_KJONN_MOTTAKER
-            ON DIM_PERSON_MOTTAKER.FK_DIM_KJONN = DIM_KJONN_MOTTAKER.PK_DIM_KJONN
-            LEFT OUTER JOIN DT_KODEVERK.DIM_ALDER
-            ON FLOOR(MONTHS_BETWEEN(SYSDATE,
-            DIM_PERSON_MOTTAKER.FODT_DATO)/12) = DIM_ALDER.ALDER
-            AND DIM_ALDER.GYLDIG_FRA_DATO <= FAM_BT_PERIODE.SISTE_DATO_I_PERIODEN
-            AND DIM_ALDER.GYLDIG_TIL_DATO >= FAM_BT_PERIODE.SISTE_DATO_I_PERIODEN
-            LEFT OUTER JOIN --dvh_fam_bt.fam_bt_kompetanse_perioder
-            (
-              SELECT
-                MAX(PK_BT_KOMPETANSE_PERIODER) PK_BT_KOMPETANSE_PERIODER,
-                FOM,
-                TOM,
- -- sokersaktivitet,
- -- annenforelder_aktivitet,
- -- annenforelder_aktivitetsland,
- -- kompetanse_resultat,
- -- barnets_bostedsland,
-                FK_BT_FAGSAK --,
- -- sokers_aktivitetsland
-              FROM
-                DVH_FAM_BT.FAM_BT_KOMPETANSE_PERIODER
-              GROUP BY
-                FOM,
-                TOM,
- --sokersaktivitet,
- --annenforelder_aktivitet,
- --annenforelder_aktivitetsland,
- --kompetanse_resultat,
- --barnets_bostedsland,
-                FK_BT_FAGSAK --,
- --sokers_aktivitetsland
-            ) KOMPETANSE_PERIODER
-            ON FAGSAK.PK_BT_FAGSAK=KOMPETANSE_PERIODER.FK_BT_FAGSAK
-            AND FAGSAK.KATEGORI='EØS'
-            AND UR.DATO_UTBET_FOM>=TO_DATE(KOMPETANSE_PERIODER.FOM,
-            'YYYY-MM')
-            AND UR.DATO_UTBET_FOM<=TO_DATE(NVL(KOMPETANSE_PERIODER.TOM,
-            '2099-12'),
-            'YYYY-MM')
-            LEFT OUTER JOIN DVH_FAM_BT.FAM_BT_KOMPETANSE_PERIODER
-            ON KOMPETANSE_PERIODER.PK_BT_KOMPETANSE_PERIODER = DVH_FAM_BT.FAM_BT_KOMPETANSE_PERIODER.PK_BT_KOMPETANSE_PERIODER
-            LEFT OUTER JOIN DT_KODEVERK.DIM_LAND DIM_LAND_ANNEN_FORELDER_AKTIVITET
-            ON DIM_LAND_ANNEN_FORELDER_AKTIVITET.LAND_ISO_2_KODE=FAM_BT_KOMPETANSE_PERIODER.ANNENFORELDER_AKTIVITETSLAND
-            AND DIM_LAND_ANNEN_FORELDER_AKTIVITET.GYLDIG_FLAGG=1
-            AND DIM_LAND_ANNEN_FORELDER_AKTIVITET.LAND_ISO_3_KODE!='ESC'
-            LEFT JOIN (
-              SELECT
-                FK_PERSON1,
-                SUBSTR(MAX(FODSEL_AAR_BARN||FODSEL_MND_BARN||'-'||FKB_PERSON1),
-                8) FKBY_PERSON1,
-                MAX(DELINGSPROSENT_YTELSE) AS DELINGSPROSENT_YTELSE,
-                COUNT(DISTINCT FKB_PERSON1) ANTBARN
-              FROM
-                DVH_FAM_BT.FAM_BT_BARN
-              WHERE
-                KILDE = V_KILDE
-                AND STAT_AARMND = P_IN_PERIOD
-                AND GYLDIG_FLAGG = P_IN_GYLDIG_FLAGG
-              GROUP BY
-                FK_PERSON1
-            ) BARN
-            ON UR.GJELDER_MOTTAKER = BARN.FK_PERSON1
-            LEFT JOIN DT_PERSON.DIM_PERSON DIM_PERSON_BARN
-            ON DIM_PERSON_BARN.FK_PERSON1 = BARN.FKBY_PERSON1
-            AND DIM_PERSON_BARN.GYLDIG_FRA_DATO <= FAM_BT_PERIODE.SISTE_DATO_I_PERIODEN
-            AND DIM_PERSON_BARN.GYLDIG_TIL_DATO >= FAM_BT_PERIODE.SISTE_DATO_I_PERIODEN
-            LEFT OUTER JOIN DT_KODEVERK.DIM_LAND DIM_LAND_BARN
-            ON DIM_PERSON_BARN.FK_DIM_LAND_BOSTED = DIM_LAND_BARN.PK_DIM_LAND
- --AND dim_land.gyldig_fra_dato <= fam_bt_periode.siste_dato_i_perioden
- --AND dim_land.gyldig_til_dato >= fam_bt_periode.siste_dato_i_perioden
-            LEFT JOIN (
-              SELECT
-                FK_PERSON1,
-                SUM(NVL(BELOP,
-                0)) BELOPHIT,
-                SUM(NVL(BELOPE,
-                0)) BELOPHIE
-              FROM
-                DVH_FAM_BT.FAM_BT_MOTTAKER
-              WHERE
-                STAT_AARMND >= V_AAR_START
-                AND STAT_AARMND < P_IN_PERIOD
-                AND GYLDIG_FLAGG = P_IN_GYLDIG_FLAGG
-              GROUP BY
-                FK_PERSON1
-            ) BELOP
-            ON UR.GJELDER_MOTTAKER = BELOP.FK_PERSON1
- --Utvidet barnetrygd
-            LEFT JOIN (
-              SELECT
-                UTBET.BEHANDLINGS_ID,
-                UTBET.DELYTELSE_ID,
-                UTBETALING.STØNAD_FOM,
-                UTBETALING.STØNAD_TOM
-              FROM
-                DVH_FAM_BT.FAM_BT_UTBET_DET UTBET
-                JOIN DVH_FAM_BT.FAM_BT_PERSON PERSON
-                ON UTBET.FK_BT_PERSON = PERSON.PK_BT_PERSON
-                AND PERSON.ROLLE = 'SØKER' JOIN DVH_FAM_BT.FAM_BT_UTBETALING UTBETALING
-                ON UTBET.FK_BT_UTBETALING = UTBETALING.PK_BT_UTBETALING
-                JOIN DVH_FAM_BT.FAM_BT_FAGSAK FAGSAK
-                ON UTBETALING.BEHANDLINGS_ID = FAGSAK.BEHANDLINGS_ID
-                AND FAGSAK.ENSLIG_FORSØRGER = 1
-            ) UTVIDET_BARNETRYGD
-            ON UR.HENVISNING = UTVIDET_BARNETRYGD.BEHANDLINGS_ID
-            AND UR.DELYTELSE_ID = UTVIDET_BARNETRYGD.DELYTELSE_ID
-            AND UTVIDET_BARNETRYGD.STØNAD_FOM <= FAM_BT_PERIODE.SISTE_DATO_I_PERIODEN
-            AND UTVIDET_BARNETRYGD.STØNAD_TOM >= FAM_BT_PERIODE.SISTE_DATO_I_PERIODEN
-            LEFT JOIN (
-              SELECT
-                FK_PERSON1,
-                SUM(NVL(BELOP_UTVIDET,
-                0)) BELOPHIT_UTVIDET
-              FROM
-                DVH_FAM_BT.FAM_BT_MOTTAKER
-              WHERE
-                STAT_AARMND >= V_AAR_START
-                AND STAT_AARMND < P_IN_PERIOD
-                AND GYLDIG_FLAGG = P_IN_GYLDIG_FLAGG
-              GROUP BY
-                FK_PERSON1
-            ) BELOPHIT_UTVIDET
-            ON UR.GJELDER_MOTTAKER = BELOPHIT_UTVIDET.FK_PERSON1
-          WHERE
-            UR.HOVEDKONTONR = 800 --in (800, 214, 216, 215)-- = 800 Test!!!
-            AND TO_CHAR(UR.POSTERINGSDATO,
-            'YYYYMM') = P_IN_PERIOD
- --AND UR.FK_PERSON1=1073261799
- --AND LENGTH(ur.delytelse_id) < 14
-          GROUP BY
-            UR.GJELDER_MOTTAKER,
-            TO_CHAR(UR.POSTERINGSDATO,
-            'YYYYMM'),
-            DIM_KJONN_MOTTAKER.KJONN_KODE,
-            FAM_BT_PERIODE.SISTE_DATO_I_PERIODEN,
-            EXTRACT( YEAR FROM DIM_PERSON_MOTTAKER.FODT_DATO),
-            TO_CHAR(DIM_PERSON_MOTTAKER.FODT_DATO,
-            'MM'),
-            DIM_PERSON_MOTTAKER.TKNR,
-            DIM_PERSON_MOTTAKER.BOSTED_KOMMUNE_NR,
-            DIM_GEOGRAFI.KOMMUNE_NR,
-            DIM_GEOGRAFI.BYDEL_KOMMUNE_NR,
-            FAGSAK.FAGSAK_ID,
-            DIM_PERSON_MOTTAKER.PK_DIM_PERSON,
-            DIM_PERSON_MOTTAKER.FK_DIM_KJONN,
-            DIM_PERSON_MOTTAKER.FK_DIM_SIVILSTATUS,
-            DIM_PERSON_MOTTAKER.FK_DIM_LAND_FODT,
-            DIM_PERSON_MOTTAKER.FK_DIM_GEOGRAFI_BOSTED,
-            DIM_PERSON_MOTTAKER.FK_DIM_LAND_STATSBORGERSKAP,
-            FAM_BT_PERIODE.PK_DIM_TID,
-            DIM_ALDER.PK_DIM_ALDER,
-            BARN.FKBY_PERSON1,
-            BARN.ANTBARN,
-            BARN.DELINGSPROSENT_YTELSE,
-            TRUNC(MONTHS_BETWEEN(FAM_BT_PERIODE.SISTE_DATO_I_PERIODEN,
-            DIM_PERSON_BARN.FODT_DATO)/12),
-            DIM_LAND_BARN.LAND_SSB_KODE,
-            NVL(BELOP.BELOPHIE,
-            0),
-            NVL(BELOP.BELOPHIT,
-            0),
-            NVL(BELOPHIT_UTVIDET.BELOPHIT_UTVIDET,
-            0),
-            DIM_PERSON_MOTTAKER.GT_VERDI
-          HAVING
-            SUM(UR.BELOP_SIGN) != 0
-        ) DATA;
+          SELECT fk_person1,
+                 SUM(nvl(belop,0)) belophit,
+                 SUM(nvl(belope,0)) belophie
+          FROM dvh_fam_bt.fam_bt_mottaker
+          WHERE stat_aarmnd >= v_aar_start
+          AND stat_aarmnd < p_in_period
+          and gyldig_flagg = p_in_gyldig_flagg
+          GROUP BY fk_person1
+        ) belop
+        ON ur.gjelder_mottaker = belop.fk_person1
+
+        --Utvidet barnetrygd
+        left join
+        (select utbet.behandlings_id, utbet.delytelse_id, utbetaling.stønad_fom, utbetaling.stønad_tom
+         from dvh_fam_bt.fam_bt_utbet_det utbet
+         join dvh_fam_bt.fam_bt_person person
+         on utbet.fk_bt_person = person.pk_bt_person
+         and person.rolle = 'SØKER'
+         join dvh_fam_bt.fam_bt_utbetaling utbetaling
+         on utbet.fk_bt_utbetaling = utbetaling.pk_bt_utbetaling
+         join dvh_fam_bt.fam_bt_fagsak fagsak
+         on utbetaling.behandlings_id = fagsak.behandlings_id
+         and fagsak.enslig_forsørger = 1) utvidet_barnetrygd
+        on ur.henvisning = utvidet_barnetrygd.behandlings_id
+        and ur.delytelse_id = utvidet_barnetrygd.delytelse_id
+        and utvidet_barnetrygd.stønad_fom <= fam_bt_periode.siste_dato_i_perioden
+        and utvidet_barnetrygd.stønad_tom >= fam_bt_periode.siste_dato_i_perioden
+        left join
+        (select fk_person1,
+                sum(nvl(belop_utvidet,0)) belophit_utvidet
+         from dvh_fam_bt.fam_bt_mottaker
+         where stat_aarmnd >= v_aar_start
+         and stat_aarmnd < p_in_period
+         and gyldig_flagg = p_in_gyldig_flagg
+         group by fk_person1
+        ) belophit_utvidet
+        ON ur.gjelder_mottaker = belophit_utvidet.fk_person1
+
+        WHERE ur.hovedkontonr = 800--in (800, 214, 216, 215)-- = 800 Test!!!
+        AND to_char(ur.posteringsdato,'YYYYMM') = p_in_period
+        --AND LENGTH(ur.delytelse_id) < 14
+        GROUP BY ur.gjelder_mottaker, to_char(ur.posteringsdato,'YYYYMM'), dim_kjonn_mottaker.kjonn_kode,
+                 fam_bt_periode.siste_dato_i_perioden, EXTRACT( YEAR FROM dim_person_mottaker.fodt_dato),
+                 to_char(dim_person_mottaker.fodt_dato,'MM'), dim_person_mottaker.tknr,
+                 dim_person_mottaker.bosted_kommune_nr, dim_geografi.kommune_nr,
+                 dim_geografi.bydel_kommune_nr, fagsak.fagsak_id,
+                 dim_person_mottaker.pk_dim_person,
+                 dim_person_mottaker.fk_dim_kjonn, dim_person_mottaker.fk_dim_sivilstatus,
+                 dim_person_mottaker.fk_dim_land_fodt, dim_person_mottaker.fk_dim_geografi_bosted,
+                 dim_person_mottaker.fk_dim_land_statsborgerskap, fam_bt_periode.pk_dim_tid,
+                 dim_alder.pk_dim_alder,barn.fkby_person1,barn.antbarn,barn.delingsprosent_ytelse,
+                 TRUNC(months_between(fam_bt_periode.siste_dato_i_perioden,dim_person_barn.fodt_dato)/12),
+                 dim_land_barn.land_ssb_kode,nvl(belop.belophie,0),nvl(belop.belophit,0)
+                ,nvl(belophit_utvidet.belophit_utvidet,0)
+        having sum(ur.belop_sign) != 0
+      ) data;
   BEGIN
- -- Slett mottakere dvh_fam_fp.fam_bt_mottaker_hist for aktuell periode
+
+    -- Slett mottakere dvh_fam_fp.fam_bt_mottaker_hist for aktuell periode
     BEGIN
-      DELETE FROM DVH_FAM_BT.FAM_BT_MOTTAKER --r152241.test_drp
-      WHERE
-        KILDE = V_KILDE
-        AND STAT_AARMND= P_IN_PERIOD
-        AND GYLDIG_FLAGG = P_IN_GYLDIG_FLAGG;
+      DELETE FROM dvh_fam_bt.fam_bt_mottaker--r152241.test_drp
+      WHERE kilde = v_kilde
+      AND stat_aarmnd= p_in_period
+      and gyldig_flagg = p_in_gyldig_flagg;
       COMMIT;
     EXCEPTION
       WHEN OTHERS THEN
-        L_ERROR_MELDING := SUBSTR(SQLCODE
-          || ' '
-          || SQLERRM, 1, 1000);
-        INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
-          MIN_LASTET_DATO,
-          ID,
-          ERROR_MSG,
-          OPPRETTET_TID,
-          KILDE
-        ) VALUES(
-          NULL,
-          NULL,
-          L_ERROR_MELDING,
-          SYSDATE,
-          'FAM_BT_MOTTAKER_INSERT_WITH1'
-        );
+        l_error_melding := substr(SQLCODE || ' ' || sqlerrm, 1, 1000);
+        INSERT INTO dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, ID, error_msg, opprettet_tid, kilde)
+        VALUES(NULL, NULL, l_error_melding, sysdate, 'FAM_BT_MOTTAKER_INSERT_WITH1');
         COMMIT;
-        P_ERROR_MELDING := SUBSTR(P_ERROR_MELDING
-          || L_ERROR_MELDING, 1, 1000);
-        L_ERROR_MELDING := NULL;
+        p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
+        l_error_melding := NULL;
     END;
-    FOR REC_MOTTAKER IN CUR_MOTTAKER LOOP
- --INSERT INTO dvh_fam_fp.fam_bt_mottaker
+
+    FOR rec_mottaker IN cur_mottaker LOOP
+      --INSERT INTO dvh_fam_fp.fam_bt_mottaker
       BEGIN
-        INSERT INTO DVH_FAM_BT.FAM_BT_MOTTAKER --R152241.test_drp
- (
-          FK_PERSON1,
-          BELOP,
-          KJONN,
-          BELOPE,
-          FODSEL_AAR,
-          FODSEL_MND,
-          TKNR,
-          BOSTED_KOMMUNE_NR,
-          BOSTED_BYDEL_KOMMUNE_NR,
-          FAGSAK_ID,
-          FK_DIM_PERSON,
-          FK_DIM_KJONN,
-          FK_DIM_SIVILSTATUS,
-          FK_DIM_LAND_FODT,
-          FK_DIM_GEOGRAFI_BOSTED,
-          FK_DIM_LAND_STATSBORGERSKAP,
-          FK_DIM_TID_MND,
-          FK_DIM_ALDER,
-          FKBY_PERSON1,
-          ANTBARN,
-          BELOPHIE,
-          BELOPHIT,
-          YBARN,
-          EOYBLAND,
-          KILDE,
-          STAT_AARMND,
-          LASTET_DATO,
-          PROSENT,
-          STATUSK,
-          BELOP_UTVIDET,
-          BELOPHIT_UTVIDET,
-          FK_BT_FAGSAK,
-          BEHANDLING_ÅRSAK,
-          GYLDIG_FLAGG,
-          EOKLAND,
-          EODLAND
- --,SOKERS_AKTIVITET
- --,ANNENFORELDER_AKTIVITET
- --,KOMPETANSE_RESULTAT
- --,BARNETS_BOSTEDSLAND
-,
-          PERSON_GT_VERDI,
-          FK_BT_KOMPETANSE_PERIODER
-        ) VALUES (
-          REC_MOTTAKER.GJELDER_MOTTAKER,
-          REC_MOTTAKER.BELOP,
-          REC_MOTTAKER.KJONN,
-          REC_MOTTAKER.BELOPE,
-          REC_MOTTAKER.FODSEL_AAR,
-          REC_MOTTAKER.FODSEL_MND,
-          REC_MOTTAKER.TKNR,
-          REC_MOTTAKER.BOSTED_KOMMUNE_NR,
-          REC_MOTTAKER.BYDEL_KOMMUNE_NR,
-          REC_MOTTAKER.FAGSAK_ID,
-          REC_MOTTAKER.PK_DIM_PERSON,
-          REC_MOTTAKER.FK_DIM_KJONN,
-          REC_MOTTAKER.FK_DIM_SIVILSTATUS,
-          REC_MOTTAKER.FK_DIM_LAND_FODT,
-          REC_MOTTAKER.FK_DIM_GEOGRAFI_BOSTED,
-          REC_MOTTAKER.FK_DIM_LAND_STATSBORGERSKAP,
-          REC_MOTTAKER.PK_DIM_TID,
-          REC_MOTTAKER.PK_DIM_ALDER,
-          REC_MOTTAKER.FKBY_PERSON1,
-          REC_MOTTAKER.ANTBARN,
-          REC_MOTTAKER.BELOPHIE,
-          REC_MOTTAKER.BELOPHIT,
-          REC_MOTTAKER.ALDERYB,
-          REC_MOTTAKER.SSB_KODE,
-          V_KILDE,
-          P_IN_PERIOD,
-          SYSDATE,
-          REC_MOTTAKER.DELINGSPROSENT_YTELSE,
-          REC_MOTTAKER.STATUSK,
-          REC_MOTTAKER.BELOP_UTVIDET,
-          REC_MOTTAKER.BELOPHIT_UTVIDET,
-          REC_MOTTAKER.PK_BT_FAGSAK,
-          REC_MOTTAKER.BEHANDLING_ÅRSAK,
-          P_IN_GYLDIG_FLAGG,
-          REC_MOTTAKER.EOKLAND,
-          REC_MOTTAKER.EODLAND
- --,rec_mottaker.sokers_aktivitet
- --,rec_mottaker.annenforelder_aktivitet
- --,rec_mottaker.kompetanse_resultat
- --,rec_mottaker.barnets_bostedsland
-,
-          REC_MOTTAKER.PERSON_GT_VERDI,
-          REC_MOTTAKER.FK_BT_KOMPETANSE_PERIODER
+        INSERT INTO dvh_fam_bt.fam_bt_mottaker--R152241.test_drp
+        (
+          fk_person1, belop, kjonn, belope,
+          fodsel_aar, fodsel_mnd, tknr, bosted_kommune_nr,
+          bosted_bydel_kommune_nr, fagsak_id, fk_dim_person,
+          fk_dim_kjonn, fk_dim_sivilstatus, fk_dim_land_fodt,
+          fk_dim_geografi_bosted, fk_dim_land_statsborgerskap, fk_dim_tid_mnd,
+          fk_dim_alder, fkby_person1, antbarn, belophie,
+          belophit, ybarn, eoybland, kilde, stat_aarmnd, lastet_dato
+         ,prosent, statusk, belop_utvidet, belophit_utvidet, fk_bt_fagsak, behandling_årsak
+         ,gyldig_flagg
+        )
+        VALUES
+        (
+          rec_mottaker.gjelder_mottaker, rec_mottaker.belop, rec_mottaker.kjonn, rec_mottaker.belope,
+          rec_mottaker.fodsel_aar, rec_mottaker.fodsel_mnd, rec_mottaker.tknr, rec_mottaker.bosted_kommune_nr,
+          rec_mottaker.bydel_kommune_nr, rec_mottaker.fagsak_id, rec_mottaker.pk_dim_person,
+          rec_mottaker.fk_dim_kjonn, rec_mottaker.fk_dim_sivilstatus, rec_mottaker.fk_dim_land_fodt,
+          rec_mottaker.fk_dim_geografi_bosted, rec_mottaker.fk_dim_land_statsborgerskap, rec_mottaker.pk_dim_tid,
+          rec_mottaker.pk_dim_alder, rec_mottaker.fkby_person1, rec_mottaker.antbarn, rec_mottaker.belophie,
+          rec_mottaker.belophit, rec_mottaker.alderyb, rec_mottaker.ssb_kode, v_kilde, p_in_period, sysdate
+         ,rec_mottaker.delingsprosent_ytelse, rec_mottaker.statusk, rec_mottaker.belop_utvidet, rec_mottaker.belophit_utvidet
+         ,rec_mottaker.pk_bt_fagsak, rec_mottaker.behandling_årsak
+         ,p_in_gyldig_flagg
         );
-        L_COMMIT := L_COMMIT + 1;
+        l_commit := l_commit + 1;
       EXCEPTION
         WHEN OTHERS THEN
-          L_ERROR_MELDING := SUBSTR(SQLCODE
-            || ' '
-            || SQLERRM, 1, 1000);
-          INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
-            MIN_LASTET_DATO,
-            ID,
-            ERROR_MSG,
-            OPPRETTET_TID,
-            KILDE
-          ) VALUES(
-            NULL,
-            REC_MOTTAKER.FAGSAK_ID,
-            L_ERROR_MELDING,
-            SYSDATE,
-            'FAM_BT_MOTTAKER_INSERT_WITH2'
-          );
-          L_COMMIT := L_COMMIT + 1; --Gå videre til neste rekord
-          P_ERROR_MELDING := SUBSTR(P_ERROR_MELDING
-            || L_ERROR_MELDING, 1, 1000);
-          L_ERROR_MELDING := NULL;
+          l_error_melding := substr(SQLCODE || ' ' || sqlerrm, 1, 1000);
+          INSERT INTO dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, ID, error_msg, opprettet_tid, kilde)
+          VALUES(NULL, rec_mottaker.fagsak_id, l_error_melding, sysdate, 'FAM_BT_MOTTAKER_INSERT_WITH2');
+          l_commit := l_commit + 1;--Gå videre til neste rekord
+          p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
+          l_error_melding := NULL;
       END;
-      IF L_COMMIT >= 100000 THEN
-        COMMIT;
-        L_COMMIT := 0;
+      IF l_commit >= 100000 THEN
+          COMMIT;
+          l_commit := 0;
       END IF;
     END LOOP;
     COMMIT;
-    IF L_ERROR_MELDING IS NOT NULL THEN
-      INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
-        ID,
-        ERROR_MSG,
-        OPPRETTET_TID,
-        KILDE
-      ) VALUES(
-        NULL,
-        L_ERROR_MELDING,
-        SYSDATE,
-        'FAM_BT_MOTTAKER_INSERT_WITH3'
-      );
+    IF l_error_melding IS NOT NULL THEN
+      INSERT INTO dvh_fam_fp.fp_xml_utbrett_error(ID, error_msg, opprettet_tid, kilde)
+      VALUES(NULL, l_error_melding, sysdate, 'FAM_BT_MOTTAKER_INSERT_WITH3');
       COMMIT;
-      P_ERROR_MELDING := SUBSTR(P_ERROR_MELDING
-        || L_ERROR_MELDING, 1, 1000);
+      p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
     END IF;
   EXCEPTION
     WHEN OTHERS THEN
-      L_ERROR_MELDING := SUBSTR(SQLCODE
-        || ' '
-        || SQLERRM, 1, 1000);
-      INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
-        MIN_LASTET_DATO,
-        ID,
-        ERROR_MSG,
-        OPPRETTET_TID,
-        KILDE
-      ) VALUES(
-        NULL,
-        NULL,
-        L_ERROR_MELDING,
-        SYSDATE,
-        'FAM_BT_MOTTAKER_INSERT_WITH4'
-      );
+      l_error_melding := substr(SQLCODE || ' ' || sqlerrm, 1, 1000);
+      INSERT INTO dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, ID, error_msg, opprettet_tid, kilde)
+      VALUES(NULL, NULL, l_error_melding, sysdate, 'FAM_BT_MOTTAKER_INSERT_WITH4');
       COMMIT;
-      P_ERROR_MELDING := SUBSTR(P_ERROR_MELDING
-        || L_ERROR_MELDING, 1, 1000);
-  END FAM_BT_MOTTAKER_INSERT;
-  PROCEDURE FAM_BT_BARN_INSERT_BCK(
-    P_IN_PERIOD IN VARCHAR2,
-    P_ERROR_MELDING OUT VARCHAR2
-  ) AS
-    V_KILDE         VARCHAR2(10) := 'BT';
-    V_STOREDATE     DATE := SYSDATE;
-    L_ERROR_MELDING VARCHAR2(1000);
-    L_COMMIT        NUMBER := 0;
-    CURSOR CUR_BARN(V_IN_PERIOD VARCHAR2) IS
-      SELECT /*+ PARALLEL(8) */
-        BARN.FK_PERSON1 FKB_PERSON1,
-        BARN.DELINGSPROSENT_YTELSE,
-        DIM_PERSON_MOTTAKER.FK_PERSON1,
-        NULL INST,
-        EXTRACT (YEAR
+      p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
+  END fam_bt_mottaker_insert_2;
+
+
+  PROCEDURE fam_bt_mottaker_insert(p_in_period IN VARCHAR2
+                                  ,p_in_gyldig_flagg in number default 0
+                                  ,p_error_melding OUT VARCHAR2) AS
+    v_aar_start VARCHAR2(6):= substr(p_in_period,1,4) || '01';
+    v_kilde VARCHAR2(10) := 'BT';
+    --v_storedate DATE := sysdate;
+    l_error_melding VARCHAR2(1000);
+
+    l_commit NUMBER := 0;
+
+    CURSOR cur_mottaker IS
+      SELECT /*+ PARALLEL(8) */ data.*,
+             belope + belophie_b as belophie,
+             belop + belophit_b as belophit
+            ,belop_utvidet + belophit_utvidet_b as belophit_utvidet
+            ,case when fagsak_type = 'INSTITUSJON' then 4
+                  when underkategori = 'ORDINÆR' then 1
+                  when underkategori = 'UTVIDET' then 2
+
+             end statusk
       FROM
-        DIM_PERSON_MOTTAKER.FODT_DATO) FODSEL_AAR,
-        TO_CHAR(DIM_PERSON_MOTTAKER.FODT_DATO,
-        'MM') FODSEL_MND,
-        DIM_KJONN_MOTTAKER.KJONN_KODE KJONN,
-        EXTRACT (YEAR FROM DIM_PERSON_BARN.FODT_DATO) FODSEL_AAR_BARN,
-        TO_CHAR(DIM_PERSON_BARN.FODT_DATO,
-        'MM') FODSEL_MND_BARN,
-        DIM_KJONN_BARN.KJONN_KODE KJONN_BARN,
-        FAM_BT_PERIODE.AAR_MAANED STAT_AARMND,
-        FAGSAK.PK_BT_FAGSAK FK_BT_FAGSAK
- --,fagsak.fagsak_id
-      FROM
-        DVH_FAM_BT.FAM_BT_UR_UTBETALING UR
-        JOIN DVH_FAM_BT.FAM_BT_UTBET_DET DET
-        ON UR.DELYTELSE_ID = DET.DELYTELSE_ID
- --and det.delytelse_id = 10364905
-        JOIN DVH_FAM_BT.FAM_BT_UTBETALING PERUT
-        ON PERUT.PK_BT_UTBETALING = DET.FK_BT_UTBETALING
-        AND PERUT.STØNAD_FOM <= UR.DATO_UTBET_FOM
-        AND PERUT.STØNAD_TOM >= UR.DATO_UTBET_TOM
-        JOIN DVH_FAM_BT.FAM_BT_PERSON BARN
-        ON BARN.PK_BT_PERSON = DET.FK_BT_PERSON
-        AND BARN.ROLLE = 'BARN' JOIN DVH_FAM_BT.FAM_BT_FAGSAK FAGSAK
-        ON FAGSAK.PK_BT_FAGSAK = PERUT.FK_BT_FAGSAK
-        AND FAGSAK.BEHANDLINGS_ID = UR.HENVISNING
-        LEFT OUTER JOIN DT_KODEVERK.DIM_TID FAM_BT_PERIODE
-        ON TO_CHAR(UR.POSTERINGSDATO,
-        'YYYYMM') = FAM_BT_PERIODE.AAR_MAANED
-        AND FAM_BT_PERIODE.DIM_NIVAA = 3
-        AND FAM_BT_PERIODE.GYLDIG_FLAGG = 1
-        LEFT OUTER JOIN DT_PERSON.DIM_PERSON DIM_PERSON_BARN
-        ON DIM_PERSON_BARN.FK_PERSON1 = BARN.FK_PERSON1
-        AND DIM_PERSON_BARN.GYLDIG_FRA_DATO <= FAM_BT_PERIODE.SISTE_DATO_I_PERIODEN
-        AND DIM_PERSON_BARN.GYLDIG_TIL_DATO >= FAM_BT_PERIODE.SISTE_DATO_I_PERIODEN
-        LEFT OUTER JOIN DT_KODEVERK.DIM_KJONN DIM_KJONN_BARN
-        ON DIM_PERSON_BARN.FK_DIM_KJONN = DIM_KJONN_BARN.PK_DIM_KJONN
- --AND dim_kjonn_barn.gyldig_fra_dato < fam_bt_periode.siste_dato_i_perioden
- --AND dim_kjonn_barn.gyldig_til_dato > fam_bt_periode.siste_dato_i_perioden
-        JOIN DT_PERSON.DIM_PERSON DIM_PERSON_MOTTAKER
-        ON DIM_PERSON_MOTTAKER.FK_PERSON1 = UR.GJELDER_MOTTAKER
-        AND DIM_PERSON_MOTTAKER.GYLDIG_FRA_DATO <= FAM_BT_PERIODE.SISTE_DATO_I_PERIODEN
-        AND DIM_PERSON_MOTTAKER.GYLDIG_TIL_DATO >= FAM_BT_PERIODE.SISTE_DATO_I_PERIODEN LEFT OUTER JOIN DT_KODEVERK.DIM_KJONN DIM_KJONN_MOTTAKER
-        ON DIM_PERSON_MOTTAKER.FK_DIM_KJONN = DIM_KJONN_MOTTAKER.PK_DIM_KJONN
- --AND dim_kjonn_mottaker.gyldig_fra_dato < fam_bt_periode.siste_dato_i_perioden
- --AND dim_kjonn_mottaker.gyldig_til_dato > fam_bt_periode.siste_dato_i_perioden
-      WHERE
-        UR.HOVEDKONTONR = 800
- --AND ur.status != 11
-        AND TO_CHAR(UR.POSTERINGSDATO,
-        'YYYYMM') = V_IN_PERIOD
- --AND LENGTH(ur.delytelse_id) < 14
-      GROUP BY
-        BARN.FK_PERSON1,
-        BARN.DELINGSPROSENT_YTELSE,
-        DIM_PERSON_MOTTAKER.FK_PERSON1,
-        EXTRACT (YEAR FROM DIM_PERSON_MOTTAKER.FODT_DATO),
-        TO_CHAR(DIM_PERSON_MOTTAKER.FODT_DATO,
-        'MM'),
-        DIM_KJONN_MOTTAKER.KJONN_KODE,
-        EXTRACT (YEAR FROM DIM_PERSON_BARN.FODT_DATO),
-        TO_CHAR(DIM_PERSON_BARN.FODT_DATO,
-        'MM'),
-        DIM_KJONN_BARN.KJONN_KODE,
-        FAM_BT_PERIODE.AAR_MAANED,
-        FAGSAK.PK_BT_FAGSAK;
+      (
+        SELECT ur.gjelder_mottaker,
+               --to_char(ur.posteringsdato,'YYYYMM') periode,
+               SUM(ur.belop_sign) belop,
+               dim_kjonn_mottaker.kjonn_kode kjonn,
+               SUM(CASE WHEN to_char(ur.posteringsdato,'YYYYMM') > to_char(ur.dato_utbet_fom,'YYYYMM') THEN
+                             ur.belop_sign
+                        ELSE 0.0
+                   END) belope,
+               EXTRACT( YEAR FROM dim_person_mottaker.fodt_dato) fodsel_aar,
+               to_char(dim_person_mottaker.fodt_dato,'MM') fodsel_mnd,
+               dim_person_mottaker.tknr,
+               dim_person_mottaker.bosted_kommune_nr,
+               dim_geografi.bydel_kommune_nr,
+               fagsak.fagsak_id,
+               max(fagsak.pk_bt_fagsak) keep (dense_rank first order by fagsak.tidspunkt_vedtak desc) as pk_bt_fagsak,
+               max(fagsak.behandling_årsak) keep (dense_rank first order by fagsak.tidspunkt_vedtak desc) as behandling_årsak,
+               max(fagsak.underkategori) keep (dense_rank first order by fagsak.tidspunkt_vedtak desc) as underkategori,
+               max(fagsak.fagsak_type) keep (dense_rank first order by fagsak.tidspunkt_vedtak desc) as fagsak_type,
+               --fagsak.enslig_forsørger,
+               dim_person_mottaker.pk_dim_person,
+               dim_person_mottaker.fk_dim_kjonn,
+               dim_person_mottaker.fk_dim_sivilstatus,
+               dim_person_mottaker.fk_dim_land_fodt,
+               dim_person_mottaker.fk_dim_geografi_bosted,
+               dim_person_mottaker.fk_dim_land_statsborgerskap,
+               fam_bt_periode.pk_dim_tid,
+               fam_bt_periode.siste_dato_i_perioden,
+               dim_alder.pk_dim_alder,
+               barn.fkby_person1,
+               barn.antbarn, barn.delingsprosent_ytelse,
+               TRUNC(months_between(fam_bt_periode.siste_dato_i_perioden,dim_person_barn.fodt_dato)/12) alderyb,
+               dim_land_barn.land_ssb_kode ssb_kode,
+               nvl(belop.belophie,0) belophie_b,
+               nvl(belop.belophit,0) belophit_b
+              ,sum((case when utvidet_barnetrygd.delytelse_id is not null then 1
+                         else 0
+                    end) * ur.belop_sign) belop_utvidet
+              ,nvl(belophit_utvidet.belophit_utvidet,0) belophit_utvidet_b,
+               max(fam_bt_kompetanse_perioder.SOKERSAKTIVITET) sokers_aktivitet,
+               max(fam_bt_kompetanse_perioder.ANNENFORELDER_AKTIVITET) annenforelder_aktivitet,
+               max(fam_bt_kompetanse_perioder.KOMPETANSE_RESULTAT) kompetanse_resultat,
+               min(CASE WHEN  fam_bt_kompetanse_perioder.KOMPETANSE_RESULTAT= 'NORGE_ER_PRIMÆRLAND' THEN '000'
+                     WHEN  fam_bt_kompetanse_perioder.KOMPETANSE_RESULTAT= 'NORGE_ER_SEKUNDÆRLAND' THEN  DIM_LAND_ANNEN_FORELDER_AKTIVITET.LAND_SSB_KODE
+                 ELSE NULL
+               END) eokland,
+               min(CASE WHEN fam_bt_kompetanse_perioder.KOMPETANSE_RESULTAT= 'NORGE_ER_PRIMÆRLAND' THEN  DIM_LAND_ANNEN_FORELDER_AKTIVITET.LAND_SSB_KODE
+		       WHEN fam_bt_kompetanse_perioder.KOMPETANSE_RESULTAT= 'NORGE_ER_SEKUNDÆRLAND' THEN '000'
+                    ELSE NULL
+               END) eodland,
+               dim_person_mottaker.GT_VERDI PERSON_GT_VERDI,
+               MAX(fam_bt_kompetanse_perioder.BARNETS_BOSTEDSLAND) BARNETS_BOSTEDSLAND,
+               MAX(fam_bt_kompetanse_perioder.PK_BT_KOMPETANSE_PERIODER) FK_BT_KOMPETANSE_PERIODER
+
+        FROM dvh_fam_bt.fam_bt_ur_utbetaling ur
+               --  dvh_fam_bt.FAM_BT_UR_202302 ur
+        LEFT JOIN dvh_fam_bt.fam_bt_fagsak fagsak
+        ON fagsak.behandlings_id = ur.henvisning
+
+        LEFT OUTER JOIN dt_kodeverk.dim_tid fam_bt_periode
+        ON to_char(ur.posteringsdato,'YYYYMM') = fam_bt_periode.aar_maaned
+        AND fam_bt_periode.dim_nivaa = 3
+        AND fam_bt_periode.gyldig_flagg = 1
+
+        LEFT OUTER JOIN dt_person.dim_person dim_person_mottaker
+        ON dim_person_mottaker.fk_person1 = ur.gjelder_mottaker
+        AND dim_person_mottaker.gyldig_fra_dato <= fam_bt_periode.siste_dato_i_perioden
+        AND dim_person_mottaker.gyldig_til_dato >= fam_bt_periode.siste_dato_i_perioden
+        LEFT OUTER JOIN dt_kodeverk.dim_geografi dim_geografi
+        ON dim_person_mottaker.fk_dim_geografi_bosted = dim_geografi.pk_dim_geografi
+        LEFT OUTER JOIN dt_kodeverk.dim_kjonn dim_kjonn_mottaker
+        ON dim_person_mottaker.fk_dim_kjonn = dim_kjonn_mottaker.pk_dim_kjonn
+
+        LEFT OUTER JOIN dt_kodeverk.dim_alder
+        ON floor(months_between(sysdate, dim_person_mottaker.fodt_dato)/12) = dim_alder.alder
+        AND dim_alder.gyldig_fra_dato <= fam_bt_periode.siste_dato_i_perioden
+        AND dim_alder.gyldig_til_dato >= fam_bt_periode.siste_dato_i_perioden
+
+        LEFT OUTER JOIN --dvh_fam_bt.fam_bt_kompetanse_perioder
+       (
+         SELECT MAX(pk_bt_kompetanse_perioder) pk_bt_kompetanse_perioder ,
+         fom,
+         tom,
+        -- sokersaktivitet,
+        -- annenforelder_aktivitet,
+        -- annenforelder_aktivitetsland,
+        -- kompetanse_resultat,
+        -- barnets_bostedsland,
+         fk_bt_fagsak--,
+        -- sokers_aktivitetsland
+         FROM dvh_fam_bt.fam_bt_kompetanse_perioder
+         group by fom,
+         tom,
+         --sokersaktivitet,
+         --annenforelder_aktivitet,
+         --annenforelder_aktivitetsland,
+         --kompetanse_resultat,
+         --barnets_bostedsland,
+         fk_bt_fagsak--,
+         --sokers_aktivitetsland
+
+         )   kompetanse_perioder  ON
+        fagsak.pk_bt_fagsak=kompetanse_perioder.FK_BT_FAGSAK AND
+        fagsak.KATEGORI='EØS' AND
+        ur.dato_utbet_fom>=to_Date(kompetanse_perioder.fom,'YYYY-MM')
+        AND ur.dato_utbet_fom<=to_Date(nvl(kompetanse_perioder.tom,'2099-12'),'YYYY-MM')
+
+        left outer join dvh_fam_bt.fam_bt_kompetanse_perioder on
+        kompetanse_perioder.pk_bt_kompetanse_perioder = dvh_fam_bt.fam_bt_kompetanse_perioder.pk_bt_kompetanse_perioder
+
+
+        LEFT OUTER JOIN dt_kodeverk.dim_land DIM_LAND_ANNEN_FORELDER_AKTIVITET ON
+        DIM_LAND_ANNEN_FORELDER_AKTIVITET.LAND_ISO_2_KODE=fam_bt_kompetanse_perioder.ANNENFORELDER_AKTIVITETSLAND
+        AND DIM_LAND_ANNEN_FORELDER_AKTIVITET.gyldig_flagg=1
+        AND DIM_LAND_ANNEN_FORELDER_AKTIVITET.LAND_ISO_3_KODE!='ESC'
+
+        LEFT JOIN
+        (
+          SELECT fk_person1,
+                 substr(MAX(fodsel_aar_barn||fodsel_mnd_barn||'-'||fkb_person1),8) fkby_person1,
+                 max(delingsprosent_ytelse) as delingsprosent_ytelse,
+                 COUNT(DISTINCT fkb_person1) antbarn
+          FROM dvh_fam_bt.fam_bt_barn
+          WHERE kilde = v_kilde
+          AND stat_aarmnd = p_in_period
+          and gyldig_flagg = p_in_gyldig_flagg
+          GROUP BY fk_person1
+        ) barn
+        ON ur.gjelder_mottaker = barn.fk_person1
+
+        LEFT JOIN dt_person.dim_person dim_person_barn
+        ON dim_person_barn.fk_person1 = barn.fkby_person1
+        AND dim_person_barn.gyldig_fra_dato <= fam_bt_periode.siste_dato_i_perioden
+        AND dim_person_barn.gyldig_til_dato >= fam_bt_periode.siste_dato_i_perioden
+
+        LEFT OUTER JOIN dt_kodeverk.dim_land dim_land_barn
+        ON dim_person_barn.fk_dim_land_bosted = dim_land_barn.pk_dim_land
+        --AND dim_land.gyldig_fra_dato <= fam_bt_periode.siste_dato_i_perioden
+        --AND dim_land.gyldig_til_dato >= fam_bt_periode.siste_dato_i_perioden
+
+        LEFT JOIN
+        (
+          SELECT fk_person1,
+                 SUM(nvl(belop,0)) belophit,
+                 SUM(nvl(belope,0)) belophie
+          FROM dvh_fam_bt.fam_bt_mottaker
+          WHERE stat_aarmnd >= v_aar_start
+          AND stat_aarmnd < p_in_period
+          and gyldig_flagg = p_in_gyldig_flagg
+          GROUP BY fk_person1
+        ) belop
+        ON ur.gjelder_mottaker = belop.fk_person1
+
+        --Utvidet barnetrygd
+        left join
+        (select utbet.behandlings_id, utbet.delytelse_id, utbetaling.stønad_fom, utbetaling.stønad_tom
+         from dvh_fam_bt.fam_bt_utbet_det utbet
+         join dvh_fam_bt.fam_bt_person person
+         on utbet.fk_bt_person = person.pk_bt_person
+         and person.rolle = 'SØKER'
+         join dvh_fam_bt.fam_bt_utbetaling utbetaling
+         on utbet.fk_bt_utbetaling = utbetaling.pk_bt_utbetaling
+         join dvh_fam_bt.fam_bt_fagsak fagsak
+         on utbetaling.behandlings_id = fagsak.behandlings_id
+         and fagsak.enslig_forsørger = 1) utvidet_barnetrygd
+        on ur.henvisning = utvidet_barnetrygd.behandlings_id
+        and ur.delytelse_id = utvidet_barnetrygd.delytelse_id
+        and utvidet_barnetrygd.stønad_fom <= fam_bt_periode.siste_dato_i_perioden
+        and utvidet_barnetrygd.stønad_tom >= fam_bt_periode.siste_dato_i_perioden
+        left join
+        (select fk_person1,
+                sum(nvl(belop_utvidet,0)) belophit_utvidet
+         from dvh_fam_bt.fam_bt_mottaker
+         where stat_aarmnd >= v_aar_start
+         and stat_aarmnd < p_in_period
+         and gyldig_flagg = p_in_gyldig_flagg
+         group by fk_person1
+        ) belophit_utvidet
+        ON ur.gjelder_mottaker = belophit_utvidet.fk_person1
+
+        WHERE ur.hovedkontonr = 800--in (800, 214, 216, 215)-- = 800 Test!!!
+        AND to_char(ur.posteringsdato,'YYYYMM') = p_in_period
+        --AND SLETT=0
+        --AND UR.FK_PERSON1=1073261799
+        --AND LENGTH(ur.delytelse_id) < 14
+        GROUP BY ur.gjelder_mottaker, to_char(ur.posteringsdato,'YYYYMM'), dim_kjonn_mottaker.kjonn_kode,
+                 fam_bt_periode.siste_dato_i_perioden, EXTRACT( YEAR FROM dim_person_mottaker.fodt_dato),
+                 to_char(dim_person_mottaker.fodt_dato,'MM'), dim_person_mottaker.tknr,
+                 dim_person_mottaker.bosted_kommune_nr, dim_geografi.kommune_nr,
+                 dim_geografi.bydel_kommune_nr, fagsak.fagsak_id
+                ,dim_person_mottaker.pk_dim_person,
+                 dim_person_mottaker.fk_dim_kjonn, dim_person_mottaker.fk_dim_sivilstatus,
+                 dim_person_mottaker.fk_dim_land_fodt, dim_person_mottaker.fk_dim_geografi_bosted,
+                 dim_person_mottaker.fk_dim_land_statsborgerskap, fam_bt_periode.pk_dim_tid,
+                 dim_alder.pk_dim_alder,barn.fkby_person1,barn.antbarn,barn.delingsprosent_ytelse,
+                 TRUNC(months_between(fam_bt_periode.siste_dato_i_perioden,dim_person_barn.fodt_dato)/12),
+                 dim_land_barn.land_ssb_kode,nvl(belop.belophie,0),nvl(belop.belophit,0)
+                ,nvl(belophit_utvidet.belophit_utvidet,0)
+                ,dim_person_mottaker.GT_VERDI
+        having sum(ur.belop_sign) != 0
+      ) data;
   BEGIN
- -- Slett data i dvh_fam_fp.fam_bt_barn for aktiuell periode (egen prosedyre)
+
+    -- Slett mottakere dvh_fam_fp.fam_bt_mottaker_hist for aktuell periode
     BEGIN
-      DELETE FROM DVH_FAM_BT.FAM_BT_BARN
-      WHERE
-        KILDE = V_KILDE
-        AND STAT_AARMND = P_IN_PERIOD;
+      DELETE FROM dvh_fam_bt.fam_bt_mottaker--r152241.test_drp
+      WHERE kilde = v_kilde
+      AND stat_aarmnd= p_in_period
+      and gyldig_flagg = p_in_gyldig_flagg;
       COMMIT;
     EXCEPTION
       WHEN OTHERS THEN
-        L_ERROR_MELDING := SQLCODE
-          || ' '
-          || SQLERRM;
-        INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
-          MIN_LASTET_DATO,
-          ID,
-          ERROR_MSG,
-          OPPRETTET_TID,
-          KILDE
-        ) VALUES(
-          NULL,
-          NULL,
-          L_ERROR_MELDING,
-          V_STOREDATE,
-          'FAM_BT_BARN_INSERT1'
-        );
+        l_error_melding := substr(SQLCODE || ' ' || sqlerrm, 1, 1000);
+        INSERT INTO dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, ID, error_msg, opprettet_tid, kilde)
+        VALUES(NULL, NULL, l_error_melding, sysdate, 'FAM_BT_MOTTAKER_INSERT_WITH1');
         COMMIT;
-        P_ERROR_MELDING := SUBSTR(P_ERROR_MELDING
-          || L_ERROR_MELDING, 1, 1000);
+        p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
+        l_error_melding := NULL;
     END;
- -- Patch opp fk_person1
-    BEGIN
-      MERGE INTO DVH_FAM_BT.FAM_BT_PERSON USING (
-        SELECT
-          OFF_ID,
-          MAX(FK_PERSON1) KEEP (DENSE_RANK FIRST
-        ORDER BY
-          GYLDIG_FRA_DATO DESC) AS FK_PERSON1
-        FROM
-          DT_PERSON.DVH_PERSON_IDENT_OFF_ID_IKKE_SKJERMET
-        GROUP BY
-          OFF_ID
-      ) PERSON_67_VASKET ON (PERSON_67_VASKET.OFF_ID = FAM_BT_PERSON.PERSON_IDENT) WHEN MATCHED THEN UPDATE SET FAM_BT_PERSON.FK_PERSON1 = PERSON_67_VASKET.FK_PERSON1 WHERE FAM_BT_PERSON.FK_PERSON1 = -1;
-      COMMIT;
-    EXCEPTION
-      WHEN OTHERS THEN
-        L_ERROR_MELDING := SQLCODE
-          || ' '
-          || SQLERRM;
-        INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
-          MIN_LASTET_DATO,
-          ID,
-          ERROR_MSG,
-          OPPRETTET_TID,
-          KILDE
-        ) VALUES(
-          NULL,
-          NULL,
-          L_ERROR_MELDING,
-          V_STOREDATE,
-          'FAM_BT_BARN_INSERT: Patch opp fk_person1'
-        );
-        COMMIT;
-        P_ERROR_MELDING := SUBSTR(P_ERROR_MELDING
-          || L_ERROR_MELDING, 1, 1000);
-    END;
- -- Slett person_ident
-    BEGIN
-      UPDATE DVH_FAM_BT.FAM_BT_PERSON
-      SET
-        PERSON_IDENT = NULL
-      WHERE
-        FK_PERSON1 != -1
-        AND PERSON_IDENT IS NOT NULL;
-      COMMIT;
-    EXCEPTION
-      WHEN OTHERS THEN
-        L_ERROR_MELDING := SQLCODE
-          || ' '
-          || SQLERRM;
-        INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
-          MIN_LASTET_DATO,
-          ID,
-          ERROR_MSG,
-          OPPRETTET_TID,
-          KILDE
-        ) VALUES(
-          NULL,
-          NULL,
-          L_ERROR_MELDING,
-          V_STOREDATE,
-          'FAM_BT_BARN_INSERT: Slett person_ident'
-        );
-        COMMIT;
-        P_ERROR_MELDING := SUBSTR(P_ERROR_MELDING
-          || L_ERROR_MELDING, 1, 1000);
-    END;
-    FOR REC_BARN IN CUR_BARN(P_IN_PERIOD) LOOP
- --dbms_output.put_line(rec_barn.fkb_person1);--Test
+
+    FOR rec_mottaker IN cur_mottaker LOOP
+      --INSERT INTO dvh_fam_fp.fam_bt_mottaker
       BEGIN
-        INSERT INTO DVH_FAM_BT.FAM_BT_BARN (
-          FKB_PERSON1,
-          FK_PERSON1,
-          INST,
-          FODSEL_AAR,
-          FODSEL_MND,
-          KJONN,
-          FODSEL_AAR_BARN,
-          FODSEL_MND_BARN,
-          KJONN_BARN,
-          DELINGSPROSENT_YTELSE,
-          STAT_AARMND,
-          KILDE,
-          LASTET_DATO,
-          FK_BT_FAGSAK
-        ) VALUES (
-          REC_BARN.FKB_PERSON1,
-          REC_BARN.FK_PERSON1,
-          REC_BARN.INST,
-          REC_BARN.FODSEL_AAR,
-          REC_BARN.FODSEL_MND,
-          REC_BARN.KJONN,
-          REC_BARN.FODSEL_AAR_BARN,
-          REC_BARN.FODSEL_MND_BARN,
-          REC_BARN.KJONN_BARN,
-          REC_BARN.DELINGSPROSENT_YTELSE,
-          REC_BARN.STAT_AARMND,
-          V_KILDE,
-          SYSDATE, --v_storedate
-          REC_BARN.FK_BT_FAGSAK
+        INSERT INTO dvh_fam_bt.fam_bt_mottaker--R152241.test_drp
+        (
+          fk_person1, belop, kjonn, belope,
+          fodsel_aar, fodsel_mnd, tknr, bosted_kommune_nr,
+          bosted_bydel_kommune_nr, fagsak_id, fk_dim_person,
+          fk_dim_kjonn, fk_dim_sivilstatus, fk_dim_land_fodt,
+          fk_dim_geografi_bosted, fk_dim_land_statsborgerskap, fk_dim_tid_mnd,
+          fk_dim_alder, fkby_person1, antbarn, belophie,
+          belophit, ybarn, eoybland, kilde, stat_aarmnd, lastet_dato
+         ,prosent, statusk, belop_utvidet, belophit_utvidet, fk_bt_fagsak, behandling_årsak
+         ,gyldig_flagg
+         ,eokland
+         ,eodland
+         --,SOKERS_AKTIVITET
+         --,ANNENFORELDER_AKTIVITET
+         --,KOMPETANSE_RESULTAT
+         --,BARNETS_BOSTEDSLAND
+         ,PERSON_GT_VERDI
+         ,FK_BT_KOMPETANSE_PERIODER
+        )
+        VALUES
+        (
+          rec_mottaker.gjelder_mottaker, rec_mottaker.belop, rec_mottaker.kjonn, rec_mottaker.belope,
+          rec_mottaker.fodsel_aar, rec_mottaker.fodsel_mnd, rec_mottaker.tknr, rec_mottaker.bosted_kommune_nr,
+          rec_mottaker.bydel_kommune_nr, rec_mottaker.fagsak_id, rec_mottaker.pk_dim_person,
+          rec_mottaker.fk_dim_kjonn, rec_mottaker.fk_dim_sivilstatus, rec_mottaker.fk_dim_land_fodt,
+          rec_mottaker.fk_dim_geografi_bosted, rec_mottaker.fk_dim_land_statsborgerskap, rec_mottaker.pk_dim_tid,
+          rec_mottaker.pk_dim_alder, rec_mottaker.fkby_person1, rec_mottaker.antbarn, rec_mottaker.belophie,
+          rec_mottaker.belophit, rec_mottaker.alderyb, rec_mottaker.ssb_kode, v_kilde, p_in_period, sysdate
+         ,rec_mottaker.delingsprosent_ytelse, rec_mottaker.statusk, rec_mottaker.belop_utvidet, rec_mottaker.belophit_utvidet
+         ,rec_mottaker.pk_bt_fagsak, rec_mottaker.behandling_årsak
+         ,p_in_gyldig_flagg
+         ,rec_mottaker.eokland
+         ,rec_mottaker.eodland
+         --,rec_mottaker.sokers_aktivitet
+         --,rec_mottaker.annenforelder_aktivitet
+         --,rec_mottaker.kompetanse_resultat
+         --,rec_mottaker.barnets_bostedsland
+         ,rec_mottaker.person_gt_verdi
+         ,rec_mottaker.fk_bt_kompetanse_perioder
+
         );
-        L_COMMIT := L_COMMIT + 1;
+        l_commit := l_commit + 1;
       EXCEPTION
         WHEN OTHERS THEN
-          L_ERROR_MELDING := SQLCODE
-            || ' '
-            || SQLERRM;
-          INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
-            MIN_LASTET_DATO,
-            ID,
-            ERROR_MSG,
-            OPPRETTET_TID,
-            KILDE
-          ) VALUES(
-            NULL,
-            REC_BARN.FKB_PERSON1,
-            L_ERROR_MELDING,
-            V_STOREDATE,
-            'FAM_BT_BARN_INSERT2'
-          );
-          L_COMMIT := L_COMMIT + 1; --Gå videre til neste rekord
-          P_ERROR_MELDING := SUBSTR(P_ERROR_MELDING
-            || L_ERROR_MELDING, 1, 1000);
+          l_error_melding := substr(SQLCODE || ' ' || sqlerrm, 1, 1000);
+          INSERT INTO dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, ID, error_msg, opprettet_tid, kilde)
+          VALUES(NULL, rec_mottaker.fagsak_id, l_error_melding, sysdate, 'FAM_BT_MOTTAKER_INSERT_WITH2');
+          l_commit := l_commit + 1;--Gå videre til neste rekord
+          p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
+          l_error_melding := NULL;
       END;
- --rollback;--Test
-      IF L_COMMIT >= 100000 THEN
-        COMMIT;
-        L_COMMIT := 0;
+      IF l_commit >= 100000 THEN
+          COMMIT;
+          l_commit := 0;
       END IF;
     END LOOP;
-    COMMIT; --commit til slutt
-    IF L_ERROR_MELDING IS NOT NULL THEN
-      INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
-        ID,
-        ERROR_MSG,
-        OPPRETTET_TID,
-        KILDE
-      ) VALUES(
-        NULL,
-        L_ERROR_MELDING,
-        V_STOREDATE,
-        'FAM_BT_BARN_INSERT3'
-      );
+    COMMIT;
+    IF l_error_melding IS NOT NULL THEN
+      INSERT INTO dvh_fam_fp.fp_xml_utbrett_error(ID, error_msg, opprettet_tid, kilde)
+      VALUES(NULL, l_error_melding, sysdate, 'FAM_BT_MOTTAKER_INSERT_WITH3');
       COMMIT;
-      P_ERROR_MELDING := SUBSTR(P_ERROR_MELDING
-        || L_ERROR_MELDING, 1, 1000);
+      p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
     END IF;
   EXCEPTION
     WHEN OTHERS THEN
-      L_ERROR_MELDING := SQLCODE
-        || ' '
-        || SQLERRM;
-      INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
-        MIN_LASTET_DATO,
-        ID,
-        ERROR_MSG,
-        OPPRETTET_TID,
-        KILDE
-      ) VALUES(
-        NULL,
-        NULL,
-        L_ERROR_MELDING,
-        V_STOREDATE,
-        'FAM_BT_BARN_INSERT4'
-      );
+      l_error_melding := substr(SQLCODE || ' ' || sqlerrm, 1, 1000);
+      INSERT INTO dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, ID, error_msg, opprettet_tid, kilde)
+      VALUES(NULL, NULL, l_error_melding, sysdate, 'FAM_BT_MOTTAKER_INSERT_WITH4');
       COMMIT;
-      P_ERROR_MELDING := SUBSTR(P_ERROR_MELDING
-        || L_ERROR_MELDING, 1, 1000);
-  END FAM_BT_BARN_INSERT_BCK;
-  PROCEDURE FAM_BT_BARN_INSERT(
-    P_IN_PERIOD IN VARCHAR2,
-    P_IN_GYLDIG_FLAGG IN NUMBER DEFAULT 0,
-    P_ERROR_MELDING OUT VARCHAR2
-  ) AS
-    V_KILDE         VARCHAR2(10) := 'BT';
-    V_STOREDATE     DATE := SYSDATE;
-    L_ERROR_MELDING VARCHAR2(1000);
-    L_COMMIT        NUMBER := 0;
-    CURSOR CUR_BARN(V_IN_PERIOD VARCHAR2) IS
-      WITH UR AS (
-        SELECT /*+ PARALLEL(8) */
-          UR.GJELDER_MOTTAKER,
-          MAX(UR.DATO_UTBET_TOM) AS MAX_DATO_UTBET_TOM,
-          MAX(UR.POSTERINGSDATO) AS MAX_POSTERINGSDATO,
-          MAX(DET.FK_BT_PERSON) KEEP (DENSE_RANK FIRST
-        ORDER BY
-          UR.DATO_UTBET_TOM DESC) AS MAX_FK_BT_PERSON,
-          MAX(UR.HENVISNING) KEEP (DENSE_RANK FIRST
-        ORDER BY
-          UR.HENVISNING DESC) AS HENVISNING
-        FROM
-          DVH_FAM_BT.FAM_BT_UR_UTBETALING UR
-          JOIN DVH_FAM_BT.FAM_BT_UTBET_DET DET
-          ON UR.DELYTELSE_ID = DET.DELYTELSE_ID JOIN DVH_FAM_BT.FAM_BT_UTBETALING UTBETALING
-          ON DET.FK_BT_UTBETALING = UTBETALING.PK_BT_UTBETALING
-          AND UTBETALING.STØNAD_FOM <= UR.DATO_UTBET_FOM
-          AND UTBETALING.STØNAD_TOM >= UR.DATO_UTBET_TOM
-          JOIN DVH_FAM_BT.FAM_BT_PERSON BARN
-          ON BARN.PK_BT_PERSON = DET.FK_BT_PERSON
-          AND BARN.ROLLE = 'BARN'
-        WHERE
-          TO_CHAR(UR.POSTERINGSDATO, 'YYYYMM') = V_IN_PERIOD
-        GROUP BY
-          TO_CHAR(UR.POSTERINGSDATO, 'YYYYMM'), UR.GJELDER_MOTTAKER, BARN.FK_PERSON1
-        HAVING
-          SUM(BELOP_SIGN) != 0
-      ), VEDTAK AS (
-        SELECT /*+ PARALLEL(8) */
-          BARN.FK_PERSON1 AS FKB_PERSON1,
-          BARN.DELINGSPROSENT_YTELSE,
-          DIM_PERSON_MOTTAKER.FK_PERSON1,
-          NULL INST,
-          EXTRACT (YEAR
-        FROM
-          DIM_PERSON_MOTTAKER.FODT_DATO) FODSEL_AAR,
-          TO_CHAR(DIM_PERSON_MOTTAKER.FODT_DATO,
-          'MM') FODSEL_MND,
-          DIM_KJONN_MOTTAKER.KJONN_KODE KJONN,
-          EXTRACT (YEAR FROM DIM_PERSON_BARN.FODT_DATO) FODSEL_AAR_BARN,
-          TO_CHAR(DIM_PERSON_BARN.FODT_DATO,
-          'MM') FODSEL_MND_BARN,
-          DIM_KJONN_BARN.KJONN_KODE KJONN_BARN,
-          FAM_BT_PERIODE.AAR_MAANED STAT_AARMND,
-          DIM_PERSON_BARN.PK_DIM_PERSON FK_DIM_PERSON_BARN,
-          FAGSAK.PK_BT_FAGSAK FK_BT_FAGSAK
-        FROM
-          UR
-          JOIN DVH_FAM_BT.FAM_BT_PERSON BARN
-          ON BARN.PK_BT_PERSON = UR.MAX_FK_BT_PERSON JOIN DVH_FAM_BT.FAM_BT_FAGSAK FAGSAK
-          ON FAGSAK.BEHANDLINGS_ID = UR.HENVISNING
-          LEFT OUTER JOIN DT_KODEVERK.DIM_TID FAM_BT_PERIODE
-          ON TO_CHAR(UR.MAX_POSTERINGSDATO,
-          'YYYYMM') = FAM_BT_PERIODE.AAR_MAANED
-          AND FAM_BT_PERIODE.DIM_NIVAA = 3
-          AND FAM_BT_PERIODE.GYLDIG_FLAGG = 1
-          LEFT OUTER JOIN DT_PERSON.DIM_PERSON DIM_PERSON_BARN
-          ON DIM_PERSON_BARN.FK_PERSON1 = BARN.FK_PERSON1
-          AND DIM_PERSON_BARN.GYLDIG_FRA_DATO <= FAM_BT_PERIODE.SISTE_DATO_I_PERIODEN
-          AND DIM_PERSON_BARN.GYLDIG_TIL_DATO >= FAM_BT_PERIODE.SISTE_DATO_I_PERIODEN
-          LEFT OUTER JOIN DT_KODEVERK.DIM_KJONN DIM_KJONN_BARN
-          ON DIM_PERSON_BARN.FK_DIM_KJONN = DIM_KJONN_BARN.PK_DIM_KJONN
-          JOIN DT_PERSON.DIM_PERSON DIM_PERSON_MOTTAKER
-          ON DIM_PERSON_MOTTAKER.FK_PERSON1 = UR.GJELDER_MOTTAKER
-          AND DIM_PERSON_MOTTAKER.GYLDIG_FRA_DATO <= FAM_BT_PERIODE.SISTE_DATO_I_PERIODEN
-          AND DIM_PERSON_MOTTAKER.GYLDIG_TIL_DATO >= FAM_BT_PERIODE.SISTE_DATO_I_PERIODEN LEFT OUTER JOIN DT_KODEVERK.DIM_KJONN DIM_KJONN_MOTTAKER
-          ON DIM_PERSON_MOTTAKER.FK_DIM_KJONN = DIM_KJONN_MOTTAKER.PK_DIM_KJONN
-        GROUP BY
-          BARN.FK_PERSON1,
-          BARN.DELINGSPROSENT_YTELSE,
-          DIM_PERSON_MOTTAKER.FK_PERSON1,
-          DIM_PERSON_MOTTAKER.FODT_DATO,
-          DIM_PERSON_BARN.FODT_DATO,
-          DIM_KJONN_MOTTAKER.KJONN_KODE,
-          DIM_KJONN_BARN.KJONN_KODE,
-          FAM_BT_PERIODE.AAR_MAANED,
-          DIM_PERSON_BARN.PK_DIM_PERSON,
-          FAGSAK.PK_BT_FAGSAK
+      p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
+  END fam_bt_mottaker_insert;
+
+  PROCEDURE fam_bt_barn_insert_bck(p_in_period IN VARCHAR2, p_error_melding OUT VARCHAR2) AS
+    v_kilde VARCHAR2(10) := 'BT';
+    v_storedate DATE := sysdate;
+    l_error_melding VARCHAR2(1000);
+    l_commit NUMBER := 0;
+
+    CURSOR cur_barn(v_in_period VARCHAR2) IS
+      SELECT /*+ PARALLEL(8) */ barn.fk_person1 fkb_person1,
+             barn.delingsprosent_ytelse,
+             dim_person_mottaker.fk_person1,
+             NULL inst,
+             EXTRACT (YEAR FROM dim_person_mottaker.fodt_dato) fodsel_aar,
+             to_char(dim_person_mottaker.fodt_dato,'MM') fodsel_mnd,
+             dim_kjonn_mottaker.kjonn_kode kjonn,
+             EXTRACT (YEAR FROM dim_person_barn.fodt_dato) fodsel_aar_barn,
+             to_char(dim_person_barn.fodt_dato,'MM') fodsel_mnd_barn,
+             dim_kjonn_barn.kjonn_kode kjonn_barn,
+             fam_bt_periode.aar_maaned stat_aarmnd,
+             fagsak.pk_bt_fagsak fk_bt_fagsak
+             --,fagsak.fagsak_id
+      FROM dvh_fam_bt.fam_bt_ur_utbetaling ur
+      JOIN dvh_fam_bt.fam_bt_utbet_det det ON
+      ur.delytelse_id = det.delytelse_id
+      --and det.delytelse_id = 10364905
+      JOIN dvh_fam_bt.fam_bt_utbetaling perut ON
+      perut.pk_bt_utbetaling = det.fk_bt_utbetaling
+      AND perut.stønad_fom <= ur.dato_utbet_fom
+      AND perut.stønad_tom >= ur.dato_utbet_tom
+
+      JOIN dvh_fam_bt.fam_bt_person barn ON
+      barn.pk_bt_person = det.fk_bt_person AND
+      barn.rolle = 'BARN'
+
+      JOIN dvh_fam_bt.fam_bt_fagsak fagsak ON
+      fagsak.pk_bt_fagsak = perut.fk_bt_fagsak
+      AND fagsak.behandlings_id = ur.henvisning
+
+      LEFT OUTER JOIN dt_kodeverk.dim_tid fam_bt_periode ON
+      to_char(ur.posteringsdato,'YYYYMM') = fam_bt_periode.aar_maaned
+      AND fam_bt_periode.dim_nivaa = 3
+      AND fam_bt_periode.gyldig_flagg = 1
+
+      LEFT OUTER JOIN dt_person.dim_person dim_person_barn ON
+      dim_person_barn.fk_person1 = barn.fk_person1
+      AND dim_person_barn.gyldig_fra_dato <= fam_bt_periode.siste_dato_i_perioden
+      AND dim_person_barn.gyldig_til_dato >= fam_bt_periode.siste_dato_i_perioden
+
+      LEFT OUTER JOIN dt_kodeverk.dim_kjonn dim_kjonn_barn ON
+      dim_person_barn.fk_dim_kjonn = dim_kjonn_barn.pk_dim_kjonn
+      --AND dim_kjonn_barn.gyldig_fra_dato < fam_bt_periode.siste_dato_i_perioden
+      --AND dim_kjonn_barn.gyldig_til_dato > fam_bt_periode.siste_dato_i_perioden
+
+      JOIN dt_person.dim_person dim_person_mottaker ON
+      dim_person_mottaker.fk_person1 = ur.gjelder_mottaker
+      AND dim_person_mottaker.gyldig_fra_dato <= fam_bt_periode.siste_dato_i_perioden
+      AND dim_person_mottaker.gyldig_til_dato >= fam_bt_periode.siste_dato_i_perioden
+
+      LEFT OUTER JOIN dt_kodeverk.dim_kjonn dim_kjonn_mottaker ON
+      dim_person_mottaker.fk_dim_kjonn = dim_kjonn_mottaker.pk_dim_kjonn
+      --AND dim_kjonn_mottaker.gyldig_fra_dato < fam_bt_periode.siste_dato_i_perioden
+      --AND dim_kjonn_mottaker.gyldig_til_dato > fam_bt_periode.siste_dato_i_perioden
+
+      WHERE ur.hovedkontonr = 800
+      --AND ur.status != 11
+      AND to_char(ur.posteringsdato,'YYYYMM') = v_in_period
+      --AND LENGTH(ur.delytelse_id) < 14
+
+      GROUP BY barn.fk_person1,barn.delingsprosent_ytelse,
+               dim_person_mottaker.fk_person1,
+               EXTRACT (YEAR FROM dim_person_mottaker.fodt_dato),
+               to_char(dim_person_mottaker.fodt_dato,'MM'),
+               dim_kjonn_mottaker.kjonn_kode,
+               EXTRACT (YEAR FROM dim_person_barn.fodt_dato),
+               to_char(dim_person_barn.fodt_dato,'MM'),
+               dim_kjonn_barn.kjonn_kode,
+               fam_bt_periode.aar_maaned, fagsak.pk_bt_fagsak;
+  BEGIN
+    -- Slett data i dvh_fam_fp.fam_bt_barn for aktiuell periode (egen prosedyre)
+    BEGIN
+      DELETE FROM dvh_fam_bt.fam_bt_barn
+      WHERE kilde = v_kilde
+      AND stat_aarmnd = p_in_period;
+      COMMIT;
+    EXCEPTION
+      WHEN OTHERS THEN
+        l_error_melding := SQLCODE || ' ' || sqlerrm;
+        INSERT INTO dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, ID, error_msg, opprettet_tid, kilde)
+        VALUES(NULL, NULL, l_error_melding, v_storedate, 'FAM_BT_BARN_INSERT1');
+        COMMIT;
+        p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
+    END;
+
+    -- Patch opp fk_person1
+    begin
+      merge into dvh_fam_bt.fam_bt_person
+      using (
+              select off_id
+                    ,max(fk_person1) keep
+                               (dense_rank first order by gyldig_fra_dato desc) as fk_person1
+              from dt_person.dvh_person_ident_off_id_ikke_skjermet
+              group by off_id
+            ) person_67_vasket
+      on (person_67_vasket.off_id = fam_bt_person.person_ident)
+      when matched then update set fam_bt_person.fk_person1 = person_67_vasket.fk_person1
+      where fam_bt_person.fk_person1 = -1;
+      commit;
+    exception
+      when others then
+        l_error_melding := sqlcode || ' ' || sqlerrm;
+        insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+        values(null, null, l_error_melding, v_storedate, 'FAM_BT_BARN_INSERT: Patch opp fk_person1');
+        commit;
+        p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
+    end;
+
+    -- Slett person_ident
+    begin
+      update dvh_fam_bt.fam_bt_person
+      set person_ident = null
+      where fk_person1 != -1
+      and person_ident is not null;
+      commit;
+    exception
+      when others then
+        l_error_melding := sqlcode || ' ' || sqlerrm;
+        insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+        values(null, null, l_error_melding, v_storedate, 'FAM_BT_BARN_INSERT: Slett person_ident');
+        commit;
+        p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
+    end;
+
+    FOR rec_barn IN cur_barn(p_in_period) LOOP
+      --dbms_output.put_line(rec_barn.fkb_person1);--Test
+      BEGIN
+        INSERT INTO dvh_fam_bt.fam_bt_barn
+        (
+          fkb_person1,
+          fk_person1,
+          inst,
+          fodsel_aar,
+          fodsel_mnd,
+          kjonn,
+          fodsel_aar_barn,
+          fodsel_mnd_barn,
+          kjonn_barn,
+          delingsprosent_ytelse,
+          stat_aarmnd,
+          kilde,
+          lastet_dato,
+          fk_bt_fagsak
+        )
+        VALUES
+        (
+          rec_barn.fkb_person1,
+          rec_barn.fk_person1,
+          rec_barn.inst,
+          rec_barn.fodsel_aar,
+          rec_barn.fodsel_mnd,
+          rec_barn.kjonn,
+          rec_barn.fodsel_aar_barn,
+          rec_barn.fodsel_mnd_barn,
+          rec_barn.kjonn_barn,
+          rec_barn.delingsprosent_ytelse,
+          rec_barn.stat_aarmnd,
+          v_kilde,
+          sysdate,--v_storedate
+          rec_barn.fk_bt_fagsak
+        );
+        l_commit := l_commit + 1;
+      EXCEPTION
+        WHEN OTHERS THEN
+          l_error_melding := SQLCODE || ' ' || sqlerrm;
+          INSERT INTO dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, ID, error_msg, opprettet_tid, kilde)
+          VALUES(NULL, rec_barn.fkb_person1, l_error_melding, v_storedate, 'FAM_BT_BARN_INSERT2');
+          l_commit := l_commit + 1;--Gå videre til neste rekord
+          p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
+      END;
+      --rollback;--Test
+      IF l_commit >= 100000 THEN
+        COMMIT;
+        l_commit := 0;
+      END IF;
+    END LOOP;
+    COMMIT;--commit til slutt
+    IF l_error_melding IS NOT NULL THEN
+      INSERT INTO dvh_fam_fp.fp_xml_utbrett_error(ID, error_msg, opprettet_tid, kilde)
+      VALUES(NULL, l_error_melding, v_storedate, 'FAM_BT_BARN_INSERT3');
+      COMMIT;
+      p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
+    END IF;
+  EXCEPTION
+    WHEN OTHERS THEN
+      l_error_melding := SQLCODE || ' ' || sqlerrm;
+      INSERT INTO dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, ID, error_msg, opprettet_tid, kilde)
+      VALUES(NULL, NULL, l_error_melding, v_storedate, 'FAM_BT_BARN_INSERT4');
+      COMMIT;
+      p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
+  END fam_bt_barn_insert_bck;
+
+  PROCEDURE fam_bt_barn_insert(p_in_period IN VARCHAR2
+                              ,p_in_gyldig_flagg in number default 0
+                              ,p_error_melding OUT VARCHAR2) AS
+    v_kilde VARCHAR2(10) := 'BT';
+    v_storedate DATE := sysdate;
+    l_error_melding VARCHAR2(1000);
+    l_commit NUMBER := 0;
+
+    CURSOR cur_barn(v_in_period VARCHAR2) IS
+      with ur as
+      (
+        select /*+ PARALLEL(8) */ ur.gjelder_mottaker
+              ,max(ur.dato_utbet_tom) as max_dato_utbet_tom, max(ur.posteringsdato) as max_posteringsdato
+              ,max(det.fk_bt_person) keep (dense_rank first order by ur.dato_utbet_tom desc) as max_fk_bt_person
+              ,max(ur.henvisning) keep (dense_rank first order by ur.henvisning desc) as henvisning
+        from dvh_fam_bt.fam_bt_ur_utbetaling ur
+        join dvh_fam_bt.fam_bt_utbet_det det
+        on ur.delytelse_id = det.delytelse_id
+        join dvh_fam_bt.fam_bt_utbetaling utbetaling
+        on det.fk_bt_utbetaling = utbetaling.pk_bt_utbetaling
+        and utbetaling.stønad_fom <= ur.dato_utbet_fom
+        and utbetaling.stønad_tom >= ur.dato_utbet_tom
+
+
+        join dvh_fam_bt.fam_bt_person barn
+        on barn.pk_bt_person = det.fk_bt_person
+        and barn.rolle = 'BARN'
+
+        where to_char(ur.posteringsdato,'YYYYMM') = v_in_period
+        group by to_char(ur.posteringsdato,'YYYYMM'), ur.gjelder_mottaker, barn.fk_person1
+        having sum(belop_sign) != 0
+      ),
+      vedtak as
+      (
+        select /*+ PARALLEL(8) */ barn.fk_person1 as fkb_person1, barn.delingsprosent_ytelse
+              ,dim_person_mottaker.fk_person1, null inst
+              ,extract (year from dim_person_mottaker.fodt_dato) fodsel_aar
+              ,to_char(dim_person_mottaker.fodt_dato,'MM') fodsel_mnd
+              ,dim_kjonn_mottaker.kjonn_kode kjonn
+              ,extract (year from dim_person_barn.fodt_dato) fodsel_aar_barn
+              ,to_char(dim_person_barn.fodt_dato,'MM') fodsel_mnd_barn
+              ,dim_kjonn_barn.kjonn_kode kjonn_barn
+              ,fam_bt_periode.aar_maaned stat_aarmnd
+              ,dim_person_barn.PK_DIM_PERSON FK_DIM_PERSON_BARN
+             ,fagsak.pk_bt_fagsak fk_bt_fagsak
+        from ur
+
+        join dvh_fam_bt.fam_bt_person barn
+        on barn.pk_bt_person = ur.max_fk_bt_person
+
+
+        JOIN dvh_fam_bt.fam_bt_fagsak fagsak ON
+            fagsak.behandlings_id = ur.henvisning
+
+        left outer join dt_kodeverk.dim_tid fam_bt_periode
+        on to_char(ur.max_posteringsdato,'YYYYMM') = fam_bt_periode.aar_maaned
+        and fam_bt_periode.dim_nivaa = 3
+        and fam_bt_periode.gyldig_flagg = 1
+
+        left outer join dt_person.dim_person dim_person_barn
+        on dim_person_barn.fk_person1 = barn.fk_person1
+        and dim_person_barn.gyldig_fra_dato <= fam_bt_periode.siste_dato_i_perioden
+        and dim_person_barn.gyldig_til_dato >= fam_bt_periode.siste_dato_i_perioden
+        left outer join dt_kodeverk.dim_kjonn dim_kjonn_barn
+        on dim_person_barn.fk_dim_kjonn = dim_kjonn_barn.pk_dim_kjonn
+
+        join dt_person.dim_person dim_person_mottaker
+        on dim_person_mottaker.fk_person1 = ur.gjelder_mottaker
+        and dim_person_mottaker.gyldig_fra_dato <= fam_bt_periode.siste_dato_i_perioden
+        and dim_person_mottaker.gyldig_til_dato >= fam_bt_periode.siste_dato_i_perioden
+        left outer join dt_kodeverk.dim_kjonn dim_kjonn_mottaker
+        on dim_person_mottaker.fk_dim_kjonn = dim_kjonn_mottaker.pk_dim_kjonn
+
+
+        group by barn.fk_person1, barn.delingsprosent_ytelse, dim_person_mottaker.fk_person1
+                ,dim_person_mottaker.fodt_dato, dim_person_barn.fodt_dato
+                ,dim_kjonn_mottaker.kjonn_kode, dim_kjonn_barn.kjonn_kode, fam_bt_periode.aar_maaned ,dim_person_barn.PK_DIM_PERSON,fagsak.pk_bt_fagsak
       )
-      SELECT /*+ PARALLEL(8) */
-        VEDTAK.*
-      FROM
-        VEDTAK;
+      select /*+ PARALLEL(8) */ vedtak.*
+      from vedtak;
   BEGIN
- -- Slett data i dvh_fam_fp.fam_bt_barn for aktiuell periode (egen prosedyre)
+    -- Slett data i dvh_fam_fp.fam_bt_barn for aktiuell periode (egen prosedyre)
     BEGIN
-      DELETE FROM DVH_FAM_BT.FAM_BT_BARN
-      WHERE
-        KILDE = V_KILDE
-        AND STAT_AARMND = P_IN_PERIOD
-        AND GYLDIG_FLAGG = P_IN_GYLDIG_FLAGG;
+      DELETE FROM dvh_fam_bt.fam_bt_barn
+      WHERE kilde = v_kilde
+      AND stat_aarmnd = p_in_period
+      and gyldig_flagg = p_in_gyldig_flagg;
       COMMIT;
     EXCEPTION
       WHEN OTHERS THEN
-        L_ERROR_MELDING := SQLCODE
-          || ' '
-          || SQLERRM;
-        INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
-          MIN_LASTET_DATO,
-          ID,
-          ERROR_MSG,
-          OPPRETTET_TID,
-          KILDE
-        ) VALUES(
-          NULL,
-          NULL,
-          L_ERROR_MELDING,
-          V_STOREDATE,
-          'FAM_BT_BARN_INSERT1'
-        );
+        l_error_melding := SQLCODE || ' ' || sqlerrm;
+        INSERT INTO dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, ID, error_msg, opprettet_tid, kilde)
+        VALUES(NULL, NULL, l_error_melding, v_storedate, 'FAM_BT_BARN_INSERT1');
         COMMIT;
-        P_ERROR_MELDING := SUBSTR(P_ERROR_MELDING
-          || L_ERROR_MELDING, 1, 1000);
+        p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
     END;
- -- Patch opp fk_person1
-    BEGIN
-      MERGE INTO DVH_FAM_BT.FAM_BT_PERSON USING (
-        SELECT
-          OFF_ID,
-          MAX(FK_PERSON1) KEEP (DENSE_RANK FIRST
-        ORDER BY
-          GYLDIG_FRA_DATO DESC) AS FK_PERSON1,
-          MAX(GYLDIG_TIL_DATO) KEEP (DENSE_RANK FIRST
-        ORDER BY
-          GYLDIG_FRA_DATO DESC) AS GYLDIG_TIL_DATO
-        FROM
-          DT_PERSON.DVH_PERSON_IDENT_OFF_ID_IKKE_SKJERMET
-        GROUP BY
-          OFF_ID
-      ) PERSON_67_VASKET ON (PERSON_67_VASKET.OFF_ID = FAM_BT_PERSON.PERSON_IDENT) WHEN MATCHED THEN UPDATE SET FAM_BT_PERSON.FK_PERSON1 = PERSON_67_VASKET.FK_PERSON1, FAM_BT_PERSON.OPPDATERT_DATO = SYSDATE WHERE FAM_BT_PERSON.FK_PERSON1 = -1 AND ROLLE = 'BARN' AND FAM_BT_PERSON.LASTET_DATO <= PERSON_67_VASKET.GYLDIG_TIL_DATO;
-      COMMIT;
-    EXCEPTION
-      WHEN OTHERS THEN
-        L_ERROR_MELDING := SQLCODE
-          || ' '
-          || SQLERRM;
-        INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
-          MIN_LASTET_DATO,
-          ID,
-          ERROR_MSG,
-          OPPRETTET_TID,
-          KILDE
-        ) VALUES(
-          NULL,
-          NULL,
-          L_ERROR_MELDING,
-          V_STOREDATE,
-          'FAM_BT_BARN_INSERT: Patch opp fk_person1'
-        );
-        COMMIT;
-        P_ERROR_MELDING := SUBSTR(P_ERROR_MELDING
-          || L_ERROR_MELDING, 1, 1000);
-    END;
- -- Slett person_ident
-    BEGIN
-      UPDATE DVH_FAM_BT.FAM_BT_PERSON
-      SET
-        PERSON_IDENT = NULL
-      WHERE
-        FK_PERSON1 != -1
-        AND PERSON_IDENT IS NOT NULL;
-      COMMIT;
-    EXCEPTION
-      WHEN OTHERS THEN
-        L_ERROR_MELDING := SQLCODE
-          || ' '
-          || SQLERRM;
-        INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
-          MIN_LASTET_DATO,
-          ID,
-          ERROR_MSG,
-          OPPRETTET_TID,
-          KILDE
-        ) VALUES(
-          NULL,
-          NULL,
-          L_ERROR_MELDING,
-          V_STOREDATE,
-          'FAM_BT_BARN_INSERT: Slett person_ident'
-        );
-        COMMIT;
-        P_ERROR_MELDING := SUBSTR(P_ERROR_MELDING
-          || L_ERROR_MELDING, 1, 1000);
-    END;
-    FOR REC_BARN IN CUR_BARN(P_IN_PERIOD) LOOP
- --dbms_output.put_line(rec_barn.fkb_person1);--Test
+
+    -- Patch opp fk_person1
+    begin
+      merge into dvh_fam_bt.fam_bt_person
+      using (
+              select off_id
+                    ,max(fk_person1) keep
+                               (dense_rank first order by gyldig_fra_dato desc) as fk_person1
+                    ,max(gyldig_til_dato) keep
+                               (dense_rank first order by gyldig_fra_dato desc) as gyldig_til_dato
+              from dt_person.dvh_person_ident_off_id_ikke_skjermet
+              group by off_id
+            ) person_67_vasket
+      on (person_67_vasket.off_id = fam_bt_person.person_ident)
+      when matched then update set fam_bt_person.fk_person1 = person_67_vasket.fk_person1
+                                  ,fam_bt_person.oppdatert_dato = sysdate
+      where fam_bt_person.fk_person1 = -1
+      and rolle = 'BARN'
+      and fam_bt_person.lastet_dato <= person_67_vasket.gyldig_til_dato;
+      commit;
+    exception
+      when others then
+        l_error_melding := sqlcode || ' ' || sqlerrm;
+        insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+        values(null, null, l_error_melding, v_storedate, 'FAM_BT_BARN_INSERT: Patch opp fk_person1');
+        commit;
+        p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
+    end;
+
+    -- Slett person_ident
+    begin
+      update dvh_fam_bt.fam_bt_person
+      set person_ident = null
+      where fk_person1 != -1
+      and person_ident is not null;
+      commit;
+    exception
+      when others then
+        l_error_melding := sqlcode || ' ' || sqlerrm;
+        insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+        values(null, null, l_error_melding, v_storedate, 'FAM_BT_BARN_INSERT: Slett person_ident');
+        commit;
+        p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
+    end;
+
+    FOR rec_barn IN cur_barn(p_in_period) LOOP
+      --dbms_output.put_line(rec_barn.fkb_person1);--Test
       BEGIN
-        INSERT INTO DVH_FAM_BT.FAM_BT_BARN (
-          FKB_PERSON1,
-          FK_PERSON1,
-          INST,
-          FODSEL_AAR,
-          FODSEL_MND,
-          KJONN,
-          FODSEL_AAR_BARN,
-          FODSEL_MND_BARN,
-          KJONN_BARN,
-          DELINGSPROSENT_YTELSE,
-          STAT_AARMND,
-          KILDE,
-          LASTET_DATO,
-          GYLDIG_FLAGG,
-          FK_BT_FAGSAK,
-          FK_DIM_PERSON_BARN
-        ) VALUES (
-          REC_BARN.FKB_PERSON1,
-          REC_BARN.FK_PERSON1,
-          REC_BARN.INST,
-          REC_BARN.FODSEL_AAR,
-          REC_BARN.FODSEL_MND,
-          REC_BARN.KJONN,
-          REC_BARN.FODSEL_AAR_BARN,
-          REC_BARN.FODSEL_MND_BARN,
-          REC_BARN.KJONN_BARN,
-          REC_BARN.DELINGSPROSENT_YTELSE,
-          REC_BARN.STAT_AARMND,
-          V_KILDE,
-          SYSDATE --v_storedate
-,
-          P_IN_GYLDIG_FLAGG,
-          REC_BARN.FK_BT_FAGSAK,
-          REC_BARN.FK_DIM_PERSON_BARN
+        INSERT INTO dvh_fam_bt.fam_bt_barn
+        (
+          fkb_person1,
+          fk_person1,
+          inst,
+          fodsel_aar,
+          fodsel_mnd,
+          kjonn,
+          fodsel_aar_barn,
+          fodsel_mnd_barn,
+          kjonn_barn,
+          delingsprosent_ytelse,
+          stat_aarmnd,
+          kilde,
+          lastet_dato,
+          gyldig_flagg,
+          fk_bt_fagsak,
+          fk_dim_person_barn
+        )
+        VALUES
+        (
+          rec_barn.fkb_person1,
+          rec_barn.fk_person1,
+          rec_barn.inst,
+          rec_barn.fodsel_aar,
+          rec_barn.fodsel_mnd,
+          rec_barn.kjonn,
+          rec_barn.fodsel_aar_barn,
+          rec_barn.fodsel_mnd_barn,
+          rec_barn.kjonn_barn,
+          rec_barn.delingsprosent_ytelse,
+          rec_barn.stat_aarmnd,
+          v_kilde,
+          sysdate--v_storedate
+         ,p_in_gyldig_flagg,
+          rec_barn.fk_bt_fagsak,
+          rec_barn.fk_dim_person_barn
         );
-        L_COMMIT := L_COMMIT + 1;
+        l_commit := l_commit + 1;
       EXCEPTION
         WHEN OTHERS THEN
-          L_ERROR_MELDING := SQLCODE
-            || ' '
-            || SQLERRM;
-          INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
-            MIN_LASTET_DATO,
-            ID,
-            ERROR_MSG,
-            OPPRETTET_TID,
-            KILDE
-          ) VALUES(
-            NULL,
-            REC_BARN.FKB_PERSON1,
-            L_ERROR_MELDING,
-            V_STOREDATE,
-            'FAM_BT_BARN_INSERT2'
-          );
-          L_COMMIT := L_COMMIT + 1; --Gå videre til neste rekord
-          P_ERROR_MELDING := SUBSTR(P_ERROR_MELDING
-            || L_ERROR_MELDING, 1, 1000);
+          l_error_melding := SQLCODE || ' ' || sqlerrm;
+          INSERT INTO dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, ID, error_msg, opprettet_tid, kilde)
+          VALUES(NULL, rec_barn.fkb_person1, l_error_melding, v_storedate, 'FAM_BT_BARN_INSERT2');
+          l_commit := l_commit + 1;--Gå videre til neste rekord
+          p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
       END;
- --rollback;--Test
-      IF L_COMMIT >= 100000 THEN
+      --rollback;--Test
+      IF l_commit >= 100000 THEN
         COMMIT;
-        L_COMMIT := 0;
+        l_commit := 0;
       END IF;
     END LOOP;
-    COMMIT; --commit til slutt
-    IF L_ERROR_MELDING IS NOT NULL THEN
-      INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
-        ID,
-        ERROR_MSG,
-        OPPRETTET_TID,
-        KILDE
-      ) VALUES(
-        NULL,
-        L_ERROR_MELDING,
-        V_STOREDATE,
-        'FAM_BT_BARN_INSERT3'
-      );
+    COMMIT;--commit til slutt
+    IF l_error_melding IS NOT NULL THEN
+      INSERT INTO dvh_fam_fp.fp_xml_utbrett_error(ID, error_msg, opprettet_tid, kilde)
+      VALUES(NULL, l_error_melding, v_storedate, 'FAM_BT_BARN_INSERT3');
       COMMIT;
-      P_ERROR_MELDING := SUBSTR(P_ERROR_MELDING
-        || L_ERROR_MELDING, 1, 1000);
+      p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
     END IF;
-    MERGE INTO FAM_BT_BARN USING (
-      SELECT
-        A.PK_BT_BARN,
-        A.STAT_AARMND,
-        A.FK_PERSON1,
-        A.FKB_PERSON1,
-        D.PK_BT_KOMPETANSE_PERIODER FK_BT_KOMPETANSE_PERIODER
-      FROM
-        FAM_BT_BARN A
-        JOIN FAM_BT_KOMPETANSE_PERIODER D
-        ON A.FK_BT_FAGSAK=D.FK_BT_FAGSAK
- --AND D.PK_BT_KOMPETANSE_PERIODER=C.FK_BT_KOMPETANSE_PERIODER
-        AND TO_DATE(A.STAT_AARMND, 'YYYYMM')>=TO_DATE(D.FOM, 'YYYY-MM')
-        AND TO_DATE(A.STAT_AARMND, 'YYYYMM')<=TO_DATE(NVL(D.TOM, '2099-12'), 'YYYY-MM') JOIN FAM_BT_KOMPETANSE_BARN C
-        ON A.FKB_PERSON1=C.FK_PERSON1
-        AND D.PK_BT_KOMPETANSE_PERIODER=C.FK_BT_KOMPETANSE_PERIODER
-      WHERE
-        A.STAT_AARMND=P_IN_PERIOD
-        AND A.GYLDIG_FLAGG=P_IN_GYLDIG_FLAGG
-    ) BARN ON (FAM_BT_BARN.PK_BT_BARN=BARN.PK_BT_BARN) WHEN MATCHED THEN UPDATE SET FAM_BT_BARN.FK_BT_KOMPETANSE_PERIODER = BARN.FK_BT_KOMPETANSE_PERIODER WHERE BARN.STAT_AARMND=P_IN_PERIOD;
+
+
+
+    MERGE into dvh_fam_bt.FAM_BT_BARN
+    USING (
+    SELECT
+    A.PK_BT_BARN,A.STAT_AARMND,A.FK_PERSON1,A.FKB_PERSON1,D.PK_BT_KOMPETANSE_PERIODER FK_BT_KOMPETANSE_PERIODER
+    FROM dvh_fam_bt.FAM_BT_BARN A
+
+
+    JOIN dvh_fam_bt.FAM_BT_KOMPETANSE_PERIODER D ON
+    A.FK_BT_FAGSAK=D.FK_BT_FAGSAK
+    --AND D.PK_BT_KOMPETANSE_PERIODER=C.FK_BT_KOMPETANSE_PERIODER
+    AND to_Date(A.STAT_AARMND,'YYYYMM')>=to_Date(D.fom,'YYYY-MM')
+    AND to_date(A.STAT_AARMND,'YYYYMM')<=to_Date(nvl(D.tom,'2099-12'),'YYYY-MM')
+
+    JOIN dvh_fam_bt.FAM_BT_KOMPETANSE_BARN C ON
+    A.FKB_PERSON1=C.FK_PERSON1
+    AND D.PK_BT_KOMPETANSE_PERIODER=C.FK_BT_KOMPETANSE_PERIODER
+
+    WHERE A.STAT_AARMND=p_in_period
+    AND A.GYLDIG_FLAGG=p_in_gyldig_flagg ) BARN ON
+    (FAM_BT_BARN.PK_BT_BARN=BARN.PK_BT_BARN)
+    WHEN MATCHED THEN UPDATE SET FAM_BT_BARN.FK_BT_KOMPETANSE_PERIODER = BARN.FK_BT_KOMPETANSE_PERIODER
+    WHERE BARN.STAT_AARMND=p_in_period;
     COMMIT;
+
+
+
   EXCEPTION
     WHEN OTHERS THEN
-      L_ERROR_MELDING := SQLCODE
-        || ' '
-        || SQLERRM;
-      INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
-        MIN_LASTET_DATO,
-        ID,
-        ERROR_MSG,
-        OPPRETTET_TID,
-        KILDE
-      ) VALUES(
-        NULL,
-        NULL,
-        L_ERROR_MELDING,
-        V_STOREDATE,
-        'FAM_BT_BARN_INSERT4'
-      );
+      l_error_melding := SQLCODE || ' ' || sqlerrm;
+      INSERT INTO dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, ID, error_msg, opprettet_tid, kilde)
+      VALUES(NULL, NULL, l_error_melding, v_storedate, 'FAM_BT_BARN_INSERT4');
       COMMIT;
-      P_ERROR_MELDING := SUBSTR(P_ERROR_MELDING
-        || L_ERROR_MELDING, 1, 1000);
-  END FAM_BT_BARN_INSERT;
-  PROCEDURE FAM_BT_MOTTAKER_INSERT_BCK(
-    P_IN_PERIOD IN VARCHAR2,
-    P_ERROR_MELDING OUT VARCHAR2
-  ) AS
-    V_KILDE         VARCHAR2(10) := 'BT';
-    V_STOREDATE     DATE := SYSDATE;
-    V_AAR_START     VARCHAR2(6):= SUBSTR(P_IN_PERIOD, 1, 4)
-      || '01';
-    V_FK_PERSON1_YB VARCHAR2(40);
-    V_FK_PERSON1_EB VARCHAR2(40);
-    V_ANT_BARN      NUMBER;
-    V_BELOPHIE      NUMBER;
-    V_BELOPHIT      NUMBER;
-    V_ALDERYB       NUMBER;
-    V_SSB_KODE      VARCHAR2(10);
-    L_ERROR_MELDING VARCHAR2(1000);
-    L_COMMIT        NUMBER := 0;
-    CURSOR CUR_MOTTAKER(V_IN_PERIOD VARCHAR2) IS
-      SELECT /*+ PARALLEL(8) */
-        GJELDER_MOTTAKER,
-        TO_CHAR(POSTERINGSDATO,
-        'YYYYMM') PERIODE,
-        SUM(BELOP_SIGN) BELOP, --, DELYTELSE_ID
-        DIM_KJONN_MOTTAKER.KJONN_KODE KJONN,
-        SUM(CASE
-          WHEN TO_CHAR(POSTERINGSDATO, 'YYYYMM') > TO_CHAR(DATO_UTBET_FOM, 'YYYYMM') THEN
-            BELOP_SIGN
-          ELSE
-            0.0
-        END) BELOPE,
-        FAM_BT_PERIODE.SISTE_DATO_I_PERIODEN,
-        EXTRACT( YEAR
-      FROM
-        DIM_PERSON_MOTTAKER.FODT_DATO) FODSEL_AAR,
-        TO_CHAR(DIM_PERSON_MOTTAKER.FODT_DATO,
-        'MM') FODSEL_MND,
- --nvl(DIM_GEOGRAFI.KOMMUNE_NR, DIM_PERSON_MOTTAKER.BOSTED_KOMMUNE_NR) KOMMUNE_NR
-        DIM_PERSON_MOTTAKER.TKNR,
-        DIM_PERSON_MOTTAKER.BOSTED_KOMMUNE_NR,
-        DIM_GEOGRAFI.KOMMUNE_NR,
- --dim_geografi.bydel_nr,
-        DIM_GEOGRAFI.BYDEL_KOMMUNE_NR,
-        FAGSAK.FAGSAK_ID,
-        DIM_PERSON_MOTTAKER.PK_DIM_PERSON,
-        DIM_PERSON_MOTTAKER.FK_DIM_KJONN,
-        DIM_PERSON_MOTTAKER.FK_DIM_SIVILSTATUS,
-        DIM_PERSON_MOTTAKER.FK_DIM_LAND_FODT,
-        DIM_PERSON_MOTTAKER.FK_DIM_GEOGRAFI_BOSTED,
-        DIM_PERSON_MOTTAKER.FK_DIM_LAND_STATSBORGERSKAP,
-        FAM_BT_PERIODE.PK_DIM_TID,
-        DIM_ALDER.PK_DIM_ALDER
-      FROM
-        DVH_FAM_BT.FAM_BT_UR_UTBETALING UR
-        LEFT JOIN DVH_FAM_BT.FAM_BT_FAGSAK FAGSAK
-        ON FAGSAK.BEHANDLINGS_ID = UR.HENVISNING
-        LEFT OUTER JOIN DT_KODEVERK.DIM_TID FAM_BT_PERIODE
-        ON TO_CHAR(UR.POSTERINGSDATO,
-        'YYYYMM') = FAM_BT_PERIODE.AAR_MAANED
-        AND FAM_BT_PERIODE.DIM_NIVAA = 3
-        AND FAM_BT_PERIODE.GYLDIG_FLAGG = 1
-        LEFT OUTER JOIN DT_PERSON.DIM_PERSON DIM_PERSON_MOTTAKER
-        ON DIM_PERSON_MOTTAKER.FK_PERSON1 = UR.GJELDER_MOTTAKER
-        AND DIM_PERSON_MOTTAKER.GYLDIG_FRA_DATO <= FAM_BT_PERIODE.SISTE_DATO_I_PERIODEN
-        AND DIM_PERSON_MOTTAKER.GYLDIG_TIL_DATO >= FAM_BT_PERIODE.SISTE_DATO_I_PERIODEN
-        LEFT OUTER JOIN DT_KODEVERK.DIM_GEOGRAFI DIM_GEOGRAFI
-        ON DIM_PERSON_MOTTAKER.FK_DIM_GEOGRAFI_BOSTED = DIM_GEOGRAFI.PK_DIM_GEOGRAFI
- --AND dim_geografi.gyldig_fra_dato< fam_bt_periode.siste_dato_i_perioden
- --AND dim_geografi.gyldig_til_dato> fam_bt_periode.siste_dato_i_perioden
-        LEFT OUTER JOIN DT_KODEVERK.DIM_KJONN DIM_KJONN_MOTTAKER
-        ON DIM_PERSON_MOTTAKER.FK_DIM_KJONN=DIM_KJONN_MOTTAKER.PK_DIM_KJONN
- --AND dim_kjonn_mottaker.gyldig_fra_dato< fam_bt_periode.siste_dato_i_perioden
- --AND dim_kjonn_mottaker.gyldig_til_dato> fam_bt_periode.siste_dato_i_perioden
-        LEFT OUTER JOIN DT_KODEVERK.DIM_ALDER
-        ON FLOOR(MONTHS_BETWEEN(SYSDATE,
-        DIM_PERSON_MOTTAKER.FODT_DATO)/12) = DIM_ALDER.ALDER
-        AND DIM_ALDER.GYLDIG_FRA_DATO <= FAM_BT_PERIODE.SISTE_DATO_I_PERIODEN
-        AND DIM_ALDER.GYLDIG_TIL_DATO >= FAM_BT_PERIODE.SISTE_DATO_I_PERIODEN
-      WHERE
-        HOVEDKONTONR = 800
-        AND TO_CHAR(POSTERINGSDATO,
-        'YYYYMM') = V_IN_PERIOD
-        AND LENGTH(DELYTELSE_ID) < 14
-      GROUP BY
-        GJELDER_MOTTAKER,
-        TO_CHAR(POSTERINGSDATO,
-        'YYYYMM'),
-        DIM_KJONN_MOTTAKER.KJONN_KODE,
-        FAM_BT_PERIODE.SISTE_DATO_I_PERIODEN,
-        EXTRACT( YEAR FROM DIM_PERSON_MOTTAKER.FODT_DATO),
-        TO_CHAR(DIM_PERSON_MOTTAKER.FODT_DATO,
-        'MM'),
- -- nvl(DIM_GEOGRAFI.KOMMUNE_NR, DIM_PERSON_MOTTAKER.BOSTED_KOMMUNE_NR)
-        DIM_PERSON_MOTTAKER.TKNR,
-        DIM_PERSON_MOTTAKER.BOSTED_KOMMUNE_NR,
-        DIM_GEOGRAFI.KOMMUNE_NR,
-        DIM_GEOGRAFI.BYDEL_KOMMUNE_NR,
-        FAGSAK.FAGSAK_ID,
-        DIM_PERSON_MOTTAKER.PK_DIM_PERSON,
-        DIM_PERSON_MOTTAKER.FK_DIM_KJONN,
-        DIM_PERSON_MOTTAKER.FK_DIM_SIVILSTATUS,
-        DIM_PERSON_MOTTAKER.FK_DIM_LAND_FODT,
-        DIM_PERSON_MOTTAKER.FK_DIM_GEOGRAFI_BOSTED,
-        DIM_PERSON_MOTTAKER.FK_DIM_LAND_STATSBORGERSKAP,
-        FAM_BT_PERIODE.PK_DIM_TID,
-        DIM_ALDER.PK_DIM_ALDER;
+      p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
+  END fam_bt_barn_insert;
+
+  PROCEDURE fam_bt_mottaker_insert_bck(p_in_period IN VARCHAR2, p_error_melding OUT VARCHAR2) AS
+    v_kilde VARCHAR2(10) := 'BT';
+    v_storedate DATE := sysdate;
+    v_aar_start VARCHAR2(6):= substr(p_in_period,1,4) || '01';
+    v_fk_person1_yb VARCHAR2(40);
+    v_fk_person1_eb VARCHAR2(40);
+    v_ant_barn NUMBER;
+    v_belophie NUMBER;
+    v_belophit NUMBER;
+    v_alderyb NUMBER;
+    v_ssb_kode VARCHAR2(10);
+
+    l_error_melding VARCHAR2(1000);
+    l_commit NUMBER := 0;
+
+    CURSOR cur_mottaker(v_in_period VARCHAR2) IS
+      SELECT /*+ PARALLEL(8) */gjelder_mottaker,
+             to_char(posteringsdato,'YYYYMM') periode,
+             SUM(belop_sign) belop,--, DELYTELSE_ID
+             dim_kjonn_mottaker.kjonn_kode kjonn,
+             SUM(CASE WHEN to_char(posteringsdato,'YYYYMM') > to_char(dato_utbet_fom,'YYYYMM') THEN
+                      belop_sign
+                      ELSE 0.0
+                 END) belope,
+             fam_bt_periode.siste_dato_i_perioden,
+             EXTRACT( YEAR FROM dim_person_mottaker.fodt_dato) fodsel_aar,
+             to_char(dim_person_mottaker.fodt_dato,'MM') fodsel_mnd,
+             --nvl(DIM_GEOGRAFI.KOMMUNE_NR, DIM_PERSON_MOTTAKER.BOSTED_KOMMUNE_NR) KOMMUNE_NR
+             DIM_PERSON_MOTTAKER.tknr,
+             DIM_PERSON_MOTTAKER.BOSTED_KOMMUNE_NR,
+             dim_geografi.kommune_nr,
+             --dim_geografi.bydel_nr,
+             dim_geografi.bydel_kommune_nr,
+             fagsak.fagsak_id,
+             dim_person_mottaker.pk_dim_person,
+             dim_person_mottaker.fk_dim_kjonn,
+             dim_person_mottaker.fk_dim_sivilstatus,
+             dim_person_mottaker.fk_dim_land_fodt,
+             dim_person_mottaker.fk_dim_geografi_bosted,
+             dim_person_mottaker.fk_dim_land_statsborgerskap,
+             fam_bt_periode.pk_dim_tid,
+             dim_alder.pk_dim_alder
+      FROM dvh_fam_bt.fam_bt_ur_utbetaling ur
+      LEFT JOIN dvh_fam_bt.fam_bt_fagsak fagsak
+      ON fagsak.behandlings_id = ur.henvisning
+
+      LEFT OUTER JOIN dt_kodeverk.dim_tid fam_bt_periode ON
+      to_char(ur.posteringsdato,'YYYYMM') = fam_bt_periode.aar_maaned
+      AND fam_bt_periode.dim_nivaa = 3
+      AND fam_bt_periode.gyldig_flagg = 1
+
+      LEFT OUTER JOIN dt_person.dim_person dim_person_mottaker ON
+      dim_person_mottaker.fk_person1 = ur.gjelder_mottaker
+      AND dim_person_mottaker.gyldig_fra_dato <= fam_bt_periode.siste_dato_i_perioden
+      AND dim_person_mottaker.gyldig_til_dato >= fam_bt_periode.siste_dato_i_perioden
+
+      LEFT OUTER JOIN dt_kodeverk.dim_geografi dim_geografi ON
+      dim_person_mottaker.fk_dim_geografi_bosted = dim_geografi.pk_dim_geografi
+      --AND dim_geografi.gyldig_fra_dato< fam_bt_periode.siste_dato_i_perioden
+      --AND dim_geografi.gyldig_til_dato> fam_bt_periode.siste_dato_i_perioden
+
+      LEFT OUTER JOIN dt_kodeverk.dim_kjonn dim_kjonn_mottaker ON
+      dim_person_mottaker.fk_dim_kjonn=dim_kjonn_mottaker.pk_dim_kjonn
+      --AND dim_kjonn_mottaker.gyldig_fra_dato< fam_bt_periode.siste_dato_i_perioden
+      --AND dim_kjonn_mottaker.gyldig_til_dato> fam_bt_periode.siste_dato_i_perioden
+
+      left outer join dt_kodeverk.dim_alder
+      on floor(months_between(sysdate, dim_person_mottaker.fodt_dato)/12) = dim_alder.alder
+      and dim_alder.gyldig_fra_dato <= fam_bt_periode.siste_dato_i_perioden
+      and dim_alder.gyldig_til_dato >= fam_bt_periode.siste_dato_i_perioden
+
+      WHERE hovedkontonr = 800
+      AND to_char(posteringsdato,'YYYYMM') = v_in_period
+      AND LENGTH(delytelse_id) < 14
+      GROUP BY gjelder_mottaker,
+               to_char(posteringsdato,'YYYYMM'),
+               dim_kjonn_mottaker.kjonn_kode,
+               fam_bt_periode.siste_dato_i_perioden,
+               EXTRACT( YEAR FROM dim_person_mottaker.fodt_dato),
+               to_char(dim_person_mottaker.fodt_dato,'MM'),
+               -- nvl(DIM_GEOGRAFI.KOMMUNE_NR, DIM_PERSON_MOTTAKER.BOSTED_KOMMUNE_NR)
+               DIM_PERSON_MOTTAKER.tknr,
+               DIM_PERSON_MOTTAKER.BOSTED_KOMMUNE_NR,
+               dim_geografi.kommune_nr,
+               dim_geografi.bydel_kommune_nr,
+               fagsak.fagsak_id,
+               dim_person_mottaker.pk_dim_person,
+               dim_person_mottaker.fk_dim_kjonn,
+               dim_person_mottaker.fk_dim_sivilstatus,
+               dim_person_mottaker.fk_dim_land_fodt,
+               dim_person_mottaker.fk_dim_geografi_bosted,
+               dim_person_mottaker.fk_dim_land_statsborgerskap,
+               fam_bt_periode.pk_dim_tid,
+               dim_alder.pk_dim_alder;
   BEGIN
- -- Slett mottakere dvh_fam_fp.fam_bt_mottaker_hist for aktuell periode
+    -- Slett mottakere dvh_fam_fp.fam_bt_mottaker_hist for aktuell periode
     BEGIN
-      DELETE FROM DVH_FAM_BT.FAM_BT_MOTTAKER
-      WHERE
-        KILDE = V_KILDE
-        AND STAT_AARMND= P_IN_PERIOD;
+      DELETE FROM dvh_fam_bt.fam_bt_mottaker
+      WHERE kilde = v_kilde
+      AND stat_aarmnd= p_in_period;
       COMMIT;
     EXCEPTION
       WHEN OTHERS THEN
-        L_ERROR_MELDING := SQLCODE
-          || ' '
-          || SQLERRM;
-        INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
-          MIN_LASTET_DATO,
-          ID,
-          ERROR_MSG,
-          OPPRETTET_TID,
-          KILDE
-        ) VALUES(
-          NULL,
-          NULL,
-          L_ERROR_MELDING,
-          V_STOREDATE,
-          'FAM_BT_MOTTAKER_INSERT1'
-        );
+        l_error_melding := SQLCODE || ' ' || sqlerrm;
+        INSERT INTO dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, ID, error_msg, opprettet_tid, kilde)
+        VALUES(NULL, NULL, l_error_melding, v_storedate, 'FAM_BT_MOTTAKER_INSERT1');
         COMMIT;
-        P_ERROR_MELDING := SUBSTR(P_ERROR_MELDING
-          || L_ERROR_MELDING, 1, 1000);
+        p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
     END;
-    FOR REC_MOTTAKER IN CUR_MOTTAKER(P_IN_PERIOD) LOOP
- --Finn Fk_person1 for yngste og eldste barn, antall barn
-      V_FK_PERSON1_YB := NULL;
-      V_FK_PERSON1_EB := NULL;
-      V_ANT_BARN := 0;
- --dbms_output.put_line('Antall barn'||sysdate);--Test!!!
+
+    FOR rec_mottaker IN cur_mottaker(p_in_period) LOOP
+      --Finn Fk_person1 for yngste og eldste barn, antall barn
+      v_fk_person1_yb := null;
+      v_fk_person1_eb := null;
+      v_ant_barn := 0;
+
+      --dbms_output.put_line('Antall barn'||sysdate);--Test!!!
       BEGIN
-        SELECT
-          SUBSTR(MIN(FODSEL_AAR_BARN||FODSEL_MND_BARN||'-'||FKB_PERSON1),
-          8,
-          40),
-          SUBSTR(MAX(FODSEL_AAR_BARN||FODSEL_MND_BARN||'-'||FKB_PERSON1),
-          8),
-          COUNT(DISTINCT FKB_PERSON1) INTO V_FK_PERSON1_EB,
-          V_FK_PERSON1_YB,
-          V_ANT_BARN
-        FROM
-          DVH_FAM_BT.FAM_BT_BARN
-        WHERE
-          FK_PERSON1 = REC_MOTTAKER.GJELDER_MOTTAKER
-          AND KILDE = V_KILDE
-          AND STAT_AARMND= P_IN_PERIOD;
- --dbms_output.put_line(rec_mottaker.gjelder_mottaker||'   '||v_fk_person1_yb);--Test
+        SELECT substr(MIN(fodsel_aar_barn||fodsel_mnd_barn||'-'||fkb_person1),8,40),
+               substr(MAX(fodsel_aar_barn||fodsel_mnd_barn||'-'||fkb_person1),8),
+               COUNT(DISTINCT fkb_person1)
+        INTO v_fk_person1_eb,
+             v_fk_person1_yb,
+             v_ant_barn
+        FROM dvh_fam_bt.fam_bt_barn
+        WHERE fk_person1 = rec_mottaker.gjelder_mottaker
+        AND kilde = v_kilde
+        AND stat_aarmnd= p_in_period;
+        --dbms_output.put_line(rec_mottaker.gjelder_mottaker||'   '||v_fk_person1_yb);--Test
       EXCEPTION
         WHEN OTHERS THEN
-          V_FK_PERSON1_EB := NULL;
-          V_FK_PERSON1_YB := NULL;
-          V_ANT_BARN := 0;
-          L_ERROR_MELDING := SQLCODE
-            || ' '
-            || SQLERRM;
-          INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
-            MIN_LASTET_DATO,
-            ID,
-            ERROR_MSG,
-            OPPRETTET_TID,
-            KILDE
-          ) VALUES(
-            NULL,
-            REC_MOTTAKER.GJELDER_MOTTAKER,
-            L_ERROR_MELDING,
-            V_STOREDATE,
-            'FAM_BT_MOTTAKER_INSERT2'
-          );
-          L_COMMIT := L_COMMIT + 1;
-          P_ERROR_MELDING := SUBSTR(P_ERROR_MELDING
-            || L_ERROR_MELDING, 1, 1000);
+          v_fk_person1_eb := NULL;
+          v_fk_person1_yb := NULL;
+          v_ant_barn := 0;
+          l_error_melding := SQLCODE || ' ' || sqlerrm;
+          INSERT INTO dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, ID, error_msg, opprettet_tid, kilde)
+          VALUES(NULL, rec_mottaker.gjelder_mottaker, l_error_melding, v_storedate, 'FAM_BT_MOTTAKER_INSERT2');
+          l_commit := l_commit + 1;
+          p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
       END;
- -- Kalkulere beløp utbetalt hittil i år, sum for tidligere perioder inneværende år + denne periode
- -- Kalkulere beløp etterbetalt hittil i år, sum for tidligere perioder inneværende år + denne periode
-      V_BELOPHIE := 0;
-      V_BELOPHIT := 0;
- --IF (v_ant_barn > 0) THEN
- --dbms_output.put_line('Beløp'||sysdate);--Test!!!
-      BEGIN
-        SELECT
-          NVL(SUM(MOT.BELOP),
-          0) + NVL(REC_MOTTAKER.BELOP,
-          0),
- --nvl(MAX(mot.belophie),0) + nvl(rec_mottaker.belope,0)
-          NVL(SUM(MOT.BELOPE),
-          0) + NVL(REC_MOTTAKER.BELOPE,
-          0) INTO V_BELOPHIT,
-          V_BELOPHIE
-        FROM
-          DVH_FAM_BT.FAM_BT_MOTTAKER MOT
-        WHERE
-          MOT.STAT_AARMND >= V_AAR_START
-          AND MOT.FK_PERSON1 = REC_MOTTAKER.GJELDER_MOTTAKER
-          AND MOT.STAT_AARMND < P_IN_PERIOD;
-      EXCEPTION
-        WHEN OTHERS THEN
-          V_BELOPHIT := 0;
-          V_BELOPHIE := 0;
-          L_ERROR_MELDING := SQLCODE
-            || ' '
-            || SQLERRM;
-          INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
-            MIN_LASTET_DATO,
-            ID,
-            ERROR_MSG,
-            OPPRETTET_TID,
-            KILDE
-          ) VALUES(
-            NULL,
-            REC_MOTTAKER.GJELDER_MOTTAKER,
-            L_ERROR_MELDING,
-            V_STOREDATE,
-            'FAM_BT_MOTTAKER_INSERT3'
-          );
-          L_COMMIT := L_COMMIT + 1;
-          P_ERROR_MELDING := SUBSTR(P_ERROR_MELDING
-            || L_ERROR_MELDING, 1, 1000);
-      END;
- --END IF;
-      V_ALDERYB := 0;
-      V_SSB_KODE := NULL;
- -- Finn yngste barns alder, bostedsland
-      IF (V_FK_PERSON1_YB IS NOT NULL) THEN
- --dbms_output.put_line('Yngste barn'||sysdate);--Test!!!
+
+      -- Kalkulere beløp utbetalt hittil i år, sum for tidligere perioder inneværende år + denne periode
+      -- Kalkulere beløp etterbetalt hittil i år, sum for tidligere perioder inneværende år + denne periode
+      v_belophie := 0;
+      v_belophit := 0;
+      --IF (v_ant_barn > 0) THEN
+      --dbms_output.put_line('Beløp'||sysdate);--Test!!!
         BEGIN
-          SELECT
-            TRUNC(MONTHS_BETWEEN(REC_MOTTAKER.SISTE_DATO_I_PERIODEN,
-            DIM_PERSON_BARN.FODT_DATO)/12),
-            DIM_LAND.LAND_SSB_KODE INTO V_ALDERYB,
-            V_SSB_KODE
-          FROM
-            DT_PERSON.DIM_PERSON DIM_PERSON_BARN
-            LEFT OUTER JOIN DT_KODEVERK.DIM_LAND DIM_LAND
-            ON DIM_PERSON_BARN.FK_DIM_LAND_BOSTED = DIM_LAND.PK_DIM_LAND
-            AND DIM_LAND.GYLDIG_FRA_DATO <= REC_MOTTAKER.SISTE_DATO_I_PERIODEN
-            AND DIM_LAND.GYLDIG_TIL_DATO >= REC_MOTTAKER.SISTE_DATO_I_PERIODEN
-          WHERE
-            DIM_PERSON_BARN.FK_PERSON1 = V_FK_PERSON1_YB
-            AND DIM_PERSON_BARN.GYLDIG_FRA_DATO <= REC_MOTTAKER.SISTE_DATO_I_PERIODEN
-            AND DIM_PERSON_BARN.GYLDIG_TIL_DATO >= REC_MOTTAKER.SISTE_DATO_I_PERIODEN;
+          SELECT nvl(SUM(mot.belop),0) + nvl(rec_mottaker.belop,0),
+                 --nvl(MAX(mot.belophie),0) + nvl(rec_mottaker.belope,0)
+                 nvl(SUM(mot.belope),0) + nvl(rec_mottaker.belope,0)
+          INTO v_belophit,v_belophie
+          FROM dvh_fam_bt.fam_bt_mottaker mot
+          WHERE mot.stat_aarmnd >= v_aar_start
+          AND mot.fk_person1 = rec_mottaker.gjelder_mottaker
+          AND mot.stat_aarmnd < p_in_period;
         EXCEPTION
           WHEN OTHERS THEN
-            V_ALDERYB := 0;
-            V_SSB_KODE := NULL;
-            L_ERROR_MELDING := SQLCODE
-              || ' '
-              || SQLERRM;
-            INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
-              MIN_LASTET_DATO,
-              ID,
-              ERROR_MSG,
-              OPPRETTET_TID,
-              KILDE
-            ) VALUES(
-              NULL,
-              REC_MOTTAKER.GJELDER_MOTTAKER,
-              L_ERROR_MELDING,
-              V_STOREDATE,
-              'FAM_BT_MOTTAKER_INSERT4'
-            );
-            L_COMMIT := L_COMMIT + 1;
-            P_ERROR_MELDING := SUBSTR(P_ERROR_MELDING
-              || L_ERROR_MELDING, 1, 1000);
+            v_belophit := 0;
+            v_belophie := 0;
+            l_error_melding := SQLCODE || ' ' || sqlerrm;
+            INSERT INTO dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, ID, error_msg, opprettet_tid, kilde)
+            VALUES(NULL, rec_mottaker.gjelder_mottaker, l_error_melding, v_storedate, 'FAM_BT_MOTTAKER_INSERT3');
+            l_commit := l_commit + 1;
+            p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
+        END;
+      --END IF;
+
+      v_alderyb := 0;
+      v_ssb_kode := null;
+      -- Finn yngste barns alder, bostedsland
+      IF (v_fk_person1_yb IS NOT NULL) THEN
+      --dbms_output.put_line('Yngste barn'||sysdate);--Test!!!
+        BEGIN
+          SELECT TRUNC(months_between(rec_mottaker.siste_dato_i_perioden,dim_person_barn.fodt_dato)/12),
+                 dim_land.land_ssb_kode
+          INTO v_alderyb, v_ssb_kode
+          FROM dt_person.dim_person dim_person_barn
+          LEFT OUTER JOIN dt_kodeverk.dim_land dim_land ON
+          dim_person_barn.fk_dim_land_bosted = dim_land.pk_dim_land
+          AND dim_land.gyldig_fra_dato <= rec_mottaker.siste_dato_i_perioden
+          AND dim_land.gyldig_til_dato >= rec_mottaker.siste_dato_i_perioden
+          WHERE dim_person_barn.fk_person1 = v_fk_person1_yb
+          AND dim_person_barn.gyldig_fra_dato <= rec_mottaker.siste_dato_i_perioden
+          AND dim_person_barn.gyldig_til_dato >= rec_mottaker.siste_dato_i_perioden;
+        EXCEPTION
+          WHEN OTHERS THEN
+            v_alderyb := 0;
+            v_ssb_kode := NULL;
+            l_error_melding := SQLCODE || ' ' || sqlerrm;
+            INSERT INTO dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, ID, error_msg, opprettet_tid, kilde)
+            VALUES(NULL, rec_mottaker.gjelder_mottaker, l_error_melding, v_storedate, 'FAM_BT_MOTTAKER_INSERT4');
+            l_commit := l_commit + 1;
+            p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
         END;
       END IF;
- --dbms_output.put_line('Insert'||sysdate);--Test!!!
+      --dbms_output.put_line('Insert'||sysdate);--Test!!!
       BEGIN
-        INSERT INTO DVH_FAM_BT.FAM_BT_MOTTAKER (
-          FK_PERSON1,
-          BELOP,
-          BELOPHIE,
-          EOYBLAND,
-          ANTBARN,
-          YBARN,
-          KJONN,
-          FODSEL_AAR,
-          FODSEL_MND,
-          BELOPHIT,
-          TKNR,
-          BOSTED_KOMMUNE_NR,
-          BOSTED_BYDEL_KOMMUNE_NR,
-          STAT_AARMND,
-          KILDE,
-          LASTET_DATO,
-          FAGSAK_ID,
-          FKBY_PERSON1,
-          BELOPE,
-          FK_DIM_PERSON,
-          FK_DIM_ALDER,
-          FK_DIM_KJONN,
-          FK_DIM_TID_MND,
-          FK_DIM_SIVILSTATUS,
-          FK_DIM_LAND_FODT,
-          FK_DIM_GEOGRAFI_BOSTED,
-          FK_DIM_LAND_STATSBORGERSKAP
-        ) VALUES (
-          REC_MOTTAKER.GJELDER_MOTTAKER,
-          REC_MOTTAKER.BELOP,
-          V_BELOPHIE,
-          SUBSTR(V_SSB_KODE, 1, 3),
-          V_ANT_BARN,
-          V_ALDERYB,
-          REC_MOTTAKER.KJONN,
-          REC_MOTTAKER.FODSEL_AAR,
-          REC_MOTTAKER.FODSEL_MND,
-          V_BELOPHIT,
- --substr(rec_mottaker.kommune_nr,1,4),
-          SUBSTR(REC_MOTTAKER.TKNR, 1, 4),
-          SUBSTR(REC_MOTTAKER.BOSTED_KOMMUNE_NR, 1, 10),
-          SUBSTR(REC_MOTTAKER.BYDEL_KOMMUNE_NR, 1, 11),
-          P_IN_PERIOD,
-          V_KILDE,
-          V_STOREDATE,
-          REC_MOTTAKER.FAGSAK_ID,
-          V_FK_PERSON1_YB,
-          REC_MOTTAKER.BELOPE,
-          REC_MOTTAKER.PK_DIM_PERSON,
-          REC_MOTTAKER.PK_DIM_ALDER,
-          REC_MOTTAKER.FK_DIM_KJONN,
-          REC_MOTTAKER.PK_DIM_TID,
-          REC_MOTTAKER.FK_DIM_SIVILSTATUS,
-          REC_MOTTAKER.FK_DIM_LAND_FODT,
-          REC_MOTTAKER.FK_DIM_GEOGRAFI_BOSTED,
-          REC_MOTTAKER.FK_DIM_LAND_STATSBORGERSKAP
+        INSERT INTO dvh_fam_bt.fam_bt_mottaker
+        (
+          fk_person1,
+          belop,
+          belophie,
+          eoybland,
+          antbarn,
+          ybarn,
+          kjonn,
+          fodsel_aar,
+          fodsel_mnd,
+          belophit,
+          tknr,
+          bosted_kommune_nr,
+          bosted_bydel_kommune_nr,
+          stat_aarmnd,
+          kilde,
+          lastet_dato,
+          fagsak_id,
+          fkby_person1,
+          belope,
+          fk_dim_person,
+          fk_dim_alder,
+          fk_dim_kjonn,
+          fk_dim_tid_mnd,
+          fk_dim_sivilstatus,
+          fk_dim_land_fodt,
+          fk_dim_geografi_bosted,
+          fk_dim_land_statsborgerskap
+          )
+        VALUES
+        (
+          rec_mottaker.gjelder_mottaker,
+          rec_mottaker.belop,
+          v_belophie,
+          substr(v_ssb_kode,1,3),
+          v_ant_barn,
+          v_alderyb,
+          rec_mottaker.kjonn,
+          rec_mottaker.fodsel_aar,
+          rec_mottaker.fodsel_mnd,
+          v_belophit,
+          --substr(rec_mottaker.kommune_nr,1,4),
+          substr(rec_mottaker.tknr,1,4),
+          substr(rec_mottaker.bosted_kommune_nr,1,10),
+          substr(rec_mottaker.bydel_kommune_nr,1,11),
+          p_in_period,
+          v_kilde,
+          v_storedate,
+          rec_mottaker.fagsak_id,
+          v_fk_person1_yb,
+          rec_mottaker.belope,
+          rec_mottaker.pk_dim_person,
+          rec_mottaker.pk_dim_alder,
+          rec_mottaker.fk_dim_kjonn,
+          rec_mottaker.pk_dim_tid,
+          rec_mottaker.fk_dim_sivilstatus,
+          rec_mottaker.fk_dim_land_fodt,
+          rec_mottaker.fk_dim_geografi_bosted,
+          rec_mottaker.fk_dim_land_statsborgerskap
         );
-        L_COMMIT := L_COMMIT + 1;
+        l_commit := l_commit + 1;
       EXCEPTION
-        WHEN OTHERS THEN
-          L_ERROR_MELDING := SQLCODE
-            || ' '
-            || SQLERRM;
-          INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
-            MIN_LASTET_DATO,
-            ID,
-            ERROR_MSG,
-            OPPRETTET_TID,
-            KILDE
-          ) VALUES(
-            NULL,
-            REC_MOTTAKER.GJELDER_MOTTAKER,
-            L_ERROR_MELDING,
-            V_STOREDATE,
-            'FAM_BT_MOTTAKER_INSERT5'
-          );
-          L_COMMIT := L_COMMIT + 1;
-          P_ERROR_MELDING := SUBSTR(P_ERROR_MELDING
-            || L_ERROR_MELDING, 1, 1000);
+          WHEN OTHERS THEN
+            l_error_melding := SQLCODE || ' ' || sqlerrm;
+            INSERT INTO dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, ID, error_msg, opprettet_tid, kilde)
+            VALUES(NULL, rec_mottaker.gjelder_mottaker, l_error_melding, v_storedate, 'FAM_BT_MOTTAKER_INSERT5');
+            l_commit := l_commit + 1;
+            p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
       END;
- --dbms_output.put_line('Commit'||sysdate);--Test!!!
-      IF L_COMMIT >= 100000 THEN
+      --dbms_output.put_line('Commit'||sysdate);--Test!!!
+      IF l_commit >= 100000 THEN
         COMMIT;
-        L_COMMIT := 0;
+        l_commit := 0;
       END IF;
     END LOOP;
     COMMIT;
-    IF L_ERROR_MELDING IS NOT NULL THEN
-      INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
-        ID,
-        ERROR_MSG,
-        OPPRETTET_TID,
-        KILDE
-      ) VALUES(
-        NULL,
-        L_ERROR_MELDING,
-        V_STOREDATE,
-        'FAM_BT_MOTTAKER_INSERT6'
-      );
+    IF l_error_melding IS NOT NULL THEN
+      INSERT INTO dvh_fam_fp.fp_xml_utbrett_error(ID, error_msg, opprettet_tid, kilde)
+      VALUES(NULL, l_error_melding, v_storedate, 'FAM_BT_MOTTAKER_INSERT6');
       COMMIT;
-      P_ERROR_MELDING := SUBSTR(P_ERROR_MELDING
-        || L_ERROR_MELDING, 1, 1000);
+      p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
     END IF;
   EXCEPTION
     WHEN OTHERS THEN
-      L_ERROR_MELDING := SQLCODE
-        || ' '
-        || SQLERRM;
-      INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
-        MIN_LASTET_DATO,
-        ID,
-        ERROR_MSG,
-        OPPRETTET_TID,
-        KILDE
-      ) VALUES(
-        NULL,
-        NULL,
-        L_ERROR_MELDING,
-        V_STOREDATE,
-        'FAM_BT_MOTTAKER_INSERT7'
-      );
+      l_error_melding := SQLCODE || ' ' || sqlerrm;
+      INSERT INTO dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, ID, error_msg, opprettet_tid, kilde)
+      VALUES(NULL, NULL, l_error_melding, v_storedate, 'FAM_BT_MOTTAKER_INSERT7');
       COMMIT;
-      P_ERROR_MELDING := SUBSTR(P_ERROR_MELDING
-        || L_ERROR_MELDING, 1, 1000);
-  END FAM_BT_MOTTAKER_INSERT_BCK;
-  PROCEDURE FAM_BT_SLETT_OFFSET(
-    P_IN_OFFSET IN VARCHAR2,
-    P_ERROR_MELDING OUT VARCHAR2
-  ) AS
-    V_TEMP_DML      VARCHAR2(4000);
-    L_ERROR_MELDING VARCHAR2(1000);
+      p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
+  END fam_bt_mottaker_insert_bck;
+
+  PROCEDURE fam_bt_slett_offset(p_in_offset IN VARCHAR2, p_error_melding OUT VARCHAR2) AS
+    v_temp_dml varchar2(4000);
+    l_error_melding VARCHAR2(1000);
   BEGIN
-    V_TEMP_DML := 'CREATE GLOBAL TEMPORARY TABLE TEMP_TBL_SLETT
+    v_temp_dml := 'CREATE GLOBAL TEMPORARY TABLE TEMP_TBL_SLETT
                    ON COMMIT PRESERVE ROWS
                    AS
                    SELECT DISTINCT det.pk_bt_utbet_det,
@@ -2037,103 +1397,81 @@ CREATE OR REPLACE PACKAGE BODY FAM_BT AS
 
                    LEFT JOIN dvh_fam_bt.fam_bt_statsborgerskap statsborg ON
                    (statsborg.fk_bt_person = pers_utb.pk_bt_person OR statsborg.fk_bt_person = pers_mot.pk_bt_person)
-                   WHERE meta.kafka_offset = '
-      || P_IN_OFFSET;
- --dbms_output.put_line(v_temp_dml);
-    EXECUTE IMMEDIATE V_TEMP_DML;
+                   WHERE meta.kafka_offset = ' || p_in_offset;
+    --dbms_output.put_line(v_temp_dml);
+    EXECUTE IMMEDIATE v_temp_dml;
+
     BEGIN
-      V_TEMP_DML := '
+      v_temp_dml := '
       DELETE FROM dvh_fam_bt.fam_bt_statsborgerskap
       WHERE pk_statsborgerskap IN (SELECT DISTINCT pk_statsborgerskap FROM TEMP_TBL_SLETT)';
- --dbms_output.put_line(v_temp_dml);
-      EXECUTE IMMEDIATE V_TEMP_DML;
-      V_TEMP_DML := '
+      --dbms_output.put_line(v_temp_dml);
+      EXECUTE IMMEDIATE v_temp_dml;
+
+      v_temp_dml := '
       DELETE FROM dvh_fam_bt.fam_bt_utbet_det
       WHERE pk_bt_utbet_det IN (SELECT DISTINCT pk_bt_utbet_det FROM TEMP_TBL_SLETT)';
- --dbms_output.put_line(v_temp_dml);
-      EXECUTE IMMEDIATE V_TEMP_DML;
-      V_TEMP_DML := '
+      --dbms_output.put_line(v_temp_dml);
+      EXECUTE IMMEDIATE v_temp_dml;
+
+      v_temp_dml := '
       DELETE FROM dvh_fam_bt.fam_bt_utbetaling
       WHERE pk_bt_utbetaling IN (SELECT DISTINCT pk_bt_utbetaling FROM TEMP_TBL_SLETT)';
- --dbms_output.put_line(v_temp_dml);
-      EXECUTE IMMEDIATE V_TEMP_DML;
-      V_TEMP_DML := '
+      --dbms_output.put_line(v_temp_dml);
+      EXECUTE IMMEDIATE v_temp_dml;
+
+      v_temp_dml := '
       DELETE FROM dvh_fam_bt.fam_bt_fagsak
       WHERE pk_bt_fagsak IN (SELECT DISTINCT pk_bt_fagsak FROM TEMP_TBL_SLETT)';
- --dbms_output.put_line(v_temp_dml);
-      EXECUTE IMMEDIATE V_TEMP_DML;
-      V_TEMP_DML := '
+      --dbms_output.put_line(v_temp_dml);
+      EXECUTE IMMEDIATE v_temp_dml;
+
+      v_temp_dml := '
       DELETE FROM dvh_fam_bt.fam_bt_person
       WHERE pk_bt_person IN (SELECT DISTINCT pk_bt_person_utb FROM TEMP_TBL_SLETT)';
- --dbms_output.put_line(v_temp_dml);
-      EXECUTE IMMEDIATE V_TEMP_DML;
-      V_TEMP_DML := '
+      --dbms_output.put_line(v_temp_dml);
+      EXECUTE IMMEDIATE v_temp_dml;
+
+      v_temp_dml := '
       DELETE FROM dvh_fam_bt.fam_bt_person
       WHERE pk_bt_person IN (SELECT DISTINCT pk_bt_person_mot FROM TEMP_TBL_SLETT)';
- --dbms_output.put_line(v_temp_dml);
-      EXECUTE IMMEDIATE V_TEMP_DML;
-      COMMIT; --Commit på alle
+      --dbms_output.put_line(v_temp_dml);
+      EXECUTE IMMEDIATE v_temp_dml;
+
+      COMMIT;--Commit på alle
     EXCEPTION
       WHEN OTHERS THEN
-        L_ERROR_MELDING := SQLCODE
-          || ' '
-          || SQLERRM;
+        l_error_melding := SQLCODE || ' ' || sqlerrm;
         ROLLBACK;
-        INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
-          MIN_LASTET_DATO,
-          ID,
-          ERROR_MSG,
-          OPPRETTET_TID,
-          KILDE
-        ) VALUES(
-          NULL,
-          NULL,
-          L_ERROR_MELDING,
-          SYSDATE,
-          'FAM_BT_SLETT_OFFSET1'
-        );
+        INSERT INTO dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, ID, error_msg, opprettet_tid, kilde)
+        VALUES(NULL, NULL, l_error_melding, sysdate, 'FAM_BT_SLETT_OFFSET1');
         COMMIT;
-        P_ERROR_MELDING := SUBSTR(P_ERROR_MELDING
-          || L_ERROR_MELDING, 1, 1000);
+        p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
     END;
- --ROLLBACK;--Test
-    V_TEMP_DML := 'TRUNCATE TABLE TEMP_TBL_SLETT';
- --dbms_output.put_line(v_temp_dml);
-    EXECUTE IMMEDIATE V_TEMP_DML;
-    V_TEMP_DML := 'DROP TABLE TEMP_TBL_SLETT';
- --dbms_output.put_line(v_temp_dml);
-    EXECUTE IMMEDIATE V_TEMP_DML;
- --COMMIT;
+
+    --ROLLBACK;--Test
+    v_temp_dml := 'TRUNCATE TABLE TEMP_TBL_SLETT';
+    --dbms_output.put_line(v_temp_dml);
+    EXECUTE IMMEDIATE v_temp_dml;
+
+    v_temp_dml := 'DROP TABLE TEMP_TBL_SLETT';
+    --dbms_output.put_line(v_temp_dml);
+    EXECUTE IMMEDIATE v_temp_dml;
+    --COMMIT;
   EXCEPTION
     WHEN OTHERS THEN
-      L_ERROR_MELDING := SQLCODE
-        || ' '
-        || SQLERRM;
-      INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
-        MIN_LASTET_DATO,
-        ID,
-        ERROR_MSG,
-        OPPRETTET_TID,
-        KILDE
-      ) VALUES(
-        NULL,
-        NULL,
-        L_ERROR_MELDING,
-        SYSDATE,
-        'FAM_BT_SLETT_OFFSET2'
-      );
+      l_error_melding := SQLCODE || ' ' || sqlerrm;
+      INSERT INTO dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, ID, error_msg, opprettet_tid, kilde)
+      VALUES(NULL, NULL, l_error_melding, sysdate, 'FAM_BT_SLETT_OFFSET2');
       COMMIT;
-      P_ERROR_MELDING := SUBSTR(P_ERROR_MELDING
-        || L_ERROR_MELDING, 1, 1000);
-  END FAM_BT_SLETT_OFFSET;
-  PROCEDURE FAM_BT2_SLETT_OFFSET(
-    P_IN_OFFSET IN VARCHAR2,
-    P_ERROR_MELDING OUT VARCHAR2
-  ) AS
-    V_TEMP_DML      VARCHAR2(4000);
-    L_ERROR_MELDING VARCHAR2(1000);
+      p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
+  END fam_bt_slett_offset;
+
+  PROCEDURE fam_bt2_slett_offset(p_in_offset IN VARCHAR2, p_error_melding OUT VARCHAR2) AS
+    v_temp_dml varchar2(4000);
+    l_error_melding VARCHAR2(1000);
   BEGIN
-    V_TEMP_DML := 'CREATE GLOBAL TEMPORARY TABLE TEMP_TBL_SLETT
+    v_temp_dml := 'CREATE GLOBAL TEMPORARY TABLE TEMP_TBL_SLETT
                    ON COMMIT PRESERVE ROWS
                    AS
                    SELECT DISTINCT det.pk_bt_utbet_det,
@@ -2171,1383 +1509,1114 @@ CREATE OR REPLACE PACKAGE BODY FAM_BT AS
 
                    LEFT JOIN dvh_fam_bt.fam_bt_statsborgerskap statsborg ON
                    (statsborg.fk_bt_person = pers_utb.pk_bt_person OR statsborg.fk_bt_person = pers_mot.pk_bt_person)
-                   where meta.kafka_offset = '
-      || P_IN_OFFSET
-      || ' AND meta.kafka_topic = ''teamfamilie.aapen-barnetrygd-vedtak-v2'' ';
- --dbms_output.put_line(v_temp_dml);
-    EXECUTE IMMEDIATE V_TEMP_DML;
+                   where meta.kafka_offset = ' || p_in_offset || ' AND meta.kafka_topic = ''teamfamilie.aapen-barnetrygd-vedtak-v2'' ' ;
+    --dbms_output.put_line(v_temp_dml);
+    EXECUTE IMMEDIATE v_temp_dml;
+
     BEGIN
-      V_TEMP_DML := '
+      v_temp_dml := '
       DELETE FROM dvh_fam_bt.fam_bt_statsborgerskap
       WHERE pk_statsborgerskap IN (SELECT DISTINCT pk_statsborgerskap FROM TEMP_TBL_SLETT)';
- --dbms_output.put_line(v_temp_dml);
-      EXECUTE IMMEDIATE V_TEMP_DML;
-      V_TEMP_DML := '
+      --dbms_output.put_line(v_temp_dml);
+      EXECUTE IMMEDIATE v_temp_dml;
+
+      v_temp_dml := '
       DELETE FROM dvh_fam_bt.fam_bt_utbet_det
       WHERE pk_bt_utbet_det IN (SELECT DISTINCT pk_bt_utbet_det FROM TEMP_TBL_SLETT)';
- --dbms_output.put_line(v_temp_dml);
-      EXECUTE IMMEDIATE V_TEMP_DML;
-      V_TEMP_DML := '
+      --dbms_output.put_line(v_temp_dml);
+      EXECUTE IMMEDIATE v_temp_dml;
+
+      v_temp_dml := '
       DELETE FROM dvh_fam_bt.fam_bt_utbetaling
       WHERE pk_bt_utbetaling IN (SELECT DISTINCT pk_bt_utbetaling FROM TEMP_TBL_SLETT)';
- --dbms_output.put_line(v_temp_dml);
-      EXECUTE IMMEDIATE V_TEMP_DML;
-      V_TEMP_DML := '
+      --dbms_output.put_line(v_temp_dml);
+      EXECUTE IMMEDIATE v_temp_dml;
+
+      v_temp_dml := '
       DELETE FROM dvh_fam_bt.fam_bt_kompetanse_barn
       WHERE pk_bt_kompetanse_barn IN (SELECT DISTINCT pk_bt_kompetanse_barn FROM TEMP_TBL_SLETT)';
- --dbms_output.put_line(v_temp_dml);
-      EXECUTE IMMEDIATE V_TEMP_DML;
-      V_TEMP_DML := '
+      --dbms_output.put_line(v_temp_dml);
+      EXECUTE IMMEDIATE v_temp_dml;
+
+      v_temp_dml := '
       DELETE FROM dvh_fam_bt.fam_bt_kompetanse_perioder
       WHERE pk_bt_kompetanse_perioder IN (SELECT DISTINCT pk_bt_kompetanse_perioder FROM TEMP_TBL_SLETT)';
- --dbms_output.put_line(v_temp_dml);
-      EXECUTE IMMEDIATE V_TEMP_DML;
-      V_TEMP_DML := '
+      --dbms_output.put_line(v_temp_dml);
+      EXECUTE IMMEDIATE v_temp_dml;
+
+      v_temp_dml := '
       DELETE FROM dvh_fam_bt.fam_bt_fagsak
       WHERE pk_bt_fagsak IN (SELECT DISTINCT pk_bt_fagsak FROM TEMP_TBL_SLETT)';
-      DBMS_OUTPUT.PUT_LINE(V_TEMP_DML);
-      EXECUTE IMMEDIATE V_TEMP_DML;
-      V_TEMP_DML := '
+      dbms_output.put_line(v_temp_dml);
+      EXECUTE IMMEDIATE v_temp_dml;
+
+      v_temp_dml := '
       DELETE FROM dvh_fam_bt.fam_bt_person
       WHERE pk_bt_person IN (SELECT DISTINCT pk_bt_person_utb FROM TEMP_TBL_SLETT)';
- --dbms_output.put_line(v_temp_dml);
-      EXECUTE IMMEDIATE V_TEMP_DML;
-      V_TEMP_DML := '
+      --dbms_output.put_line(v_temp_dml);
+      EXECUTE IMMEDIATE v_temp_dml;
+
+      v_temp_dml := '
       DELETE FROM dvh_fam_bt.fam_bt_person
       WHERE pk_bt_person IN (SELECT DISTINCT pk_bt_person_mot FROM TEMP_TBL_SLETT)';
- --dbms_output.put_line(v_temp_dml);
-      EXECUTE IMMEDIATE V_TEMP_DML;
-      COMMIT; --Commit på alle
+      --dbms_output.put_line(v_temp_dml);
+      EXECUTE IMMEDIATE v_temp_dml;
+
+      COMMIT;--Commit på alle
     EXCEPTION
       WHEN OTHERS THEN
-        L_ERROR_MELDING := SQLCODE
-          || ' '
-          || SQLERRM;
+        l_error_melding := SQLCODE || ' ' || sqlerrm;
         ROLLBACK;
-        INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
-          MIN_LASTET_DATO,
-          ID,
-          ERROR_MSG,
-          OPPRETTET_TID,
-          KILDE
-        ) VALUES(
-          NULL,
-          NULL,
-          L_ERROR_MELDING,
-          SYSDATE,
-          'FAM_BT_SLETT_OFFSET1'
-        );
+        INSERT INTO dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, ID, error_msg, opprettet_tid, kilde)
+        VALUES(NULL, NULL, l_error_melding, sysdate, 'FAM_BT_SLETT_OFFSET1');
         COMMIT;
-        P_ERROR_MELDING := SUBSTR(P_ERROR_MELDING
-          || L_ERROR_MELDING, 1, 1000);
+        p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
     END;
- --ROLLBACK;--Test
-    V_TEMP_DML := 'TRUNCATE TABLE TEMP_TBL_SLETT';
- --dbms_output.put_line(v_temp_dml);
-    EXECUTE IMMEDIATE V_TEMP_DML;
-    V_TEMP_DML := 'DROP TABLE TEMP_TBL_SLETT';
- --dbms_output.put_line(v_temp_dml);
-    EXECUTE IMMEDIATE V_TEMP_DML;
- --COMMIT;
+
+    --ROLLBACK;--Test
+    v_temp_dml := 'TRUNCATE TABLE TEMP_TBL_SLETT';
+    --dbms_output.put_line(v_temp_dml);
+    EXECUTE IMMEDIATE v_temp_dml;
+
+    v_temp_dml := 'DROP TABLE TEMP_TBL_SLETT';
+    --dbms_output.put_line(v_temp_dml);
+    EXECUTE IMMEDIATE v_temp_dml;
+    --COMMIT;
   EXCEPTION
     WHEN OTHERS THEN
-      L_ERROR_MELDING := SQLCODE
-        || ' '
-        || SQLERRM;
-      INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
-        MIN_LASTET_DATO,
-        ID,
-        ERROR_MSG,
-        OPPRETTET_TID,
-        KILDE
-      ) VALUES(
-        NULL,
-        NULL,
-        L_ERROR_MELDING,
-        SYSDATE,
-        'FAM_BT_SLETT_OFFSET2'
-      );
+      l_error_melding := SQLCODE || ' ' || sqlerrm;
+      INSERT INTO dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, ID, error_msg, opprettet_tid, kilde)
+      VALUES(NULL, NULL, l_error_melding, sysdate, 'FAM_BT_SLETT_OFFSET2');
       COMMIT;
-      P_ERROR_MELDING := SUBSTR(P_ERROR_MELDING
-        || L_ERROR_MELDING, 1, 1000);
-  END FAM_BT2_SLETT_OFFSET;
-  PROCEDURE FAM_BT_UTPAKKING_OFFSET(
-    P_IN_OFFSET IN NUMBER,
-    P_ERROR_MELDING OUT VARCHAR2
-  ) AS
- --v_person_ident VARCHAR2(20);
-    V_FK_PERSON1_SOKER NUMBER;
-    V_FK_PERSON1_UTB   NUMBER;
-    V_PK_BT_UTBETALING NUMBER;
-    V_PK_BT_UTBET_DET  NUMBER;
-    V_PK_PERSON_SOKER  NUMBER;
-    V_PK_PERSON_UTB    NUMBER;
-    V_PK_FAGSAK        NUMBER;
-    V_STOREDATE        DATE := SYSDATE;
-    L_ERROR_MELDING    VARCHAR2(4000);
-    CURSOR CUR_BT_FAGSAK(P_OFFSET NUMBER) IS
-      WITH JDATA AS (
-        SELECT
-          KAFKA_OFFSET,
-          MELDING AS DOC,
-          PK_BT_META_DATA
-        FROM
-          DVH_FAM_BT.FAM_BT_META_DATA
-        WHERE
-          KAFKA_OFFSET = P_OFFSET
- --WHERE kafka_offset=110--Test!!!
-      )
-      SELECT
-        T.BEHANDLING_OPPRINNELSE,
-        T.BEHANDLING_TYPE,
-        T.FAGSAK_ID,
-        T.BEHANDLINGS_ID,
-        CAST(TO_TIMESTAMP_TZ(T.TIDSPUNKT_VEDTAK,
-        'FXYYYY-MM-DD"T"HH24:MI:SS.FXFF3TZH:TZM') AT TIME ZONE 'Europe/Belgrade' AS TIMESTAMP) AS TIDSPUNKT_VEDTAK,
-        CASE
-          WHEN T.ENSLIG_FORSØRGER = 'false' THEN
-            '0'
-          ELSE
-            '1'
-        END AS ENSLIG_FORSØRGER,
-        T.KATEGORI,
-        T.UNDERKATEGORI,
-        'BT' AS KILDESYSTEM,
-        CURRENT_TIMESTAMP AS LASTET_DATO,
-        T.FUNKSJONELL_ID,
-        T.BEHANDLINGÅRSAK,
-        T.PERSON_IDENT,
-        T.ROLLE,
-        T.STATSBORGERSKAP,
-        T.ANNENPART_BOSTEDSLAND,
-        T.ANNENPART_PERSONIDENT,
-        T.ANNENPART_STATSBORGERSKAP,
-        T.BOSTEDSLAND,
-        T.DELINGSPROSENT_OMSORG,
-        T.DELINGSPROSENT_YTELSE,
-        T.PRIMÆRLAND,
-        T.SEKUNDÆRLAND,
-        PK_BT_META_DATA,
-        KAFKA_OFFSET
-      FROM
-        JDATA,
-        JSON_TABLE ( DOC,
-        '$' COLUMNS ( BEHANDLING_OPPRINNELSE VARCHAR2 PATH '$.behandlingOpprinnelse',
-        BEHANDLING_TYPE VARCHAR2 PATH '$.behandlingType',
-        FAGSAK_ID VARCHAR2 PATH '$.fagsakId',
-        BEHANDLINGS_ID VARCHAR2 PATH '$.behandlingsId',
-        TIDSPUNKT_VEDTAK VARCHAR2 PATH '$.tidspunktVedtak',
-        ENSLIG_FORSØRGER VARCHAR2 PATH '$.ensligForsørger',
-        KATEGORI VARCHAR2 PATH '$.kategori',
-        UNDERKATEGORI VARCHAR2 PATH '$.underkategori',
-        FUNKSJONELL_ID VARCHAR2 PATH '$.funksjonellId',
-        PERSON_IDENT VARCHAR2 PATH '$.person[*].personIdent',
-        ROLLE VARCHAR2 PATH '$.person[*].rolle',
-        STATSBORGERSKAP VARCHAR2 PATH '$.person[*].statsborgerskap[*]',
-        ANNENPART_BOSTEDSLAND VARCHAR2 PATH '$.person[*].annenpartBostedsland',
-        ANNENPART_PERSONIDENT VARCHAR2 PATH '$.person[*].annenpartPersonident',
-        ANNENPART_STATSBORGERSKAP VARCHAR2 PATH '$.person[*].annenpartStatsborgerskap',
-        BOSTEDSLAND VARCHAR2 PATH '$.person[*].bostedsland',
-        DELINGSPROSENT_OMSORG VARCHAR2 PATH '$.person[*].delingsprosentOmsorg',
-        DELINGSPROSENT_YTELSE VARCHAR2 PATH '$.person[*].delingsprosentYtelse',
-        PRIMÆRLAND VARCHAR2 PATH '$.person[*].primærland',
-        SEKUNDÆRLAND VARCHAR2 PATH '$.person[*].sekundærland',
-        BEHANDLINGÅRSAK VARCHAR2 PATH '$.behandlingÅrsak' ) ) T;
-    CURSOR CUR_BT_UTBETALING(P_OFFSET NUMBER) IS
-      WITH JDATA AS (
-        SELECT
-          KAFKA_OFFSET,
-          MELDING AS DOC
-        FROM
-          DVH_FAM_BT.FAM_BT_META_DATA
-        WHERE
-          KAFKA_OFFSET = P_OFFSET
- --WHERE kafka_offset=110--Test!!!
-      )
-      SELECT
-        T.UTBETALT_PER_MND,
-        TO_DATE(T.STØNAD_FOM,
-        'YYYY-MM-DD') AS STØNAD_FOM,
-        TO_DATE(T.STØNAD_TOM,
-        'YYYY-MM-DD') AS STØNAD_TOM,
-        T.HJEMMEL,
-        CURRENT_TIMESTAMP AS LASTET_DATO,
-        BEHANDLINGS_ID,
-        KAFKA_OFFSET
-      FROM
-        JDATA,
-        JSON_TABLE ( DOC,
-        '$' COLUMNS ( BEHANDLINGS_ID VARCHAR2 PATH '$.behandlingsId',
-        NESTED PATH '$.utbetalingsperioder[*]' COLUMNS ( UTBETALT_PER_MND VARCHAR2 PATH '$.utbetaltPerMnd',
-        STØNAD_FOM VARCHAR2 PATH '$.stønadFom',
-        STØNAD_TOM VARCHAR2 PATH '$.stønadTom',
-        HJEMMEL VARCHAR2 PATH '$.hjemmel' )) ) T;
-    CURSOR CUR_BT_UTBETALINGS_DETALJER(P_OFFSET NUMBER, P_FOM DATE, P_TOM DATE) IS
-      WITH JDATA AS (
-        SELECT
-          KAFKA_OFFSET,
-          MELDING AS DOC
-        FROM
-          DVH_FAM_BT.FAM_BT_META_DATA
-        WHERE
-          KAFKA_OFFSET = P_OFFSET
- --WHERE kafka_offset = 110--Test!!!
-      )
-      SELECT --1 AS pk_bt_utbet_det
- --,
-        S.HJEMMEL,
-        S.UTBETALTPERMND,
-        S.STØNADFOM,
-        S.STØNADTOM,
-        S.KLASSEKODE,
-        S.DELYTELSE_ID,
-        S.UTBETALT_PR_MND,
-        S.STONAD_FOM,
-        S.PERSONIDENT,
-        S.ROLLE,
-        S.STATSBORGERSKAP,
-        S.BOSTEDSLAND,
-        S.PRIMÆRLAND,
-        S.SEKUNDÆRLAND,
-        S.DELINGSPROSENTOMSORG DELINGSPROSENT_OMSORG,
-        S.DELINGSPROSENTYTELSE DELINGSPROSENT_YTELSE,
-        S.ANNENPARTPERSONIDENT ANNENPART_PERSONIDENT,
-        S.ANNENPARTSTATSBORGERSKAP ANNENPART_STATSBORGERSKAP,
-        S.ANNENPARTBOSTEDSLAND ANNENPART_BOSTEDSLAND,
-        CURRENT_TIMESTAMP AS LASTET_DATO,
-        BEHANDLINGS_ID,
-        KAFKA_OFFSET
-      FROM
-        JDATA,
-        JSON_TABLE ( DOC,
-        '$' COLUMNS ( BEHANDLINGS_ID VARCHAR2 PATH '$.behandlingsId',
-        NESTED PATH '$.utbetalingsperioder[*]' COLUMNS ( HJEMMEL VARCHAR2 PATH '$.hjemmel',
-        UTBETALTPERMND VARCHAR2 PATH '$.utbetaltPerMnd',
-        STØNADFOM VARCHAR2 PATH '$.stønadFom',
-        STØNADTOM VARCHAR2 PATH '$.stønadTom',
-        JOINED_ON VARCHAR2 PATH '$.joined_on',
-        NESTED PATH '$.utbetalingsDetaljer[*]' COLUMNS ( KLASSEKODE VARCHAR2 PATH '$.klassekode',
-        DELYTELSE_ID VARCHAR2 PATH '$.delytelseId',
-        UTBETALT_PR_MND VARCHAR2 PATH '$..utbetaltPrMnd',
-        STONAD_FOM VARCHAR2 PATH '$.stonad_fom',
-        PERSONIDENT VARCHAR2 PATH '$.person[*].personIdent',
-        ROLLE VARCHAR2 PATH '$.person[*].rolle',
-        STATSBORGERSKAP VARCHAR2 PATH '$.person[*].statsborgerskap[*]',
-        BOSTEDSLAND VARCHAR2 PATH '$.person[*].bostedsland',
-        PRIMÆRLAND VARCHAR2 PATH '$.person[*].primærland',
-        SEKUNDÆRLAND VARCHAR2 PATH '$.person[*].sekundærland',
-        DELINGSPROSENTOMSORG VARCHAR2 PATH '$.person[*].delingsprosentOmsorg',
-        DELINGSPROSENTYTELSE VARCHAR2 PATH '$.person[*].delingsprosentYtelse',
-        ANNENPARTPERSONIDENT VARCHAR2 PATH '$.person[*].annenpartPersonident',
-        ANNENPARTSTATSBORGERSKAP VARCHAR2 PATH '$.person[*].annenpartStatsborgerskap',
-        ANNENPARTBOSTEDSLAND VARCHAR2 PATH '$.person[*].annenpartBostedsland' ))) ) S
-      WHERE
-        TO_DATE(S.STØNADFOM,
-        'YYYY-MM-DD') = P_FOM
-        AND TO_DATE(S.STØNADTOM,
-        'YYYY-MM-DD') = P_TOM
- --WHERE TO_DATE(S.stønadfom,'YYYY-MM-DD') >= TO_DATE('2020-03-01','YYYY-MM-DD')--Test!!!
- --AND TO_DATE(S.stønadtom,'YYYY-MM-DD') <= TO_DATE('2032-01-31','YYYY-MM-DD')--Test!!!
-;
+      p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
+  END fam_bt2_slett_offset;
+
+  PROCEDURE fam_bt_utpakking_offset(p_in_offset IN NUMBER, p_error_melding OUT VARCHAR2) AS
+  --v_person_ident VARCHAR2(20);
+  v_fk_person1_soker NUMBER;
+  v_fk_person1_utb NUMBER;
+  v_pk_bt_utbetaling NUMBER;
+  v_pk_bt_utbet_det NUMBER;
+  v_pk_person_soker NUMBER;
+  v_pk_person_utb NUMBER;
+  v_pk_fagsak NUMBER;
+  v_storedate DATE := sysdate;
+  l_error_melding VARCHAR2(4000);
+
+  CURSOR cur_bt_fagsak(p_offset NUMBER) IS
+    WITH jdata AS (
+      SELECT kafka_offset
+            ,melding AS doc
+            ,pk_bt_meta_data
+      FROM dvh_fam_bt.fam_bt_meta_data
+      WHERE kafka_offset = p_offset
+      --WHERE kafka_offset=110--Test!!!
+    )
+    SELECT T.behandling_opprinnelse
+          ,T.behandling_type
+          ,T.fagsak_id
+          ,T.behandlings_id
+          ,CAST(to_timestamp_tz(T.tidspunkt_vedtak, 'FXYYYY-MM-DD"T"HH24:MI:SS.FXFF3TZH:TZM') AT TIME ZONE 'Europe/Belgrade' AS TIMESTAMP) AS tidspunkt_vedtak
+          ,CASE
+           WHEN T.enslig_forsørger = 'false' THEN '0'
+           ELSE '1'
+           END AS enslig_forsørger
+          ,T.kategori
+          ,T.underkategori
+          ,'BT' AS kildesystem
+          ,current_timestamp AS lastet_dato
+          ,T.funksjonell_id
+          ,T.behandlingÅrsak
+          ,T.person_ident
+          ,T.rolle
+          ,T.statsborgerskap
+          ,T.annenpart_bostedsland
+          ,T.annenpart_personident
+          ,T.annenpart_statsborgerskap
+          ,T.bostedsland
+          ,T.delingsprosent_omsorg
+          ,T.delingsprosent_ytelse
+          ,T.primærland
+          ,T.sekundærland
+          ,pk_bt_meta_data
+          ,kafka_offset
+    FROM jdata
+        ,JSON_TABLE
+        (
+          doc, '$'
+          COLUMNS (
+          behandling_opprinnelse    VARCHAR2 PATH '$.behandlingOpprinnelse'
+         ,behandling_type           VARCHAR2 PATH '$.behandlingType'
+         ,fagsak_id                 VARCHAR2 PATH '$.fagsakId'
+         ,behandlings_id            VARCHAR2 PATH '$.behandlingsId'
+         ,tidspunkt_vedtak          VARCHAR2 PATH '$.tidspunktVedtak'
+         ,enslig_forsørger          VARCHAR2 PATH '$.ensligForsørger'
+         ,kategori                  VARCHAR2 PATH '$.kategori'
+         ,underkategori             VARCHAR2 PATH '$.underkategori'
+         ,funksjonell_id            VARCHAR2 PATH '$.funksjonellId'
+         ,person_ident              VARCHAR2 PATH '$.person[*].personIdent'
+         ,rolle                     VARCHAR2 PATH '$.person[*].rolle'
+         ,statsborgerskap           VARCHAR2 PATH '$.person[*].statsborgerskap[*]'
+         ,annenpart_bostedsland     VARCHAR2 PATH '$.person[*].annenpartBostedsland'
+         ,annenpart_personident     VARCHAR2 PATH '$.person[*].annenpartPersonident'
+         ,annenpart_statsborgerskap VARCHAR2 PATH '$.person[*].annenpartStatsborgerskap'
+         ,bostedsland               VARCHAR2 PATH '$.person[*].bostedsland'
+         ,delingsprosent_omsorg     VARCHAR2 PATH '$.person[*].delingsprosentOmsorg'
+         ,delingsprosent_ytelse     VARCHAR2 PATH '$.person[*].delingsprosentYtelse'
+         ,primærland                VARCHAR2 PATH '$.person[*].primærland'
+         ,sekundærland              VARCHAR2 PATH '$.person[*].sekundærland'
+         ,behandlingÅrsak           VARCHAR2 PATH '$.behandlingÅrsak'
+         )
+        ) T;
+
+  CURSOR cur_bt_utbetaling(p_offset NUMBER) IS
+    WITH jdata AS (
+      SELECT kafka_offset
+            ,melding AS doc
+      FROM dvh_fam_bt.fam_bt_meta_data
+      WHERE kafka_offset = p_offset
+      --WHERE kafka_offset=110--Test!!!
+    )
+    SELECT T.utbetalt_per_mnd
+          ,TO_DATE(T.stønad_fom, 'YYYY-MM-DD') AS stønad_fom
+          ,TO_DATE(T.stønad_tom, 'YYYY-MM-DD') AS stønad_tom
+          ,T.hjemmel
+          ,current_timestamp AS lastet_dato
+          ,behandlings_id
+          ,kafka_offset
+    FROM jdata
+        ,JSON_TABLE
+        (
+         doc, '$'
+         COLUMNS (
+         behandlings_id     VARCHAR2 PATH '$.behandlingsId',
+         NESTED             PATH '$.utbetalingsperioder[*]'
+         COLUMNS (
+         utbetalt_per_mnd   VARCHAR2 PATH '$.utbetaltPerMnd'
+        ,stønad_fom         VARCHAR2 PATH '$.stønadFom'
+        ,stønad_tom         VARCHAR2 PATH '$.stønadTom'
+        ,hjemmel            VARCHAR2 PATH '$.hjemmel'
+        ))
+        ) T;
+
+  CURSOR cur_bt_utbetalings_detaljer(p_offset NUMBER, p_fom DATE, p_tom DATE) IS
+    WITH jdata AS (
+      SELECT kafka_offset
+            ,melding AS doc
+      FROM dvh_fam_bt.fam_bt_meta_data
+      WHERE kafka_offset = p_offset
+      --WHERE kafka_offset = 110--Test!!!
+    )
+    SELECT --1 AS pk_bt_utbet_det
+          --,
+           S.hjemmel
+          ,S.utbetaltpermnd
+          ,S.stønadfom
+          ,S.stønadtom
+          ,S.klassekode
+          ,S.delytelse_id
+          ,S.utbetalt_pr_mnd
+          ,S.stonad_fom
+          ,S.personident
+          ,S.rolle
+          ,S.statsborgerskap
+          ,S.bostedsland
+          ,S.primærland
+          ,S.sekundærland
+          ,S.delingsprosentomsorg delingsprosent_omsorg
+          ,S.delingsprosentytelse delingsprosent_ytelse
+          ,S.annenpartpersonident annenpart_personident
+          ,S.annenpartstatsborgerskap annenpart_statsborgerskap
+          ,S.annenpartbostedsland annenpart_bostedsland
+          ,current_timestamp AS lastet_dato
+          ,behandlings_id
+          ,kafka_offset
+    FROM jdata
+        ,JSON_TABLE
+         (
+          doc, '$'
+          COLUMNS (
+          behandlings_id            VARCHAR2 PATH '$.behandlingsId',
+          NESTED                    PATH '$.utbetalingsperioder[*]'
+          COLUMNS (
+          hjemmel                   VARCHAR2 PATH '$.hjemmel'
+         ,utbetaltpermnd            VARCHAR2 PATH '$.utbetaltPerMnd'
+         ,stønadfom                 VARCHAR2 PATH '$.stønadFom'
+         ,stønadtom                 VARCHAR2 PATH '$.stønadTom'
+         ,joined_on                 VARCHAR2 PATH '$.joined_on'
+         ,NESTED                    PATH '$.utbetalingsDetaljer[*]'
+          COLUMNS (
+          klassekode                VARCHAR2 PATH '$.klassekode'
+         ,delytelse_id              VARCHAR2 PATH '$.delytelseId'
+         ,utbetalt_pr_mnd           VARCHAR2 PATH '$..utbetaltPrMnd'
+         ,stonad_fom                VARCHAR2 PATH '$.stonad_fom'
+         ,personident               VARCHAR2 PATH '$.person[*].personIdent'
+         ,rolle                     VARCHAR2 PATH '$.person[*].rolle'
+         ,statsborgerskap           VARCHAR2 PATH '$.person[*].statsborgerskap[*]'
+         ,bostedsland               VARCHAR2 PATH '$.person[*].bostedsland'
+         ,primærland                VARCHAR2 PATH '$.person[*].primærland'
+         ,sekundærland              VARCHAR2 PATH '$.person[*].sekundærland'
+         ,delingsprosentomsorg      VARCHAR2 PATH '$.person[*].delingsprosentOmsorg'
+         ,delingsprosentytelse      VARCHAR2 PATH '$.person[*].delingsprosentYtelse'
+         ,annenpartpersonident      VARCHAR2 PATH '$.person[*].annenpartPersonident'
+         ,annenpartstatsborgerskap  VARCHAR2 PATH '$.person[*].annenpartStatsborgerskap'
+         ,annenpartbostedsland      VARCHAR2 PATH '$.person[*].annenpartBostedsland'
+          )))
+         ) S
+    WHERE TO_DATE(S.stønadfom,'YYYY-MM-DD') = p_fom
+    AND TO_DATE(S.stønadtom,'YYYY-MM-DD') = p_tom
+    --WHERE TO_DATE(S.stønadfom,'YYYY-MM-DD') >= TO_DATE('2020-03-01','YYYY-MM-DD')--Test!!!
+    --AND TO_DATE(S.stønadtom,'YYYY-MM-DD') <= TO_DATE('2032-01-31','YYYY-MM-DD')--Test!!!
+    ;
+
   BEGIN
- -- For alle fagsaker
-    FOR REC_FAG IN CUR_BT_FAGSAK(P_IN_OFFSET) LOOP
+    -- For alle fagsaker
+    FOR rec_fag IN cur_bt_fagsak(p_in_offset) LOOP
       BEGIN
- --dbms_output.put_line(rec_fag.fagsak_id);
-        V_PK_PERSON_SOKER := NULL;
-        V_FK_PERSON1_SOKER := -1;
-        SELECT
-          DVH_FAMBT_KAFKA.HIBERNATE_SEQUENCE.NEXTVAL INTO V_PK_PERSON_SOKER
-        FROM
-          DUAL;
- --Hent fk_person1
+        --dbms_output.put_line(rec_fag.fagsak_id);
+        v_pk_person_soker := NULL;
+        v_fk_person1_soker := -1;
+        SELECT dvh_fambt_kafka.hibernate_sequence.NEXTVAL INTO v_pk_person_soker FROM dual;
+
+        --Hent fk_person1
         BEGIN
-          SELECT
-            DISTINCT PERSON_67_VASKET.FK_PERSON1 AS AK_PERSON1 INTO V_FK_PERSON1_SOKER
-          FROM
-            DT_PERSON.DVH_PERSON_IDENT_OFF_ID_IKKE_SKJERMET PERSON_67_VASKET
-          WHERE
-            PERSON_67_VASKET.OFF_ID = REC_FAG.PERSON_IDENT
-            AND REC_FAG.TIDSPUNKT_VEDTAK BETWEEN PERSON_67_VASKET.GYLDIG_FRA_DATO
-            AND PERSON_67_VASKET.GYLDIG_TIL_DATO;
+          SELECT DISTINCT person_67_vasket.fk_person1 as ak_person1
+          INTO v_fk_person1_soker
+          FROM dt_person.dvh_person_ident_off_id_ikke_skjermet person_67_vasket
+          WHERE person_67_vasket.off_id = rec_fag.person_ident
+          AND rec_fag.tidspunkt_vedtak BETWEEN person_67_vasket.gyldig_fra_dato AND person_67_vasket.gyldig_til_dato;
         EXCEPTION
           WHEN OTHERS THEN
-            V_FK_PERSON1_SOKER := -1;
-            L_ERROR_MELDING := SQLCODE
-              || ' '
-              || SQLERRM;
-            INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
-              MIN_LASTET_DATO,
-              ID,
-              ERROR_MSG,
-              OPPRETTET_TID,
-              KILDE
-            ) VALUES(
-              NULL,
-              REC_FAG.FAGSAK_ID,
-              L_ERROR_MELDING,
-              V_STOREDATE,
-              'FAM_BT_UTPAKKING_OFFSET1'
-            );
+            v_fk_person1_soker := -1;
+            l_error_melding := SQLCODE || ' ' || sqlerrm;
+            INSERT INTO dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, ID, error_msg, opprettet_tid, kilde)
+            VALUES(NULL, rec_fag.fagsak_id, l_error_melding, v_storedate, 'FAM_BT_UTPAKKING_OFFSET1');
             COMMIT;
-            P_ERROR_MELDING := SUBSTR(P_ERROR_MELDING
-              || L_ERROR_MELDING, 1, 1000);
+            p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
         END;
- -- Insert søker into person tabell
-        INSERT INTO DVH_FAM_BT.FAM_BT_PERSON (
-          PK_BT_PERSON,
-          ANNENPART_BOSTEDSLAND,
-          ANNENPART_PERSONIDENT,
-          ANNENPART_STATSBORGERSKAP,
-          BOSTEDSLAND,
-          DELINGSPROSENT_OMSORG,
-          DELINGSPROSENT_YTELSE,
-          PERSON_IDENT,
-          PRIMÆRLAND,
-          ROLLE,
-          SEKUNDÆRLAND,
-          FK_PERSON1,
-          LASTET_DATO,
-          BEHANDLINGS_ID,
-          KAFKA_OFFSET
-        ) VALUES (
-          V_PK_PERSON_SOKER,
-          REC_FAG.ANNENPART_BOSTEDSLAND,
-          REC_FAG.ANNENPART_PERSONIDENT,
-          REC_FAG.ANNENPART_STATSBORGERSKAP,
-          REC_FAG.BOSTEDSLAND,
-          REC_FAG.DELINGSPROSENT_OMSORG,
-          REC_FAG.DELINGSPROSENT_YTELSE,
-          REC_FAG.PERSON_IDENT,
-          REC_FAG.PRIMÆRLAND,
-          REC_FAG.ROLLE,
-          REC_FAG.SEKUNDÆRLAND,
-          V_FK_PERSON1_SOKER,
-          REC_FAG.LASTET_DATO,
-          REC_FAG.BEHANDLINGS_ID,
-          REC_FAG.KAFKA_OFFSET
+        -- Insert søker into person tabell
+        INSERT INTO dvh_fam_bt.fam_bt_person
+        (
+          pk_bt_person
+         ,annenpart_bostedsland
+         ,annenpart_personident
+         ,annenpart_statsborgerskap
+         ,bostedsland
+         ,delingsprosent_omsorg
+         ,delingsprosent_ytelse
+         ,person_ident
+         ,primærland
+         ,rolle
+         ,sekundærland
+         ,fk_person1
+         ,lastet_dato
+         ,behandlings_id
+         ,kafka_offset
+        )
+        VALUES
+        (
+          v_pk_person_soker
+         ,rec_fag.annenpart_bostedsland
+         ,rec_fag.annenpart_personident
+         ,rec_fag.annenpart_statsborgerskap
+         ,rec_fag.bostedsland
+         ,rec_fag.delingsprosent_omsorg
+         ,rec_fag.delingsprosent_ytelse
+         ,rec_fag.person_ident
+         ,rec_fag.primærland
+         ,rec_fag.rolle
+         ,rec_fag.sekundærland
+         ,v_fk_person1_soker
+         ,rec_fag.lastet_dato
+         ,rec_fag.behandlings_id
+         ,rec_fag.kafka_offset
         );
- -- Insert into FAGSAK tabellen
-        V_PK_FAGSAK := NULL;
-        SELECT
-          DVH_FAMBT_KAFKA.HIBERNATE_SEQUENCE.NEXTVAL INTO V_PK_FAGSAK
-        FROM
-          DUAL;
-        INSERT INTO DVH_FAM_BT.FAM_BT_FAGSAK (
-          PK_BT_FAGSAK,
-          FK_BT_PERSON,
-          FK_BT_META_DATA,
-          BEHANDLING_OPPRINNELSE,
-          BEHANDLING_TYPE,
-          FAGSAK_ID,
-          BEHANDLINGS_ID,
-          TIDSPUNKT_VEDTAK,
-          ENSLIG_FORSØRGER,
-          KATEGORI,
-          UNDERKATEGORI,
-          KILDESYSTEM,
-          LASTET_DATO,
-          FUNKSJONELL_ID,
-          BEHANDLING_ÅRSAK,
-          KAFKA_OFFSET
-        ) VALUES (
-          V_PK_FAGSAK,
-          V_PK_PERSON_SOKER,
-          REC_FAG.PK_BT_META_DATA,
-          REC_FAG.BEHANDLING_OPPRINNELSE,
-          REC_FAG.BEHANDLING_TYPE,
-          REC_FAG.FAGSAK_ID,
-          REC_FAG.BEHANDLINGS_ID,
-          REC_FAG.TIDSPUNKT_VEDTAK,
-          REC_FAG.ENSLIG_FORSØRGER,
-          REC_FAG.KATEGORI,
-          REC_FAG.UNDERKATEGORI,
-          REC_FAG.KILDESYSTEM,
-          REC_FAG.LASTET_DATO,
-          REC_FAG.FUNKSJONELL_ID,
-          REC_FAG.BEHANDLINGÅRSAK,
-          REC_FAG.KAFKA_OFFSET
+
+        -- Insert into FAGSAK tabellen
+        v_pk_fagsak := NULL;
+        SELECT dvh_fambt_kafka.hibernate_sequence.NEXTVAL INTO v_pk_fagsak FROM dual;
+        INSERT INTO dvh_fam_bt.fam_bt_fagsak
+        (
+           pk_bt_fagsak
+          ,fk_bt_person
+          ,fk_bt_meta_data
+          ,behandling_opprinnelse
+          ,behandling_type
+          ,fagsak_id
+          ,behandlings_id
+          ,tidspunkt_vedtak
+          ,enslig_forsørger
+          ,kategori
+          ,underkategori
+          ,kildesystem
+          ,lastet_dato
+          ,funksjonell_id
+          ,behandling_Årsak
+          ,kafka_offset
+        )
+        VALUES
+        (
+          v_pk_fagsak
+         ,v_pk_person_soker
+         ,rec_fag.pk_bt_meta_data
+         ,rec_fag.behandling_opprinnelse
+         ,rec_fag.behandling_type
+         ,rec_fag.fagsak_id
+         ,rec_fag.behandlings_id
+         ,rec_fag.tidspunkt_vedtak
+         ,rec_fag.enslig_forsørger
+         ,rec_fag.kategori
+         ,rec_fag.underkategori
+         ,rec_fag.kildesystem
+         ,rec_fag.lastet_dato
+         ,rec_fag.funksjonell_id
+         ,rec_fag.behandlingÅrsak
+         ,rec_fag.kafka_offset
         );
- -- For alle utbetalingsperioder
-        FOR REC_UTBETALING IN CUR_BT_UTBETALING(P_IN_OFFSET) LOOP
+
+        -- For alle utbetalingsperioder
+        FOR rec_utbetaling IN cur_bt_utbetaling(p_in_offset) LOOP
           BEGIN
- --dbms_output.put_line('Hallo z:'||rec_utbetaling.stønad_fom||','||rec_utbetaling.stønad_tom);
-            V_PK_BT_UTBETALING := NULL;
-            SELECT
-              DVH_FAMBT_KAFKA.HIBERNATE_SEQUENCE.NEXTVAL INTO V_PK_BT_UTBETALING
-            FROM
-              DUAL;
- --v_pk_bt_utbetaling:=rec_utbetaling.PK_BT_UTBETALING;
-            INSERT INTO DVH_FAM_BT.FAM_BT_UTBETALING (
-              PK_BT_UTBETALING,
-              UTBETALT_PER_MND,
-              STØNAD_FOM,
-              STØNAD_TOM,
-              HJEMMEL,
-              LASTET_DATO,
-              FK_BT_FAGSAK,
-              BEHANDLINGS_ID,
-              KAFKA_OFFSET
-            ) VALUES (
-              V_PK_BT_UTBETALING,
-              REC_UTBETALING.UTBETALT_PER_MND,
-              REC_UTBETALING.STØNAD_FOM,
-              REC_UTBETALING.STØNAD_TOM,
-              REC_UTBETALING.HJEMMEL,
-              REC_UTBETALING.LASTET_DATO,
-              V_PK_FAGSAK,
-              REC_UTBETALING.BEHANDLINGS_ID,
-              REC_UTBETALING.KAFKA_OFFSET
+            --dbms_output.put_line('Hallo z:'||rec_utbetaling.stønad_fom||','||rec_utbetaling.stønad_tom);
+            v_pk_bt_utbetaling := NULL;
+            SELECT dvh_fambt_kafka.hibernate_sequence.NEXTVAL INTO v_pk_bt_utbetaling FROM dual;
+            --v_pk_bt_utbetaling:=rec_utbetaling.PK_BT_UTBETALING;
+            INSERT INTO dvh_fam_bt.fam_bt_utbetaling
+            (
+              pk_bt_utbetaling
+             ,utbetalt_per_mnd
+             ,stønad_fom
+             ,stønad_tom
+             ,hjemmel
+             ,lastet_dato
+             ,fk_bt_fagsak
+             ,behandlings_id
+             ,kafka_offset
+            )
+            VALUES
+            (
+              v_pk_bt_utbetaling
+             ,rec_utbetaling.utbetalt_per_mnd
+             ,rec_utbetaling.stønad_fom
+             ,rec_utbetaling.stønad_tom
+             ,rec_utbetaling.hjemmel
+             ,rec_utbetaling.lastet_dato
+             ,v_pk_fagsak
+             ,rec_utbetaling.behandlings_id
+             ,rec_utbetaling.kafka_offset
             );
- -- For alle utbetalingsdetaljer for aktuell tidsperiode
-            FOR REC_UTBET_DET IN CUR_BT_UTBETALINGS_DETALJER(P_IN_OFFSET, REC_UTBETALING.STØNAD_FOM, REC_UTBETALING.STØNAD_TOM) LOOP
+
+            -- For alle utbetalingsdetaljer for aktuell tidsperiode
+            FOR rec_utbet_det IN cur_bt_utbetalings_detaljer(p_in_offset, rec_utbetaling.stønad_fom, rec_utbetaling.stønad_tom) LOOP
               BEGIN
- --dbms_output.put_line(rec_utbet_det.personident||','||rec_utbet_det.stønadfom||'YY'||to_char(rec_utbet_det.utbetalt_pr_mnd));
- --Hent fk_person1
-                V_FK_PERSON1_UTB := -1;
+                --dbms_output.put_line(rec_utbet_det.personident||','||rec_utbet_det.stønadfom||'YY'||to_char(rec_utbet_det.utbetalt_pr_mnd));
+                --Hent fk_person1
+                v_fk_person1_utb := -1;
                 BEGIN
-                  SELECT
-                    DISTINCT PERSON_67_VASKET.FK_PERSON1 AS AK_PERSON1 INTO V_FK_PERSON1_UTB
-                  FROM
-                    DT_PERSON.DVH_PERSON_IDENT_OFF_ID_IKKE_SKJERMET PERSON_67_VASKET
-                  WHERE
-                    PERSON_67_VASKET.OFF_ID = REC_UTBET_DET.PERSONIDENT
-                    AND REC_FAG.TIDSPUNKT_VEDTAK BETWEEN PERSON_67_VASKET.GYLDIG_FRA_DATO
-                    AND PERSON_67_VASKET.GYLDIG_TIL_DATO;
+                  SELECT DISTINCT person_67_vasket.fk_person1 as ak_person1
+                  INTO v_fk_person1_utb
+                  FROM dt_person.dvh_person_ident_off_id_ikke_skjermet person_67_vasket
+                  WHERE person_67_vasket.off_id = rec_utbet_det.personident
+                  AND rec_fag.tidspunkt_vedtak BETWEEN person_67_vasket.gyldig_fra_dato AND person_67_vasket.gyldig_til_dato;
                 EXCEPTION
                   WHEN OTHERS THEN
-                    V_FK_PERSON1_UTB := -1;
-                    L_ERROR_MELDING := SQLCODE
-                      || ' '
-                      || SQLERRM;
-                    INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
-                      MIN_LASTET_DATO,
-                      ID,
-                      ERROR_MSG,
-                      OPPRETTET_TID,
-                      KILDE
-                    ) VALUES(
-                      NULL,
-                      REC_UTBET_DET.BEHANDLINGS_ID,
-                      L_ERROR_MELDING,
-                      V_STOREDATE,
-                      'FAM_BT_UTPAKKING_OFFSET2'
-                    );
+                    v_fk_person1_utb := -1;
+                    l_error_melding := SQLCODE || ' ' || sqlerrm;
+                    INSERT INTO dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, ID, error_msg, opprettet_tid, kilde)
+                    VALUES(NULL, rec_utbet_det.behandlings_id, l_error_melding, v_storedate, 'FAM_BT_UTPAKKING_OFFSET2');
                     COMMIT;
-                    P_ERROR_MELDING := SUBSTR(P_ERROR_MELDING
-                      || L_ERROR_MELDING, 1, 1000);
+                    p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
                 END;
-                V_PK_PERSON_UTB := NULL;
-                SELECT
-                  DVH_FAMBT_KAFKA.HIBERNATE_SEQUENCE.NEXTVAL INTO V_PK_PERSON_UTB
-                FROM
-                  DUAL;
- --dbms_output.put_line(v_pk_person_utb);
+
+                v_pk_person_utb := NULL;
+                SELECT dvh_fambt_kafka.hibernate_sequence.NEXTVAL INTO v_pk_person_utb FROM dual;
+                --dbms_output.put_line(v_pk_person_utb);
                 BEGIN
-                  INSERT INTO DVH_FAM_BT.FAM_BT_PERSON (
-                    PK_BT_PERSON,
-                    ANNENPART_BOSTEDSLAND,
-                    ANNENPART_PERSONIDENT,
-                    ANNENPART_STATSBORGERSKAP,
-                    BOSTEDSLAND,
-                    DELINGSPROSENT_OMSORG,
-                    DELINGSPROSENT_YTELSE,
-                    PERSON_IDENT,
-                    PRIMÆRLAND,
-                    ROLLE,
-                    SEKUNDÆRLAND,
-                    FK_PERSON1,
-                    LASTET_DATO,
-                    BEHANDLINGS_ID,
-                    KAFKA_OFFSET
-                  ) VALUES (
- --dvh_fam_fp.hibernate_sequence_test.NEXTVAL
-                    V_PK_PERSON_UTB,
-                    REC_UTBET_DET.ANNENPART_BOSTEDSLAND,
-                    REC_UTBET_DET.ANNENPART_PERSONIDENT,
-                    REC_UTBET_DET.ANNENPART_STATSBORGERSKAP,
-                    REC_UTBET_DET.BOSTEDSLAND,
-                    REC_UTBET_DET.DELINGSPROSENT_OMSORG,
-                    REC_UTBET_DET.DELINGSPROSENT_YTELSE,
-                    REC_UTBET_DET.PERSONIDENT,
-                    REC_UTBET_DET.PRIMÆRLAND,
-                    REC_UTBET_DET.ROLLE,
-                    REC_UTBET_DET.SEKUNDÆRLAND
- -- ,rec_utbet_det.FK_PERSON1
-,
-                    V_FK_PERSON1_UTB,
-                    REC_UTBET_DET.LASTET_DATO,
-                    REC_UTBET_DET.BEHANDLINGS_ID,
-                    REC_UTBET_DET.KAFKA_OFFSET
-                  );
+                INSERT INTO dvh_fam_bt.fam_bt_person
+                (
+                  pk_bt_person
+                 ,annenpart_bostedsland
+                 ,annenpart_personident
+                 ,annenpart_statsborgerskap
+                 ,bostedsland
+                 ,delingsprosent_omsorg
+                 ,delingsprosent_ytelse
+                 ,person_ident
+                 ,primærland
+                 ,rolle
+                 ,sekundærland
+                 ,fk_person1
+                 ,lastet_dato
+                 ,behandlings_id
+                 ,kafka_offset
+                )
+                VALUES
+                (
+                  --dvh_fam_fp.hibernate_sequence_test.NEXTVAL
+                  v_pk_person_utb
+                 ,rec_utbet_det.annenpart_bostedsland
+                 ,rec_utbet_det.annenpart_personident
+                 ,rec_utbet_det.annenpart_statsborgerskap
+                 ,rec_utbet_det.bostedsland
+                 ,rec_utbet_det.delingsprosent_omsorg
+                 ,rec_utbet_det.delingsprosent_ytelse
+                 ,rec_utbet_det.personident
+                 ,rec_utbet_det.primærland
+                 ,rec_utbet_det.rolle
+                 ,rec_utbet_det.sekundærland
+                 -- ,rec_utbet_det.FK_PERSON1
+                 ,v_fk_person1_utb
+                 ,rec_utbet_det.lastet_dato
+                 ,rec_utbet_det.behandlings_id
+                 ,rec_utbet_det.kafka_offset
+                );
                 EXCEPTION
                   WHEN OTHERS THEN
-                    DBMS_OUTPUT.PUT_LINE(V_PK_PERSON_UTB);
-                    L_ERROR_MELDING := SQLCODE
-                      || ' '
-                      || SQLERRM;
-                    INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
-                      MIN_LASTET_DATO,
-                      ID,
-                      ERROR_MSG,
-                      OPPRETTET_TID,
-                      KILDE
-                    ) VALUES(
-                      NULL,
-                      REC_UTBET_DET.BEHANDLINGS_ID,
-                      L_ERROR_MELDING,
-                      V_STOREDATE,
-                      'FAM_BT_UTPAKKING_OFFSET3'
-                    );
+                    dbms_output.put_line(v_pk_person_utb);
+                    l_error_melding := SQLCODE || ' ' || sqlerrm;
+                    INSERT INTO dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, ID, error_msg, opprettet_tid, kilde)
+                    VALUES(NULL, rec_utbet_det.behandlings_id, l_error_melding, v_storedate, 'FAM_BT_UTPAKKING_OFFSET3');
                     COMMIT;
-                    P_ERROR_MELDING := SUBSTR(P_ERROR_MELDING
-                      || L_ERROR_MELDING, 1, 1000);
+                    p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
                 END;
+
                 BEGIN
-                  INSERT INTO DVH_FAM_BT.FAM_BT_UTBET_DET (
-                    PK_BT_UTBET_DET,
-                    KLASSEKODE,
-                    DELYTELSE_ID,
-                    UTBETALT_PR_MND,
-                    LASTET_DATO,
-                    FK_BT_PERSON,
-                    FK_BT_UTBETALING,
-                    BEHANDLINGS_ID,
-                    KAFKA_OFFSET
-                  ) VALUES (
-                    DVH_FAMBT_KAFKA.HIBERNATE_SEQUENCE.NEXTVAL
- --v_pk_bt_utbet_det
-,
-                    REC_UTBET_DET.KLASSEKODE,
-                    REC_UTBET_DET.DELYTELSE_ID,
-                    REC_UTBET_DET.UTBETALT_PR_MND,
-                    REC_UTBET_DET.LASTET_DATO,
-                    V_PK_PERSON_UTB,
-                    V_PK_BT_UTBETALING,
-                    REC_UTBET_DET.BEHANDLINGS_ID,
-                    REC_UTBET_DET.KAFKA_OFFSET
-                  );
+                INSERT INTO dvh_fam_bt.fam_bt_utbet_det
+                (
+                  pk_bt_utbet_det
+                 ,klassekode
+                 ,delytelse_id
+                 ,utbetalt_pr_mnd
+                 ,lastet_dato
+                 ,fk_bt_person
+                 ,fk_bt_utbetaling
+                 ,behandlings_id
+                 ,kafka_offset
+                )
+                VALUES
+                (
+                  dvh_fambt_kafka.hibernate_sequence.NEXTVAL
+                  --v_pk_bt_utbet_det
+                 ,rec_utbet_det.klassekode
+                 ,rec_utbet_det.delytelse_id
+                 ,rec_utbet_det.utbetalt_pr_mnd
+                 ,rec_utbet_det.lastet_dato
+                 ,v_pk_person_utb
+                 ,v_pk_bt_utbetaling
+                 ,rec_utbet_det.behandlings_id
+                 ,rec_utbet_det.kafka_offset
+                );
                 EXCEPTION
                   WHEN OTHERS THEN
-                    L_ERROR_MELDING := SQLCODE
-                      || ' '
-                      || SQLERRM;
-                    INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
-                      MIN_LASTET_DATO,
-                      ID,
-                      ERROR_MSG,
-                      OPPRETTET_TID,
-                      KILDE
-                    ) VALUES(
-                      NULL,
-                      REC_UTBET_DET.BEHANDLINGS_ID,
-                      L_ERROR_MELDING,
-                      V_STOREDATE,
-                      'FAM_BT_UTPAKKING_OFFSET4'
-                    );
+                    l_error_melding := SQLCODE || ' ' || sqlerrm;
+                    INSERT INTO dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, ID, error_msg, opprettet_tid, kilde)
+                    VALUES(NULL, rec_utbet_det.behandlings_id, l_error_melding, v_storedate, 'FAM_BT_UTPAKKING_OFFSET4');
                     COMMIT;
-                    P_ERROR_MELDING := SUBSTR(P_ERROR_MELDING
-                      || L_ERROR_MELDING, 1, 1000);
+                    p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
                 END;
               EXCEPTION
                 WHEN OTHERS THEN
-                  L_ERROR_MELDING := SQLCODE
-                    || ' '
-                    || SQLERRM;
-                  INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
-                    MIN_LASTET_DATO,
-                    ID,
-                    ERROR_MSG,
-                    OPPRETTET_TID,
-                    KILDE
-                  ) VALUES(
-                    NULL,
-                    REC_FAG.FAGSAK_ID,
-                    L_ERROR_MELDING,
-                    V_STOREDATE,
-                    'FAM_BT_UTPAKKING_OFFSET5'
-                  );
+                  l_error_melding := SQLCODE || ' ' || sqlerrm;
+                  INSERT INTO dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, ID, error_msg, opprettet_tid, kilde)
+                  VALUES(NULL, rec_fag.fagsak_id, l_error_melding, v_storedate, 'FAM_BT_UTPAKKING_OFFSET5');
                   COMMIT;
-                  P_ERROR_MELDING := SUBSTR(P_ERROR_MELDING
-                    || L_ERROR_MELDING, 1, 1000);
+                  p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
               END;
-            END LOOP; --Utbetalingsdetaljer
+            END LOOP;--Utbetalingsdetaljer
           EXCEPTION
             WHEN OTHERS THEN
-              L_ERROR_MELDING := SQLCODE
-                || ' '
-                || SQLERRM;
-              INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
-                MIN_LASTET_DATO,
-                ID,
-                ERROR_MSG,
-                OPPRETTET_TID,
-                KILDE
-              ) VALUES(
-                NULL,
-                REC_FAG.FAGSAK_ID,
-                L_ERROR_MELDING,
-                V_STOREDATE,
-                'FAM_BT_UTPAKKING_OFFSET6'
-              );
+              l_error_melding := SQLCODE || ' ' || sqlerrm;
+              INSERT INTO dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, ID, error_msg, opprettet_tid, kilde)
+              VALUES(NULL, rec_fag.fagsak_id, l_error_melding, v_storedate, 'FAM_BT_UTPAKKING_OFFSET6');
               COMMIT;
-              P_ERROR_MELDING := SUBSTR(P_ERROR_MELDING
-                || L_ERROR_MELDING, 1, 1000);
+              p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
           END;
-        END LOOP; --Utbetalinger
+        END LOOP;--Utbetalinger
       EXCEPTION
         WHEN OTHERS THEN
-          L_ERROR_MELDING := SQLCODE
-            || ' '
-            || SQLERRM;
-          INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
-            MIN_LASTET_DATO,
-            ID,
-            ERROR_MSG,
-            OPPRETTET_TID,
-            KILDE
-          ) VALUES(
-            NULL,
-            REC_FAG.FAGSAK_ID,
-            L_ERROR_MELDING,
-            V_STOREDATE,
-            'FAM_BT_UTPAKKING_OFFSET7'
-          );
+          l_error_melding := SQLCODE || ' ' || sqlerrm;
+          INSERT INTO dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, ID, error_msg, opprettet_tid, kilde)
+          VALUES(NULL, rec_fag.fagsak_id, l_error_melding, v_storedate, 'FAM_BT_UTPAKKING_OFFSET7');
           COMMIT;
-          P_ERROR_MELDING := SUBSTR(P_ERROR_MELDING
-            || L_ERROR_MELDING, 1, 1000);
+          p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
       END;
-    END LOOP; --Fagsak
+    END LOOP;--Fagsak
     COMMIT;
-    IF L_ERROR_MELDING IS NOT NULL THEN
-      INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
-        ID,
-        ERROR_MSG,
-        OPPRETTET_TID,
-        KILDE
-      ) VALUES(
-        NULL,
-        L_ERROR_MELDING,
-        V_STOREDATE,
-        'FAM_BT_UTPAKKING_OFFSET8'
-      );
+    IF l_error_melding IS NOT NULL THEN
+      INSERT INTO dvh_fam_fp.fp_xml_utbrett_error(ID, error_msg, opprettet_tid, kilde)
+      VALUES(NULL, l_error_melding, v_storedate, 'FAM_BT_UTPAKKING_OFFSET8');
       COMMIT;
-      P_ERROR_MELDING := SUBSTR(P_ERROR_MELDING
-        || L_ERROR_MELDING, 1, 1000);
+      p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
     END IF;
   EXCEPTION
     WHEN OTHERS THEN
-      L_ERROR_MELDING := SQLCODE
-        || ' '
-        || SQLERRM;
-      INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
-        MIN_LASTET_DATO,
-        ID,
-        ERROR_MSG,
-        OPPRETTET_TID,
-        KILDE
-      ) VALUES(
-        NULL,
-        NULL,
-        L_ERROR_MELDING,
-        V_STOREDATE,
-        'FAM_BT_UTPAKKING_OFFSET9'
-      );
+      l_error_melding := SQLCODE || ' ' || sqlerrm;
+      INSERT INTO dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, ID, error_msg, opprettet_tid, kilde)
+      VALUES(NULL, NULL, l_error_melding, v_storedate, 'FAM_BT_UTPAKKING_OFFSET9');
       COMMIT;
-      P_ERROR_MELDING := SUBSTR(P_ERROR_MELDING
-        || L_ERROR_MELDING, 1, 1000);
-  END FAM_BT_UTPAKKING_OFFSET;
-  PROCEDURE FAM_BT2_UTPAKKING_OFFSET(
-    P_IN_OFFSET IN NUMBER,
-    P_ERROR_MELDING OUT VARCHAR2
-  ) AS
- --v_person_ident VARCHAR2(20);
-    V_FK_PERSON1_SOKER          NUMBER;
-    V_FK_PERSON1_UTB            NUMBER;
-    V_PK_BT_UTBETALING          NUMBER;
-    V_PK_BT_UTBET_DET           NUMBER;
-    V_PK_PERSON_SOKER           NUMBER;
-    V_PK_PERSON_UTB             NUMBER;
-    V_PK_FAGSAK                 NUMBER;
-    V_PK_BT_KOMPETANSE_PERIODER NUMBER;
-    V_PK_BT_KOMPETANSE_BARN     NUMBER;
-    V_STOREDATE                 DATE := SYSDATE;
-    L_ERROR_MELDING             VARCHAR2(4000);
-    CURSOR CUR_BT_FAGSAK(P_OFFSET NUMBER) IS
-      WITH JDATA AS (
-        SELECT
-          KAFKA_OFFSET,
-          MELDING AS DOC,
-          PK_BT_META_DATA
-        FROM
-          DVH_FAM_BT.FAM_BT_META_DATA
-        WHERE
-          KAFKA_OFFSET = P_OFFSET
-          AND KAFKA_TOPIC = 'teamfamilie.aapen-barnetrygd-vedtak-v2'
- --WHERE kafka_offset=110--Test!!!
-      )
-      SELECT
-        T.BEHANDLING_OPPRINNELSE,
-        T.BEHANDLING_TYPE,
-        T.FAGSAK_ID,
-        T.BEHANDLINGS_ID,
-        CAST(TO_TIMESTAMP_TZ(T.TIDSPUNKT_VEDTAK,
-        'FXYYYY-MM-DD"T"HH24:MI:SS.FXFF3TZH:TZM') AT TIME ZONE 'Europe/Belgrade' AS TIMESTAMP) AS TIDSPUNKT_VEDTAK,
-        CASE
-          WHEN T.ENSLIG_FORSØRGER = 'false' THEN
-            '0'
-          ELSE
-            '1'
-        END AS ENSLIG_FORSØRGER,
-        T.KATEGORI,
-        T.UNDERKATEGORI,
-        'BT' AS KILDESYSTEM,
-        CURRENT_TIMESTAMP AS LASTET_DATO,
-        T.FUNKSJONELL_ID,
-        T.BEHANDLINGÅRSAK,
-        T.PERSON_IDENT,
-        T.ROLLE,
-        T.STATSBORGERSKAP,
-        T.ANNENPART_BOSTEDSLAND,
-        T.ANNENPART_PERSONIDENT,
-        T.ANNENPART_STATSBORGERSKAP,
-        T.BOSTEDSLAND,
-        T.DELINGSPROSENT_OMSORG,
-        T.DELINGSPROSENT_YTELSE,
-        T.PRIMÆRLAND,
-        T.SEKUNDÆRLAND,
-        PK_BT_META_DATA,
-        KAFKA_OFFSET
-      FROM
-        JDATA,
-        JSON_TABLE ( DOC,
-        '$' COLUMNS ( BEHANDLING_OPPRINNELSE VARCHAR2 PATH '$.behandlingOpprinnelse',
-        BEHANDLING_TYPE VARCHAR2 PATH '$.behandlingTypeV2',
-        FAGSAK_ID VARCHAR2 PATH '$.fagsakId',
-        BEHANDLINGS_ID VARCHAR2 PATH '$.behandlingsId',
-        TIDSPUNKT_VEDTAK VARCHAR2 PATH '$.tidspunktVedtak',
-        ENSLIG_FORSØRGER VARCHAR2 PATH '$.ensligForsørger',
-        KATEGORI VARCHAR2 PATH '$.kategoriV2',
-        UNDERKATEGORI VARCHAR2 PATH '$.underkategoriV2',
-        FUNKSJONELL_ID VARCHAR2 PATH '$.funksjonellId',
-        PERSON_IDENT VARCHAR2 PATH '$.personV2[*].personIdent',
-        ROLLE VARCHAR2 PATH '$.personV2[*].rolle',
-        STATSBORGERSKAP VARCHAR2 PATH '$.personV2[*].statsborgerskap[*]',
-        ANNENPART_BOSTEDSLAND VARCHAR2 PATH '$.personV2[*].annenpartBostedsland',
-        ANNENPART_PERSONIDENT VARCHAR2 PATH '$.personV2[*].annenpartPersonident',
-        ANNENPART_STATSBORGERSKAP VARCHAR2 PATH '$.personV2[*].annenpartStatsborgerskap',
-        BOSTEDSLAND VARCHAR2 PATH '$.personV2[*].bostedsland',
-        DELINGSPROSENT_OMSORG VARCHAR2 PATH '$.personV2[*].delingsprosentOmsorg',
-        DELINGSPROSENT_YTELSE VARCHAR2 PATH '$.personV2[*].delingsprosentYtelse',
-        PRIMÆRLAND VARCHAR2 PATH '$.personV2[*].primærland',
-        SEKUNDÆRLAND VARCHAR2 PATH '$.personV2[*].sekundærland',
-        BEHANDLINGÅRSAK VARCHAR2 PATH '$.behandlingÅrsakV2' ) ) T;
+      p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
+  END fam_bt_utpakking_offset;
+
+  PROCEDURE fam_bt2_utpakking_offset(p_in_offset IN NUMBER, p_error_melding OUT VARCHAR2) AS
+  --v_person_ident VARCHAR2(20);
+  v_fk_person1_soker NUMBER;
+  v_fk_person1_utb NUMBER;
+  v_pk_bt_utbetaling NUMBER;
+  v_pk_bt_utbet_det NUMBER;
+  v_pk_person_soker NUMBER;
+  v_pk_person_utb NUMBER;
+  v_pk_fagsak NUMBER;
+  v_pk_bt_kompetanse_perioder NUMBER;
+  v_pk_bt_kompetanse_barn NUMBER;
+  v_storedate DATE := sysdate;
+  l_error_melding VARCHAR2(4000);
+
+  CURSOR cur_bt_fagsak(p_offset NUMBER) IS
+    WITH jdata AS (
+      SELECT kafka_offset
+            ,melding AS doc
+            ,pk_bt_meta_data
+      FROM dvh_fam_bt.fam_bt_meta_data
+      WHERE kafka_offset = p_offset
+      AND kafka_topic = 'teamfamilie.aapen-barnetrygd-vedtak-v2'
+      --WHERE kafka_offset=110--Test!!!
+    )
+    SELECT T.behandling_opprinnelse
+          ,T.behandling_type
+          ,T.fagsak_id
+          ,T.behandlings_id
+          ,CAST(to_timestamp_tz(T.tidspunkt_vedtak, 'FXYYYY-MM-DD"T"HH24:MI:SS.FXFF3TZH:TZM') AT TIME ZONE 'Europe/Belgrade' AS TIMESTAMP) AS tidspunkt_vedtak
+          ,CASE
+           WHEN T.enslig_forsørger = 'false' THEN '0'
+           ELSE '1'
+           END AS enslig_forsørger
+          ,T.kategori
+          ,T.underkategori
+          ,'BT' AS kildesystem
+          ,current_timestamp AS lastet_dato
+          ,T.funksjonell_id
+          ,T.behandlingÅrsak
+          ,T.person_ident
+          ,T.rolle
+          ,T.statsborgerskap
+          ,T.annenpart_bostedsland
+          ,T.annenpart_personident
+          ,T.annenpart_statsborgerskap
+          ,T.bostedsland
+          ,T.delingsprosent_omsorg
+          ,T.delingsprosent_ytelse
+          ,T.primærland
+          ,T.sekundærland
+          ,pk_bt_meta_data
+          ,kafka_offset
+    FROM jdata
+        ,JSON_TABLE
+        (
+          doc, '$'
+          COLUMNS (
+          behandling_opprinnelse    VARCHAR2 PATH '$.behandlingOpprinnelse'
+         ,behandling_type           VARCHAR2 PATH '$.behandlingTypeV2'
+         ,fagsak_id                 VARCHAR2 PATH '$.fagsakId'
+         ,behandlings_id            VARCHAR2 PATH '$.behandlingsId'
+         ,tidspunkt_vedtak          VARCHAR2 PATH '$.tidspunktVedtak'
+         ,enslig_forsørger          VARCHAR2 PATH '$.ensligForsørger'
+         ,kategori                  VARCHAR2 PATH '$.kategoriV2'
+         ,underkategori             VARCHAR2 PATH '$.underkategoriV2'
+         ,funksjonell_id            VARCHAR2 PATH '$.funksjonellId'
+         ,person_ident              VARCHAR2 PATH '$.personV2[*].personIdent'
+         ,rolle                     VARCHAR2 PATH '$.personV2[*].rolle'
+         ,statsborgerskap           VARCHAR2 PATH '$.personV2[*].statsborgerskap[*]'
+         ,annenpart_bostedsland     VARCHAR2 PATH '$.personV2[*].annenpartBostedsland'
+         ,annenpart_personident     VARCHAR2 PATH '$.personV2[*].annenpartPersonident'
+         ,annenpart_statsborgerskap VARCHAR2 PATH '$.personV2[*].annenpartStatsborgerskap'
+         ,bostedsland               VARCHAR2 PATH '$.personV2[*].bostedsland'
+         ,delingsprosent_omsorg     VARCHAR2 PATH '$.personV2[*].delingsprosentOmsorg'
+         ,delingsprosent_ytelse     VARCHAR2 PATH '$.personV2[*].delingsprosentYtelse'
+         ,primærland                VARCHAR2 PATH '$.personV2[*].primærland'
+         ,sekundærland              VARCHAR2 PATH '$.personV2[*].sekundærland'
+         ,behandlingÅrsak           VARCHAR2 PATH '$.behandlingÅrsakV2'
+         )
+        ) T;
+
  ---------------------------------------------
-    CURSOR CUR_BT_KOMPETANSE_PERIODER(P_OFFSET NUMBER) IS
-      WITH JDATA AS (
-        SELECT
-          KAFKA_OFFSET,
-          MELDING AS DOC,
-          PK_BT_META_DATA
-        FROM
-          DVH_FAM_BT.FAM_BT_META_DATA
-        WHERE
-          KAFKA_OFFSET = P_OFFSET
-          AND KAFKA_TOPIC = 'teamfamilie.aapen-barnetrygd-vedtak-v2'
-      )
-      SELECT
-        T.FOM,
-        T.TOM,
-        T.SOKERSAKTIVITET,
-        T.ANNENFORELDER_AKTIVITET,
-        T.ANNENFORELDER_AKTIVITETSLAND,
-        T.BARNETS_BOSTEDSLAND,
-        T.KOMPETANSE_RESULTAT,
-        CURRENT_TIMESTAMP AS LASTET_DATO
-      FROM
-        JDATA,
-        JSON_TABLE ( DOC,
-        '$' COLUMNS ( TOM VARCHAR2 PATH '$.kompetanseperioder[*].tom',
-        FOM VARCHAR2 PATH '$.kompetanseperioder[*].fom',
-        SOKERSAKTIVITET VARCHAR2 PATH '$.kompetanseperioder[*].sokersaktivitet',
-        ANNENFORELDER_AKTIVITET VARCHAR2 PATH '$.kompetanseperioder[*].annenForeldersAktivitet',
-        ANNENFORELDER_AKTIVITETSLAND VARCHAR2 PATH '$.kompetanseperioder[*].annenForeldersAktivitetsland',
-        BARNETS_BOSTEDSLAND VARCHAR2 PATH '$.kompetanseperioder[*].barnetsBostedsland',
-        KOMPETANSE_RESULTAT VARCHAR2 PATH '$.kompetanseperioder[*].resultat' )) T;
- --------------------------------------------------------
-    CURSOR CUR_BT_UTBETALING(P_OFFSET NUMBER) IS
-      WITH JDATA AS (
-        SELECT
-          KAFKA_OFFSET,
-          MELDING AS DOC
-        FROM
-          DVH_FAM_BT.FAM_BT_META_DATA
-        WHERE
-          KAFKA_OFFSET = P_OFFSET
-          AND KAFKA_TOPIC = 'teamfamilie.aapen-barnetrygd-vedtak-v2'
- --WHERE kafka_offset=110--Test!!!
-      )
-      SELECT
-        T.UTBETALT_PER_MND,
-        TO_DATE(T.STØNAD_FOM,
-        'YYYY-MM-DD') AS STØNAD_FOM,
-        TO_DATE(T.STØNAD_TOM,
-        'YYYY-MM-DD') AS STØNAD_TOM,
-        T.HJEMMEL,
-        CURRENT_TIMESTAMP AS LASTET_DATO,
-        BEHANDLINGS_ID,
-        KAFKA_OFFSET
-      FROM
-        JDATA,
-        JSON_TABLE ( DOC,
-        '$' COLUMNS ( BEHANDLINGS_ID VARCHAR2 PATH '$.behandlingsId',
-        NESTED PATH '$.utbetalingsperioderV2[*]' COLUMNS ( UTBETALT_PER_MND VARCHAR2 PATH '$.utbetaltPerMnd',
-        STØNAD_FOM VARCHAR2 PATH '$.stønadFom',
-        STØNAD_TOM VARCHAR2 PATH '$.stønadTom',
-        HJEMMEL VARCHAR2 PATH '$.hjemmel' )) ) T;
-    CURSOR CUR_BT_UTBETALINGS_DETALJER(P_OFFSET NUMBER, P_FOM DATE, P_TOM DATE) IS
-      WITH JDATA AS (
-        SELECT
-          KAFKA_OFFSET,
-          MELDING AS DOC
-        FROM
-          DVH_FAM_BT.FAM_BT_META_DATA
-        WHERE
-          KAFKA_OFFSET = P_OFFSET
-          AND KAFKA_TOPIC = 'teamfamilie.aapen-barnetrygd-vedtak-v2'
- --WHERE kafka_offset = 110--Test!!!
-      )
-      SELECT --1 AS pk_bt_utbet_det
- --,
-        S.HJEMMEL,
-        S.UTBETALTPERMND,
-        S.STØNADFOM,
-        S.STØNADTOM,
-        S.KLASSEKODE,
-        S.DELYTELSE_ID,
-        S.UTBETALT_PR_MND,
-        S.STONAD_FOM,
-        S.PERSONIDENT,
-        S.ROLLE,
-        S.STATSBORGERSKAP,
-        S.BOSTEDSLAND
- -- ,S.primærland
- -- ,S.sekundærland
- -- ,S.delingsprosentomsorg delingsprosent_omsorg
-,
-        S.DELINGSPROSENTYTELSE DELINGSPROSENT_YTELSE
- --  ,S.annenpartpersonident annenpart_personident
- -- ,S.annenpartstatsborgerskap annenpart_statsborgerskap
- -- ,S.annenpartbostedsland annenpart_bostedsland
-,
-        CURRENT_TIMESTAMP AS LASTET_DATO,
-        BEHANDLINGS_ID,
-        KAFKA_OFFSET
-      FROM
-        JDATA,
-        JSON_TABLE ( DOC,
-        '$' COLUMNS ( BEHANDLINGS_ID VARCHAR2 PATH '$.behandlingsId',
-        NESTED PATH '$.utbetalingsperioderV2[*]' COLUMNS ( HJEMMEL VARCHAR2 PATH '$.hjemmel',
-        UTBETALTPERMND VARCHAR2 PATH '$.utbetaltPerMnd',
-        STØNADFOM VARCHAR2 PATH '$.stønadFom',
-        STØNADTOM VARCHAR2 PATH '$.stønadTom',
-        JOINED_ON VARCHAR2 PATH '$.joined_on',
-        NESTED PATH '$.utbetalingsDetaljer[*]' COLUMNS ( KLASSEKODE VARCHAR2 PATH '$.klassekode',
-        DELYTELSE_ID VARCHAR2 PATH '$.delytelseId',
-        UTBETALT_PR_MND VARCHAR2 PATH '$..utbetaltPrMnd',
-        STONAD_FOM VARCHAR2 PATH '$.stonad_fom',
-        PERSONIDENT VARCHAR2 PATH '$.personV2[*].personIdent',
-        ROLLE VARCHAR2 PATH '$.personV2[*].rolle',
-        STATSBORGERSKAP VARCHAR2 PATH '$.personV2[*].statsborgerskap[*]',
-        BOSTEDSLAND VARCHAR2 PATH '$.personV2[*].bostedsland'
- --,primærland                VARCHAR2 PATH '$.personV2[*].primærland'
- --,sekundærland              VARCHAR2 PATH '$.personV2[*].sekundærland'
- --,delingsprosentomsorg      VARCHAR2 PATH '$.personV2[*].delingsprosentOmsorg'
-,
-        DELINGSPROSENTYTELSE VARCHAR2 PATH '$.personV2[*].delingsprosentYtelse'
- -- ,annenpartpersonident      VARCHAR2 PATH '$.personV2[*].annenpartPersonident'
- -- ,annenpartstatsborgerskap  VARCHAR2 PATH '$.personV2[*].annenpartStatsborgerskap'
- -- ,annenpartbostedsland      VARCHAR2 PATH '$.personV2[*].annenpartBostedsland'
-        ))) ) S
-      WHERE
-        TO_DATE(S.STØNADFOM,
-        'YYYY-MM-DD') = P_FOM
-        AND TO_DATE(S.STØNADTOM,
-        'YYYY-MM-DD') = P_TOM
- --WHERE TO_DATE(S.stønadfom,'YYYY-MM-DD') >= TO_DATE('2020-03-01','YYYY-MM-DD')--Test!!!
- --AND TO_DATE(S.stønadtom,'YYYY-MM-DD') <= TO_DATE('2032-01-31','YYYY-MM-DD')--Test!!!
-;
+  CURSOR cur_bt_kompetanse_perioder(p_offset NUMBER) IS
+    WITH jdata as (
+      SELECT kafka_offset
+            ,melding AS doc
+            ,pk_bt_meta_data
+      FROM dvh_fam_bt.fam_bt_meta_data
+      WHERE kafka_offset = p_offset
+      AND kafka_topic = 'teamfamilie.aapen-barnetrygd-vedtak-v2'
+
+    )
+    select T.fom
+          ,T.tom
+          ,T.sokersaktivitet
+          ,T.annenforelder_aktivitet
+          ,T.annenforelder_aktivitetsland
+          ,T.barnets_bostedsland
+          ,T.kompetanse_Resultat
+          ,current_timestamp AS lastet_dato
+    from jdata
+        ,JSON_TABLE
+        (
+         doc, '$'
+         COLUMNS (
+         tom                            VARCHAR2 PATH '$.kompetanseperioder[*].tom'
+        ,fom                            VARCHAR2 PATH '$.kompetanseperioder[*].fom'
+        ,sokersaktivitet                VARCHAR2 PATH '$.kompetanseperioder[*].sokersaktivitet'
+        ,annenforelder_aktivitet        VARCHAR2 PATH '$.kompetanseperioder[*].annenForeldersAktivitet'
+        ,annenforelder_aktivitetsland   VARCHAR2 PATH '$.kompetanseperioder[*].annenForeldersAktivitetsland'
+        ,barnets_bostedsland               VARCHAR2 PATH '$.kompetanseperioder[*].barnetsBostedsland'
+        ,kompetanse_Resultat            VARCHAR2 PATH '$.kompetanseperioder[*].resultat'
+
+         )) T;
+    --------------------------------------------------------
+
+  CURSOR cur_bt_utbetaling(p_offset NUMBER) IS
+    WITH jdata AS (
+      SELECT kafka_offset
+            ,melding AS doc
+      FROM dvh_fam_bt.fam_bt_meta_data
+      WHERE kafka_offset = p_offset
+      AND kafka_topic = 'teamfamilie.aapen-barnetrygd-vedtak-v2'
+      --WHERE kafka_offset=110--Test!!!
+    )
+    SELECT T.utbetalt_per_mnd
+          ,TO_DATE(T.stønad_fom, 'YYYY-MM-DD') AS stønad_fom
+          ,TO_DATE(T.stønad_tom, 'YYYY-MM-DD') AS stønad_tom
+          ,T.hjemmel
+          ,current_timestamp AS lastet_dato
+          ,behandlings_id
+          ,kafka_offset
+    FROM jdata
+        ,JSON_TABLE
+        (
+         doc, '$'
+         COLUMNS (
+         behandlings_id     VARCHAR2 PATH '$.behandlingsId',
+         NESTED             PATH '$.utbetalingsperioderV2[*]'
+         COLUMNS (
+         utbetalt_per_mnd   VARCHAR2 PATH '$.utbetaltPerMnd'
+        ,stønad_fom         VARCHAR2 PATH '$.stønadFom'
+        ,stønad_tom         VARCHAR2 PATH '$.stønadTom'
+        ,hjemmel            VARCHAR2 PATH '$.hjemmel'
+        ))
+        ) T;
+
+  CURSOR cur_bt_utbetalings_detaljer(p_offset NUMBER, p_fom DATE, p_tom DATE) IS
+    WITH jdata AS (
+      SELECT kafka_offset
+            ,melding AS doc
+      FROM dvh_fam_bt.fam_bt_meta_data
+      WHERE kafka_offset = p_offset
+      AND kafka_topic = 'teamfamilie.aapen-barnetrygd-vedtak-v2'
+      --WHERE kafka_offset = 110--Test!!!
+    )
+    SELECT --1 AS pk_bt_utbet_det
+          --,
+           S.hjemmel
+          ,S.utbetaltpermnd
+          ,S.stønadfom
+          ,S.stønadtom
+          ,S.klassekode
+          ,S.delytelse_id
+          ,S.utbetalt_pr_mnd
+          ,S.stonad_fom
+          ,S.personident
+          ,S.rolle
+          ,S.statsborgerskap
+          ,S.bostedsland
+         -- ,S.primærland
+         -- ,S.sekundærland
+         -- ,S.delingsprosentomsorg delingsprosent_omsorg
+          ,S.delingsprosentytelse delingsprosent_ytelse
+        --  ,S.annenpartpersonident annenpart_personident
+         -- ,S.annenpartstatsborgerskap annenpart_statsborgerskap
+         -- ,S.annenpartbostedsland annenpart_bostedsland
+          ,current_timestamp AS lastet_dato
+          ,behandlings_id
+          ,kafka_offset
+    FROM jdata
+        ,JSON_TABLE
+         (
+          doc, '$'
+          COLUMNS (
+          behandlings_id            VARCHAR2 PATH '$.behandlingsId',
+          NESTED                    PATH '$.utbetalingsperioderV2[*]'
+          COLUMNS (
+          hjemmel                   VARCHAR2 PATH '$.hjemmel'
+         ,utbetaltpermnd            VARCHAR2 PATH '$.utbetaltPerMnd'
+         ,stønadfom                 VARCHAR2 PATH '$.stønadFom'
+         ,stønadtom                 VARCHAR2 PATH '$.stønadTom'
+         ,joined_on                 VARCHAR2 PATH '$.joined_on'
+         ,NESTED                    PATH '$.utbetalingsDetaljer[*]'
+          COLUMNS (
+          klassekode                VARCHAR2 PATH '$.klassekode'
+         ,delytelse_id              VARCHAR2 PATH '$.delytelseId'
+         ,utbetalt_pr_mnd           VARCHAR2 PATH '$..utbetaltPrMnd'
+         ,stonad_fom                VARCHAR2 PATH '$.stonad_fom'
+         ,personident               VARCHAR2 PATH '$.personV2[*].personIdent'
+         ,rolle                     VARCHAR2 PATH '$.personV2[*].rolle'
+         ,statsborgerskap           VARCHAR2 PATH '$.personV2[*].statsborgerskap[*]'
+         ,bostedsland               VARCHAR2 PATH '$.personV2[*].bostedsland'
+         --,primærland                VARCHAR2 PATH '$.personV2[*].primærland'
+         --,sekundærland              VARCHAR2 PATH '$.personV2[*].sekundærland'
+         --,delingsprosentomsorg      VARCHAR2 PATH '$.personV2[*].delingsprosentOmsorg'
+         ,delingsprosentytelse      VARCHAR2 PATH '$.personV2[*].delingsprosentYtelse'
+        -- ,annenpartpersonident      VARCHAR2 PATH '$.personV2[*].annenpartPersonident'
+        -- ,annenpartstatsborgerskap  VARCHAR2 PATH '$.personV2[*].annenpartStatsborgerskap'
+        -- ,annenpartbostedsland      VARCHAR2 PATH '$.personV2[*].annenpartBostedsland'
+          )))
+         ) S
+    WHERE TO_DATE(S.stønadfom,'YYYY-MM-DD') = p_fom
+    AND TO_DATE(S.stønadtom,'YYYY-MM-DD') = p_tom
+    --WHERE TO_DATE(S.stønadfom,'YYYY-MM-DD') >= TO_DATE('2020-03-01','YYYY-MM-DD')--Test!!!
+    --AND TO_DATE(S.stønadtom,'YYYY-MM-DD') <= TO_DATE('2032-01-31','YYYY-MM-DD')--Test!!!
+    ;
+
   BEGIN
- -- For alle fagsaker
-    FOR REC_FAG IN CUR_BT_FAGSAK(P_IN_OFFSET) LOOP
+    -- For alle fagsaker
+    FOR rec_fag IN cur_bt_fagsak(p_in_offset) LOOP
       BEGIN
- --dbms_output.put_line(rec_fag.fagsak_id);
-        V_PK_PERSON_SOKER := NULL;
-        V_FK_PERSON1_SOKER := -1;
-        SELECT
-          DVH_FAMBT_KAFKA.HIBERNATE_SEQUENCE.NEXTVAL INTO V_PK_PERSON_SOKER
-        FROM
-          DUAL;
- --Hent fk_person1
+        --dbms_output.put_line(rec_fag.fagsak_id);
+        v_pk_person_soker := NULL;
+        v_fk_person1_soker := -1;
+        SELECT dvh_fambt_kafka.hibernate_sequence.NEXTVAL INTO v_pk_person_soker FROM dual;
+
+        --Hent fk_person1
         BEGIN
-          SELECT
-            DISTINCT PERSON_67_VASKET.FK_PERSON1 AS AK_PERSON1 INTO V_FK_PERSON1_SOKER
-          FROM
-            DT_PERSON.DVH_PERSON_IDENT_OFF_ID_IKKE_SKJERMET PERSON_67_VASKET
-          WHERE
-            PERSON_67_VASKET.OFF_ID = REC_FAG.PERSON_IDENT
-            AND REC_FAG.TIDSPUNKT_VEDTAK BETWEEN PERSON_67_VASKET.GYLDIG_FRA_DATO
-            AND PERSON_67_VASKET.GYLDIG_TIL_DATO;
+          SELECT DISTINCT person_67_vasket.fk_person1 as ak_person1
+          INTO v_fk_person1_soker
+          FROM dt_person.dvh_person_ident_off_id_ikke_skjermet person_67_vasket
+          WHERE person_67_vasket.off_id = rec_fag.person_ident
+          AND rec_fag.tidspunkt_vedtak BETWEEN person_67_vasket.gyldig_fra_dato AND person_67_vasket.gyldig_til_dato;
         EXCEPTION
           WHEN OTHERS THEN
-            V_FK_PERSON1_SOKER := -1;
-            L_ERROR_MELDING := SQLCODE
-              || ' '
-              || SQLERRM;
-            INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
-              MIN_LASTET_DATO,
-              ID,
-              ERROR_MSG,
-              OPPRETTET_TID,
-              KILDE
-            ) VALUES(
-              NULL,
-              REC_FAG.FAGSAK_ID,
-              L_ERROR_MELDING,
-              V_STOREDATE,
-              'FAM_BT_UTPAKKING_OFFSET1'
-            );
+            v_fk_person1_soker := -1;
+            l_error_melding := SQLCODE || ' ' || sqlerrm;
+            INSERT INTO dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, ID, error_msg, opprettet_tid, kilde)
+            VALUES(NULL, rec_fag.fagsak_id, l_error_melding, v_storedate, 'FAM_BT_UTPAKKING_OFFSET1');
             COMMIT;
-            P_ERROR_MELDING := SUBSTR(P_ERROR_MELDING
-              || L_ERROR_MELDING, 1, 1000);
+            p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
         END;
- -- Insert søker into person tabell
-        INSERT INTO DVH_FAM_BT.FAM_BT_PERSON (
-          PK_BT_PERSON
- --,annenpart_bostedsland
- --,annenpart_personident
- --,annenpart_statsborgerskap
-,
-          BOSTEDSLAND
- --,delingsprosent_omsorg
-,
-          DELINGSPROSENT_YTELSE,
-          PERSON_IDENT
- --,primærland
-,
-          ROLLE
- --,sekundærland
-,
-          FK_PERSON1,
-          LASTET_DATO,
-          BEHANDLINGS_ID,
-          KAFKA_OFFSET
-        ) VALUES (
-          V_PK_PERSON_SOKER
- --,rec_fag.annenpart_bostedsland
- --,rec_fag.annenpart_personident
- --,rec_fag.annenpart_statsborgerskap
-,
-          REC_FAG.BOSTEDSLAND
- --,rec_fag.delingsprosent_omsorg
-,
-          REC_FAG.DELINGSPROSENT_YTELSE,
-          REC_FAG.PERSON_IDENT
- --,rec_fag.primærland
-,
-          REC_FAG.ROLLE
- --,rec_fag.sekundærland
-,
-          V_FK_PERSON1_SOKER,
-          REC_FAG.LASTET_DATO,
-          REC_FAG.BEHANDLINGS_ID,
-          REC_FAG.KAFKA_OFFSET
+        -- Insert søker into person tabell
+        INSERT INTO dvh_fam_bt.fam_bt_person
+        (
+          pk_bt_person
+         --,annenpart_bostedsland
+         --,annenpart_personident
+         --,annenpart_statsborgerskap
+         ,bostedsland
+         --,delingsprosent_omsorg
+         ,delingsprosent_ytelse
+         ,person_ident
+         --,primærland
+         ,rolle
+         --,sekundærland
+         ,fk_person1
+         ,lastet_dato
+         ,behandlings_id
+         ,kafka_offset
+        )
+        VALUES
+        (
+          v_pk_person_soker
+         --,rec_fag.annenpart_bostedsland
+         --,rec_fag.annenpart_personident
+         --,rec_fag.annenpart_statsborgerskap
+         ,rec_fag.bostedsland
+         --,rec_fag.delingsprosent_omsorg
+         ,rec_fag.delingsprosent_ytelse
+         ,rec_fag.person_ident
+         --,rec_fag.primærland
+         ,rec_fag.rolle
+         --,rec_fag.sekundærland
+         ,v_fk_person1_soker
+         ,rec_fag.lastet_dato
+         ,rec_fag.behandlings_id
+         ,rec_fag.kafka_offset
         );
- -- Insert into FAGSAK tabellen
-        V_PK_FAGSAK := NULL;
-        SELECT
-          DVH_FAMBT_KAFKA.HIBERNATE_SEQUENCE.NEXTVAL INTO V_PK_FAGSAK
-        FROM
-          DUAL;
-        INSERT INTO DVH_FAM_BT.FAM_BT_FAGSAK (
-          PK_BT_FAGSAK,
-          FK_BT_PERSON,
-          FK_BT_META_DATA,
-          BEHANDLING_OPPRINNELSE,
-          BEHANDLING_TYPE,
-          FAGSAK_ID,
-          BEHANDLINGS_ID,
-          TIDSPUNKT_VEDTAK,
-          ENSLIG_FORSØRGER,
-          KATEGORI,
-          UNDERKATEGORI,
-          KILDESYSTEM,
-          LASTET_DATO,
-          FUNKSJONELL_ID,
-          BEHANDLING_ÅRSAK,
-          KAFKA_OFFSET
-        ) VALUES (
-          V_PK_FAGSAK,
-          V_PK_PERSON_SOKER,
-          REC_FAG.PK_BT_META_DATA,
-          REC_FAG.BEHANDLING_OPPRINNELSE,
-          REC_FAG.BEHANDLING_TYPE,
-          REC_FAG.FAGSAK_ID,
-          REC_FAG.BEHANDLINGS_ID,
-          REC_FAG.TIDSPUNKT_VEDTAK,
-          REC_FAG.ENSLIG_FORSØRGER,
-          REC_FAG.KATEGORI,
-          REC_FAG.UNDERKATEGORI,
-          REC_FAG.KILDESYSTEM,
-          REC_FAG.LASTET_DATO,
-          REC_FAG.FUNKSJONELL_ID,
-          REC_FAG.BEHANDLINGÅRSAK,
-          REC_FAG.KAFKA_OFFSET
+
+        -- Insert into FAGSAK tabellen
+        v_pk_fagsak := NULL;
+        SELECT dvh_fambt_kafka.hibernate_sequence.NEXTVAL INTO v_pk_fagsak FROM dual;
+        INSERT INTO dvh_fam_bt.fam_bt_fagsak
+        (
+           pk_bt_fagsak
+          ,fk_bt_person
+          ,fk_bt_meta_data
+          ,behandling_opprinnelse
+          ,behandling_type
+          ,fagsak_id
+          ,behandlings_id
+          ,tidspunkt_vedtak
+          ,enslig_forsørger
+          ,kategori
+          ,underkategori
+          ,kildesystem
+          ,lastet_dato
+          ,funksjonell_id
+          ,behandling_Årsak
+          ,kafka_offset
+        )
+        VALUES
+        (
+          v_pk_fagsak
+         ,v_pk_person_soker
+         ,rec_fag.pk_bt_meta_data
+         ,rec_fag.behandling_opprinnelse
+         ,rec_fag.behandling_type
+         ,rec_fag.fagsak_id
+         ,rec_fag.behandlings_id
+         ,rec_fag.tidspunkt_vedtak
+         ,rec_fag.enslig_forsørger
+         ,rec_fag.kategori
+         ,rec_fag.underkategori
+         ,rec_fag.kildesystem
+         ,rec_fag.lastet_dato
+         ,rec_fag.funksjonell_id
+         ,rec_fag.behandlingÅrsak
+         ,rec_fag.kafka_offset
         );
- --------------------------------------
- -- For alle Kompetanse/insert into fam_bt_kompetanse_perioder
-        FOR REC_KOMPETANSE IN CUR_BT_KOMPETANSE_PERIODER(P_IN_OFFSET) LOOP
+   --------------------------------------
+
+
+        -- For alle Kompetanse/insert into fam_bt_kompetanse_perioder
+        FOR rec_kompetanse IN cur_bt_kompetanse_perioder(p_in_offset) LOOP
           BEGIN
-            V_PK_BT_KOMPETANSE_PERIODER := NULL;
-            SELECT
-              DVH_FAMBT_KAFKA.HIBERNATE_SEQUENCE.NEXTVAL INTO V_PK_BT_KOMPETANSE_PERIODER
-            FROM
-              DUAL;
-            INSERT INTO DVH_FAM_BT.FAM_BT_KOMPETANSE_PERIODER (
-              PK_BT_KOMPETANSE_PERIODER,
-              FOM,
-              TOM,
-              SOKERSAKTIVITET,
-              ANNENFORELDER_AKTIVITET,
-              ANNENFORELDER_AKTIVITETSLAND,
-              KOMPETANSE_RESULTAT,
-              BARNETS_BOSTEDSLAND,
-              FK_BT_FAGSAK,
-              LASTET_DATO
-            ) VALUES (
-              V_PK_BT_KOMPETANSE_PERIODER,
-              REC_KOMPETANSE.FOM,
-              REC_KOMPETANSE.TOM,
-              REC_KOMPETANSE.SOKERSAKTIVITET,
-              REC_KOMPETANSE.ANNENFORELDER_AKTIVITET,
-              REC_KOMPETANSE.ANNENFORELDER_AKTIVITETSLAND,
-              REC_KOMPETANSE.KOMPETANSE_RESULTAT,
-              REC_KOMPETANSE.BARNETS_BOSTEDSLAND,
-              V_PK_FAGSAK,
-              REC_KOMPETANSE.LASTET_DATO
+            v_pk_bt_kompetanse_perioder := NULL;
+            SELECT dvh_fambt_kafka.hibernate_sequence.NEXTVAL INTO v_pk_bt_kompetanse_perioder FROM dual;
+            INSERT INTO dvh_fam_bt.fam_bt_kompetanse_perioder
+            (
+              pk_bt_kompetanse_perioder
+             ,fom
+             ,tom
+             ,sokersaktivitet
+             ,annenforelder_aktivitet
+             ,annenforelder_aktivitetsland
+             ,kompetanse_Resultat
+             ,barnets_bostedsland
+             ,fk_bt_fagsak
+             ,lastet_dato
+
+            )
+            VALUES
+            (
+              v_pk_bt_kompetanse_perioder
+             ,rec_kompetanse.fom
+             ,rec_kompetanse.tom
+             ,rec_kompetanse.sokersaktivitet
+             ,rec_kompetanse.annenforelder_aktivitet
+             ,rec_kompetanse.annenforelder_aktivitetsland
+             ,rec_kompetanse.kompetanse_Resultat
+             ,rec_kompetanse.barnets_bostedsland
+             ,v_pk_fagsak
+             ,rec_kompetanse.lastet_dato
             );
-          END;
- -- Insert into fam_bt_kompetanse_barn
-          V_PK_BT_KOMPETANSE_BARN := NULL;
-          SELECT
-            DVH_FAMBT_KAFKA.HIBERNATE_SEQUENCE.NEXTVAL INTO V_PK_BT_KOMPETANSE_BARN
-          FROM
-            DUAL;
-          INSERT INTO DVH_FAM_BT.FAM_BT_KOMPETANSE_BARN (
-            PK_BT_KOMPETANSE_BARN,
-            FK_BT_KOMPETANSE_PERIODER,
-            FK_PERSON1
-          ) VALUES (
-            V_PK_BT_KOMPETANSE_BARN,
-            V_PK_BT_KOMPETANSE_PERIODER,
-            V_FK_PERSON1_SOKER
-          );
+       END;
+        -- Insert into fam_bt_kompetanse_barn
+        v_pk_bt_kompetanse_barn := NULL;
+        SELECT dvh_fambt_kafka.hibernate_sequence.NEXTVAL INTO v_pk_bt_kompetanse_barn FROM dual;
+        INSERT INTO dvh_fam_bt.fam_bt_kompetanse_barn
+        (
+             pk_bt_kompetanse_barn
+             ,fk_bt_kompetanse_perioder
+             ,fk_person1
+        )
+        VALUES
+        (
+              v_pk_bt_kompetanse_barn
+             ,v_pk_bt_kompetanse_perioder
+             ,v_fk_person1_soker
+        );
         END LOOP;
- -----------------------------
- -- For alle utbetalingsperioder
-        FOR REC_UTBETALING IN CUR_BT_UTBETALING(P_IN_OFFSET) LOOP
+        -----------------------------
+
+
+
+
+        -- For alle utbetalingsperioder
+        FOR rec_utbetaling IN cur_bt_utbetaling(p_in_offset) LOOP
           BEGIN
- --dbms_output.put_line('Hallo z:'||rec_utbetaling.stønad_fom||','||rec_utbetaling.stønad_tom);
-            V_PK_BT_UTBETALING := NULL;
-            SELECT
-              DVH_FAMBT_KAFKA.HIBERNATE_SEQUENCE.NEXTVAL INTO V_PK_BT_UTBETALING
-            FROM
-              DUAL;
- --v_pk_bt_utbetaling:=rec_utbetaling.PK_BT_UTBETALING;
-            INSERT INTO DVH_FAM_BT.FAM_BT_UTBETALING (
-              PK_BT_UTBETALING,
-              UTBETALT_PER_MND,
-              STØNAD_FOM,
-              STØNAD_TOM,
-              HJEMMEL,
-              LASTET_DATO,
-              FK_BT_FAGSAK,
-              BEHANDLINGS_ID,
-              KAFKA_OFFSET
-            ) VALUES (
-              V_PK_BT_UTBETALING,
-              REC_UTBETALING.UTBETALT_PER_MND,
-              REC_UTBETALING.STØNAD_FOM,
-              REC_UTBETALING.STØNAD_TOM,
-              REC_UTBETALING.HJEMMEL,
-              REC_UTBETALING.LASTET_DATO,
-              V_PK_FAGSAK,
-              REC_UTBETALING.BEHANDLINGS_ID,
-              REC_UTBETALING.KAFKA_OFFSET
+            --dbms_output.put_line('Hallo z:'||rec_utbetaling.stønad_fom||','||rec_utbetaling.stønad_tom);
+            v_pk_bt_utbetaling := NULL;
+            SELECT dvh_fambt_kafka.hibernate_sequence.NEXTVAL INTO v_pk_bt_utbetaling FROM dual;
+            --v_pk_bt_utbetaling:=rec_utbetaling.PK_BT_UTBETALING;
+            INSERT INTO dvh_fam_bt.fam_bt_utbetaling
+            (
+              pk_bt_utbetaling
+             ,utbetalt_per_mnd
+             ,stønad_fom
+             ,stønad_tom
+             ,hjemmel
+             ,lastet_dato
+             ,fk_bt_fagsak
+             ,behandlings_id
+             ,kafka_offset
+            )
+            VALUES
+            (
+              v_pk_bt_utbetaling
+             ,rec_utbetaling.utbetalt_per_mnd
+             ,rec_utbetaling.stønad_fom
+             ,rec_utbetaling.stønad_tom
+             ,rec_utbetaling.hjemmel
+             ,rec_utbetaling.lastet_dato
+             ,v_pk_fagsak
+             ,rec_utbetaling.behandlings_id
+             ,rec_utbetaling.kafka_offset
             );
- -- For alle utbetalingsdetaljer for aktuell tidsperiode
-            FOR REC_UTBET_DET IN CUR_BT_UTBETALINGS_DETALJER(P_IN_OFFSET, REC_UTBETALING.STØNAD_FOM, REC_UTBETALING.STØNAD_TOM) LOOP
+
+            -- For alle utbetalingsdetaljer for aktuell tidsperiode
+            FOR rec_utbet_det IN cur_bt_utbetalings_detaljer(p_in_offset, rec_utbetaling.stønad_fom, rec_utbetaling.stønad_tom) LOOP
               BEGIN
- --dbms_output.put_line(rec_utbet_det.personident||','||rec_utbet_det.stønadfom||'YY'||to_char(rec_utbet_det.utbetalt_pr_mnd));
- --Hent fk_person1
-                V_FK_PERSON1_UTB := -1;
+                --dbms_output.put_line(rec_utbet_det.personident||','||rec_utbet_det.stønadfom||'YY'||to_char(rec_utbet_det.utbetalt_pr_mnd));
+                --Hent fk_person1
+                v_fk_person1_utb := -1;
                 BEGIN
-                  SELECT
-                    DISTINCT PERSON_67_VASKET.FK_PERSON1 AS AK_PERSON1 INTO V_FK_PERSON1_UTB
-                  FROM
-                    DT_PERSON.DVH_PERSON_IDENT_OFF_ID_IKKE_SKJERMET PERSON_67_VASKET
-                  WHERE
-                    PERSON_67_VASKET.OFF_ID = REC_UTBET_DET.PERSONIDENT
-                    AND REC_FAG.TIDSPUNKT_VEDTAK BETWEEN PERSON_67_VASKET.GYLDIG_FRA_DATO
-                    AND PERSON_67_VASKET.GYLDIG_TIL_DATO;
+                  SELECT DISTINCT person_67_vasket.fk_person1 as ak_person1
+                  INTO v_fk_person1_utb
+                  FROM dt_person.dvh_person_ident_off_id_ikke_skjermet person_67_vasket
+                  WHERE person_67_vasket.off_id = rec_utbet_det.personident
+                  AND rec_fag.tidspunkt_vedtak BETWEEN person_67_vasket.gyldig_fra_dato AND person_67_vasket.gyldig_til_dato;
                 EXCEPTION
                   WHEN OTHERS THEN
-                    V_FK_PERSON1_UTB := -1;
-                    L_ERROR_MELDING := SQLCODE
-                      || ' '
-                      || SQLERRM;
-                    INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
-                      MIN_LASTET_DATO,
-                      ID,
-                      ERROR_MSG,
-                      OPPRETTET_TID,
-                      KILDE
-                    ) VALUES(
-                      NULL,
-                      REC_UTBET_DET.BEHANDLINGS_ID,
-                      L_ERROR_MELDING,
-                      V_STOREDATE,
-                      'FAM_BT_UTPAKKING_OFFSET2'
-                    );
+                    v_fk_person1_utb := -1;
+                    l_error_melding := SQLCODE || ' ' || sqlerrm;
+                    INSERT INTO dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, ID, error_msg, opprettet_tid, kilde)
+                    VALUES(NULL, rec_utbet_det.behandlings_id, l_error_melding, v_storedate, 'FAM_BT_UTPAKKING_OFFSET2');
                     COMMIT;
-                    P_ERROR_MELDING := SUBSTR(P_ERROR_MELDING
-                      || L_ERROR_MELDING, 1, 1000);
+                    p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
                 END;
-                V_PK_PERSON_UTB := NULL;
-                SELECT
-                  DVH_FAMBT_KAFKA.HIBERNATE_SEQUENCE.NEXTVAL INTO V_PK_PERSON_UTB
-                FROM
-                  DUAL;
- --dbms_output.put_line(v_pk_person_utb);
+
+                v_pk_person_utb := NULL;
+                SELECT dvh_fambt_kafka.hibernate_sequence.NEXTVAL INTO v_pk_person_utb FROM dual;
+                --dbms_output.put_line(v_pk_person_utb);
                 BEGIN
-                  INSERT INTO DVH_FAM_BT.FAM_BT_PERSON (
-                    PK_BT_PERSON
- --,annenpart_bostedsland
- --,annenpart_personident
- --,annenpart_statsborgerskap
-,
-                    BOSTEDSLAND
- --,delingsprosent_omsorg
-,
-                    DELINGSPROSENT_YTELSE,
-                    PERSON_IDENT
- --,primærland
-,
-                    ROLLE
- --,sekundærland
-,
-                    FK_PERSON1,
-                    LASTET_DATO,
-                    BEHANDLINGS_ID,
-                    KAFKA_OFFSET
-                  ) VALUES (
- --dvh_fam_fp.hibernate_sequence_test.NEXTVAL
-                    V_PK_PERSON_UTB
- --,rec_utbet_det.annenpart_bostedsland
- --,rec_utbet_det.annenpart_personident
- --,rec_utbet_det.annenpart_statsborgerskap
-,
-                    REC_UTBET_DET.BOSTEDSLAND
- --,rec_utbet_det.delingsprosent_omsorg
-,
-                    REC_UTBET_DET.DELINGSPROSENT_YTELSE,
-                    REC_UTBET_DET.PERSONIDENT
- --,rec_utbet_det.primærland
-,
-                    REC_UTBET_DET.ROLLE
- --,rec_utbet_det.sekundærland
- -- ,rec_utbet_det.FK_PERSON1
-,
-                    V_FK_PERSON1_UTB,
-                    REC_UTBET_DET.LASTET_DATO,
-                    REC_UTBET_DET.BEHANDLINGS_ID,
-                    REC_UTBET_DET.KAFKA_OFFSET
-                  );
+                INSERT INTO dvh_fam_bt.fam_bt_person
+                (
+                  pk_bt_person
+                 --,annenpart_bostedsland
+                 --,annenpart_personident
+                 --,annenpart_statsborgerskap
+                 ,bostedsland
+                 --,delingsprosent_omsorg
+                 ,delingsprosent_ytelse
+                 ,person_ident
+                 --,primærland
+                 ,rolle
+                 --,sekundærland
+                 ,fk_person1
+                 ,lastet_dato
+                 ,behandlings_id
+                 ,kafka_offset
+                )
+                VALUES
+                (
+                  --dvh_fam_fp.hibernate_sequence_test.NEXTVAL
+                  v_pk_person_utb
+                 --,rec_utbet_det.annenpart_bostedsland
+                 --,rec_utbet_det.annenpart_personident
+                 --,rec_utbet_det.annenpart_statsborgerskap
+                 ,rec_utbet_det.bostedsland
+                 --,rec_utbet_det.delingsprosent_omsorg
+                 ,rec_utbet_det.delingsprosent_ytelse
+                 ,rec_utbet_det.personident
+                 --,rec_utbet_det.primærland
+                 ,rec_utbet_det.rolle
+                 --,rec_utbet_det.sekundærland
+                 -- ,rec_utbet_det.FK_PERSON1
+                 ,v_fk_person1_utb
+                 ,rec_utbet_det.lastet_dato
+                 ,rec_utbet_det.behandlings_id
+                 ,rec_utbet_det.kafka_offset
+                );
                 EXCEPTION
                   WHEN OTHERS THEN
-                    DBMS_OUTPUT.PUT_LINE(V_PK_PERSON_UTB);
-                    L_ERROR_MELDING := SQLCODE
-                      || ' '
-                      || SQLERRM;
-                    INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
-                      MIN_LASTET_DATO,
-                      ID,
-                      ERROR_MSG,
-                      OPPRETTET_TID,
-                      KILDE
-                    ) VALUES(
-                      NULL,
-                      REC_UTBET_DET.BEHANDLINGS_ID,
-                      L_ERROR_MELDING,
-                      V_STOREDATE,
-                      'FAM_BT_UTPAKKING_OFFSET3'
-                    );
+                    dbms_output.put_line(v_pk_person_utb);
+                    l_error_melding := SQLCODE || ' ' || sqlerrm;
+                    INSERT INTO dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, ID, error_msg, opprettet_tid, kilde)
+                    VALUES(NULL, rec_utbet_det.behandlings_id, l_error_melding, v_storedate, 'FAM_BT_UTPAKKING_OFFSET3');
                     COMMIT;
-                    P_ERROR_MELDING := SUBSTR(P_ERROR_MELDING
-                      || L_ERROR_MELDING, 1, 1000);
+                    p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
                 END;
+
                 BEGIN
-                  INSERT INTO DVH_FAM_BT.FAM_BT_UTBET_DET (
-                    PK_BT_UTBET_DET,
-                    KLASSEKODE,
-                    DELYTELSE_ID,
-                    UTBETALT_PR_MND,
-                    LASTET_DATO,
-                    FK_BT_PERSON,
-                    FK_BT_UTBETALING,
-                    BEHANDLINGS_ID,
-                    KAFKA_OFFSET
-                  ) VALUES (
-                    DVH_FAMBT_KAFKA.HIBERNATE_SEQUENCE.NEXTVAL
- --v_pk_bt_utbet_det
-,
-                    REC_UTBET_DET.KLASSEKODE,
-                    REC_UTBET_DET.DELYTELSE_ID,
-                    REC_UTBET_DET.UTBETALT_PR_MND,
-                    REC_UTBET_DET.LASTET_DATO,
-                    V_PK_PERSON_UTB,
-                    V_PK_BT_UTBETALING,
-                    REC_UTBET_DET.BEHANDLINGS_ID,
-                    REC_UTBET_DET.KAFKA_OFFSET
-                  );
+                INSERT INTO dvh_fam_bt.fam_bt_utbet_det
+                (
+                  pk_bt_utbet_det
+                 ,klassekode
+                 ,delytelse_id
+                 ,utbetalt_pr_mnd
+                 ,lastet_dato
+                 ,fk_bt_person
+                 ,fk_bt_utbetaling
+                 ,behandlings_id
+                 ,kafka_offset
+                )
+                VALUES
+                (
+                  dvh_fambt_kafka.hibernate_sequence.NEXTVAL
+                  --v_pk_bt_utbet_det
+                 ,rec_utbet_det.klassekode
+                 ,rec_utbet_det.delytelse_id
+                 ,rec_utbet_det.utbetalt_pr_mnd
+                 ,rec_utbet_det.lastet_dato
+                 ,v_pk_person_utb
+                 ,v_pk_bt_utbetaling
+                 ,rec_utbet_det.behandlings_id
+                 ,rec_utbet_det.kafka_offset
+                );
                 EXCEPTION
                   WHEN OTHERS THEN
-                    L_ERROR_MELDING := SQLCODE
-                      || ' '
-                      || SQLERRM;
-                    INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
-                      MIN_LASTET_DATO,
-                      ID,
-                      ERROR_MSG,
-                      OPPRETTET_TID,
-                      KILDE
-                    ) VALUES(
-                      NULL,
-                      REC_UTBET_DET.BEHANDLINGS_ID,
-                      L_ERROR_MELDING,
-                      V_STOREDATE,
-                      'FAM_BT_UTPAKKING_OFFSET4'
-                    );
+                    l_error_melding := SQLCODE || ' ' || sqlerrm;
+                    INSERT INTO dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, ID, error_msg, opprettet_tid, kilde)
+                    VALUES(NULL, rec_utbet_det.behandlings_id, l_error_melding, v_storedate, 'FAM_BT_UTPAKKING_OFFSET4');
                     COMMIT;
-                    P_ERROR_MELDING := SUBSTR(P_ERROR_MELDING
-                      || L_ERROR_MELDING, 1, 1000);
+                    p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
                 END;
               EXCEPTION
                 WHEN OTHERS THEN
-                  L_ERROR_MELDING := SQLCODE
-                    || ' '
-                    || SQLERRM;
-                  INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
-                    MIN_LASTET_DATO,
-                    ID,
-                    ERROR_MSG,
-                    OPPRETTET_TID,
-                    KILDE
-                  ) VALUES(
-                    NULL,
-                    REC_FAG.FAGSAK_ID,
-                    L_ERROR_MELDING,
-                    V_STOREDATE,
-                    'FAM_BT_UTPAKKING_OFFSET5'
-                  );
+                  l_error_melding := SQLCODE || ' ' || sqlerrm;
+                  INSERT INTO dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, ID, error_msg, opprettet_tid, kilde)
+                  VALUES(NULL, rec_fag.fagsak_id, l_error_melding, v_storedate, 'FAM_BT_UTPAKKING_OFFSET5');
                   COMMIT;
-                  P_ERROR_MELDING := SUBSTR(P_ERROR_MELDING
-                    || L_ERROR_MELDING, 1, 1000);
+                  p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
               END;
-            END LOOP; --Utbetalingsdetaljer
+            END LOOP;--Utbetalingsdetaljer
           EXCEPTION
             WHEN OTHERS THEN
-              L_ERROR_MELDING := SQLCODE
-                || ' '
-                || SQLERRM;
-              INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
-                MIN_LASTET_DATO,
-                ID,
-                ERROR_MSG,
-                OPPRETTET_TID,
-                KILDE
-              ) VALUES(
-                NULL,
-                REC_FAG.FAGSAK_ID,
-                L_ERROR_MELDING,
-                V_STOREDATE,
-                'FAM_BT_UTPAKKING_OFFSET6'
-              );
+              l_error_melding := SQLCODE || ' ' || sqlerrm;
+              INSERT INTO dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, ID, error_msg, opprettet_tid, kilde)
+              VALUES(NULL, rec_fag.fagsak_id, l_error_melding, v_storedate, 'FAM_BT_UTPAKKING_OFFSET6');
               COMMIT;
-              P_ERROR_MELDING := SUBSTR(P_ERROR_MELDING
-                || L_ERROR_MELDING, 1, 1000);
+              p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
           END;
-        END LOOP; --Utbetalinger
+        END LOOP;--Utbetalinger
       EXCEPTION
         WHEN OTHERS THEN
-          L_ERROR_MELDING := SQLCODE
-            || ' '
-            || SQLERRM;
-          INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
-            MIN_LASTET_DATO,
-            ID,
-            ERROR_MSG,
-            OPPRETTET_TID,
-            KILDE
-          ) VALUES(
-            NULL,
-            REC_FAG.FAGSAK_ID,
-            L_ERROR_MELDING,
-            V_STOREDATE,
-            'FAM_BT_UTPAKKING_OFFSET7'
-          );
+          l_error_melding := SQLCODE || ' ' || sqlerrm;
+          INSERT INTO dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, ID, error_msg, opprettet_tid, kilde)
+          VALUES(NULL, rec_fag.fagsak_id, l_error_melding, v_storedate, 'FAM_BT_UTPAKKING_OFFSET7');
           COMMIT;
-          P_ERROR_MELDING := SUBSTR(P_ERROR_MELDING
-            || L_ERROR_MELDING, 1, 1000);
+          p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
       END;
-    END LOOP; --Fagsak
+    END LOOP;--Fagsak
     COMMIT;
-    IF L_ERROR_MELDING IS NOT NULL THEN
-      INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
-        ID,
-        ERROR_MSG,
-        OPPRETTET_TID,
-        KILDE
-      ) VALUES(
-        NULL,
-        L_ERROR_MELDING,
-        V_STOREDATE,
-        'FAM_BT_UTPAKKING_OFFSET8'
-      );
+    IF l_error_melding IS NOT NULL THEN
+      INSERT INTO dvh_fam_fp.fp_xml_utbrett_error(ID, error_msg, opprettet_tid, kilde)
+      VALUES(NULL, l_error_melding, v_storedate, 'FAM_BT_UTPAKKING_OFFSET8');
       COMMIT;
-      P_ERROR_MELDING := SUBSTR(P_ERROR_MELDING
-        || L_ERROR_MELDING, 1, 1000);
+      p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
     END IF;
   EXCEPTION
     WHEN OTHERS THEN
-      L_ERROR_MELDING := SQLCODE
-        || ' '
-        || SQLERRM;
-      INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
-        MIN_LASTET_DATO,
-        ID,
-        ERROR_MSG,
-        OPPRETTET_TID,
-        KILDE
-      ) VALUES(
-        NULL,
-        NULL,
-        L_ERROR_MELDING,
-        V_STOREDATE,
-        'FAM_BT_UTPAKKING_OFFSET9'
-      );
+      l_error_melding := SQLCODE || ' ' || sqlerrm;
+      INSERT INTO dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, ID, error_msg, opprettet_tid, kilde)
+      VALUES(NULL, NULL, l_error_melding, v_storedate, 'FAM_BT_UTPAKKING_OFFSET9');
       COMMIT;
-      P_ERROR_MELDING := SUBSTR(P_ERROR_MELDING
-        || L_ERROR_MELDING, 1, 1000);
-  END FAM_BT2_UTPAKKING_OFFSET;
-END FAM_BT;
+      p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
+  END fam_bt2_utpakking_offset;
+
+END fam_bt;

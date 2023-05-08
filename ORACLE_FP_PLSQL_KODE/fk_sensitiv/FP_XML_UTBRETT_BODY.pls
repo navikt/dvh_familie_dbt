@@ -13,7 +13,7 @@ create or replace PACKAGE BODY                                                  
   procedure SLETT_KODE67_FAGSAK(dummy in varchar2, p_error_melding out varchar2) as
     cursor cur_fp_fagsak(p_inn_lastet_dato date) is
       select distinct fam_fp_personopplysninger.fagsak_id
-      from fk_sensitiv.fam_fp_personopplysninger
+      from dvh_fam_fp.fam_fp_personopplysninger
       left outer join dt_person.dvh_person_ident_aktor_ikke_skjermet person_67_vasket
       on fam_fp_personopplysninger.aktoer_id = person_67_vasket.aktor_id
       and trunc(sysdate, 'dd') between person_67_vasket.gyldig_fra_dato and person_67_vasket.gyldig_til_dato
@@ -22,7 +22,7 @@ create or replace PACKAGE BODY                                                  
       and person_67_vasket.aktor_id is null;
     cursor cur_svp_fagsak(p_inn_lastet_dato date) is
       select distinct fam_sp_personopplysninger.fagsak_id
-      from fk_sensitiv.fam_sp_personopplysninger
+      from dvh_fam_fp.fam_sp_personopplysninger
       left outer join dt_person.dvh_person_ident_aktor_ikke_skjermet person_67_vasket
       on fam_sp_personopplysninger.aktoer_id = person_67_vasket.aktor_id
       and trunc(sysdate, 'dd') between person_67_vasket.gyldig_fra_dato and person_67_vasket.gyldig_til_dato
@@ -31,16 +31,16 @@ create or replace PACKAGE BODY                                                  
       and person_67_vasket.aktor_id is null;
     cursor cur_es_fagsak(p_inn_lastet_dato date) is
       select distinct fp_engangsstonad_dvh.fagsak_id
-      from fk_sensitiv.fp_engangsstonad_dvh
+      from dvh_fam_fp.fp_engangsstonad_dvh
       left outer join dt_person.dvh_person_ident_aktor_ikke_skjermet person_67_vasket
       on fp_engangsstonad_dvh.aktoerid = person_67_vasket.aktor_id
       and trunc(sysdate, 'dd') between person_67_vasket.gyldig_fra_dato and person_67_vasket.gyldig_til_dato
       where fp_engangsstonad_dvh.aktoerid is not null
       and trunc(fp_engangsstonad_dvh.lastet_dato, 'dd') = p_inn_lastet_dato
-      and person_67_vasket.aktor_id is null;      
+      and person_67_vasket.aktor_id is null;
     cursor cur_trans(p_inn_fagsak_id number) is
       select distinct fam_fp_vedtak_utbetaling.trans_id
-      from fk_sensitiv.fam_fp_vedtak_utbetaling
+      from dvh_fam_fp.fam_fp_vedtak_utbetaling
       where fagsak_id = p_inn_fagsak_id;
 
       l_max_lastet_dato date := null;
@@ -48,7 +48,7 @@ create or replace PACKAGE BODY                                                  
     --Hent max lastet_dato for å kun behandle nyligste fagsak
     select trunc(max(lastet_dato), 'dd')
     into l_max_lastet_dato
-    from fk_sensitiv.fam_fp_vedtak_utbetaling;
+    from dvh_fam_fp.fam_fp_vedtak_utbetaling;
     --ES
     for rec_es_fagsak in cur_es_fagsak(l_max_lastet_dato) loop
       for rec_es_trans in cur_trans(rec_es_fagsak.fagsak_id) loop
@@ -56,7 +56,7 @@ create or replace PACKAGE BODY                                                  
           SLETT_TRANS_ID('ES', rec_es_trans.trans_id, p_error_melding);
         exception
           when others then
-            insert into fk_sensitiv.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+            insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
             values(null, rec_es_trans.trans_id, p_error_melding, sysdate, 'SLETT_KODE67_FAGSAK:ES');
             commit;
             exit;
@@ -70,7 +70,7 @@ create or replace PACKAGE BODY                                                  
           SLETT_TRANS_ID('FP', rec_fp_trans.trans_id, p_error_melding);
         exception
           when others then
-            insert into fk_sensitiv.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+            insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
             values(null, rec_fp_trans.trans_id, p_error_melding, sysdate, 'SLETT_KODE67_FAGSAK:FP');
             commit;
             exit;
@@ -84,7 +84,7 @@ create or replace PACKAGE BODY                                                  
           SLETT_TRANS_ID('SVP', rec_svp_trans.trans_id, p_error_melding);
         exception
           when others then
-            insert into fk_sensitiv.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+            insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
             values(null, rec_svp_trans.trans_id, p_error_melding, sysdate, 'SLETT_KODE67_FAGSAK:SVP');
             commit;
             exit;
@@ -96,7 +96,7 @@ create or replace PACKAGE BODY                                                  
       if p_error_melding is null then
         p_error_melding := sqlcode || ' ' || sqlerrm;
       end if;
-      insert into fk_sensitiv.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+      insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
       values(null, null, p_error_melding, sysdate, 'SLETT_KODE67_FAGSAK');
       commit;
   end SLETT_KODE67_FAGSAK;
@@ -119,7 +119,7 @@ create or replace PACKAGE BODY                                                  
       on tabeller.owner = kolonner.owner
       and tabeller.table_name = kolonner.table_name
       and kolonner.column_name = 'TRANS_ID'
-      where tabeller.owner = 'FK_SENSITIV'
+      where tabeller.owner = 'DVH_FAM_FP'
       and tabeller.table_name  IN ('FP_ENGANGSSTONAD_DVH','FAM_FP_VEDTAK_UTBETALING');
 
     cursor cur_fp_tabeller is
@@ -129,7 +129,7 @@ create or replace PACKAGE BODY                                                  
       on tabeller.owner = kolonner.owner
       and tabeller.table_name = kolonner.table_name
       and kolonner.column_name = 'TRANS_ID'
-      where tabeller.owner = 'FK_SENSITIV'
+      where tabeller.owner = 'DVH_FAM_FP'
       and tabeller.table_name like 'FAM_FP%'
       and tabeller.table_name not like 'FAM_%HIST%';
 
@@ -140,7 +140,7 @@ create or replace PACKAGE BODY                                                  
       on tabeller.owner = kolonner.owner
       and tabeller.table_name = kolonner.table_name
       and kolonner.column_name = 'TRANS_ID'
-      where tabeller.owner = 'FK_SENSITIV'
+      where tabeller.owner = 'DVH_FAM_FP'
       and (tabeller.table_name like 'FAM_SP%' OR tabeller.table_name = 'FAM_FP_VEDTAK_UTBETALING')
       and tabeller.table_name not like 'FAM_%HIST%';
   begin
@@ -151,9 +151,9 @@ create or replace PACKAGE BODY                                                  
           execute immediate 'delete from ' || rec_es_tabeller.tabell || ' where trans_id = ' || p_inn_trans_id;
         exception
           when others then
-            rollback;        
+            rollback;
             p_out_error_melding := sqlcode || ' ' || sqlerrm;
-            insert into fk_sensitiv.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+            insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
             values(null, p_inn_trans_id, p_out_error_melding, sysdate, 'SLETT_TRANS_ID:ES');
             commit;
             exit;
@@ -166,12 +166,12 @@ create or replace PACKAGE BODY                                                  
       for rec_fp_tabeller in cur_fp_tabeller loop
         begin
           --dbms_output.put_line('delete from ' || rec_fp_tabeller.tabell || ' where trans_id = ' || p_inn_trans_id);--Test
-          execute immediate 'delete from ' || rec_fp_tabeller.tabell || ' where trans_id = ' || p_inn_trans_id; 
+          execute immediate 'delete from ' || rec_fp_tabeller.tabell || ' where trans_id = ' || p_inn_trans_id;
         exception
           when others then
             rollback;
             p_out_error_melding := sqlcode || ' ' || sqlerrm;
-            insert into fk_sensitiv.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+            insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
             values(null, p_inn_trans_id, p_out_error_melding, sysdate, 'SLETT_TRANS_ID:FP');
             commit;
             exit;
@@ -189,7 +189,7 @@ create or replace PACKAGE BODY                                                  
           when others then
             rollback;
             p_out_error_melding := sqlcode || ' ' || sqlerrm;
-            insert into fk_sensitiv.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+            insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
             values(null, p_inn_trans_id, p_out_error_melding, sysdate, 'SLETT_TRANS_ID:SVP');
             commit;
             exit;
@@ -197,11 +197,11 @@ create or replace PACKAGE BODY                                                  
       end loop;
       commit;
     end if;
-    
+
     --Blanke ut xml_clob i hist tabell
     if p_out_error_melding is null then
       begin
-        update fk_sensitiv.fam_fp_vedtak_utbetaling_hist
+        update dvh_fam_fp.fam_fp_vedtak_utbetaling_hist
         set xml_clob = null
         where trans_id = p_inn_trans_id;
         commit;
@@ -209,7 +209,7 @@ create or replace PACKAGE BODY                                                  
         when others then
           rollback;
           p_out_error_melding := sqlcode || ' ' || sqlerrm;
-          insert into fk_sensitiv.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+          insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
           values(null, p_inn_trans_id, p_out_error_melding, sysdate, 'SLETT_TRANS_ID:HIST');
           commit;
       end;
@@ -229,24 +229,24 @@ create or replace PACKAGE BODY                                                  
   procedure SLETT_GAMLE_VEDTAK(p_inn_kilde in varchar2, p_out_error_melding out varchar2) as
     cursor cur_es_vedtak is
       select es.trans_id, es.versjon
-      from fk_sensitiv.fam_fp_vedtak_utbetaling fam
-      join fk_sensitiv.fp_engangsstonad_dvh es
+      from dvh_fam_fp.fam_fp_vedtak_utbetaling fam
+      join dvh_fam_fp.fp_engangsstonad_dvh es
       on fam.trans_id = es.trans_id
       and fam.versjon != es.versjon
       where fam.fagsak_type = 'ES';--Engangsstønad
 
     cursor cur_fp_vedtak is
       select fp.trans_id, fp.versjon
-      from fk_sensitiv.fam_fp_vedtak_utbetaling fam
-      join fk_sensitiv.fam_fp_fagsak fp
+      from dvh_fam_fp.fam_fp_vedtak_utbetaling fam
+      join dvh_fam_fp.fam_fp_fagsak fp
       on fam.trans_id = fp.trans_id
       and fam.versjon != fp.versjon
       where fam.fagsak_type = 'FP';--Foreldrepenger
 
     cursor cur_svp_vedtak is
       select sp.trans_id, sp.versjon
-      from fk_sensitiv.fam_fp_vedtak_utbetaling fam
-      join fk_sensitiv.fam_sp_fagsak sp
+      from dvh_fam_fp.fam_fp_vedtak_utbetaling fam
+      join dvh_fam_fp.fam_sp_fagsak sp
       on fam.trans_id = sp.trans_id
       and fam.versjon != sp.versjon
       where fam.fagsak_type = 'SVP';--Svangerskapspenger
@@ -260,8 +260,8 @@ create or replace PACKAGE BODY                                                  
           end if;
         exception
           when others then
-            p_out_error_melding := sqlcode || ' ' || sqlerrm;          
-            insert into fk_sensitiv.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+            p_out_error_melding := sqlcode || ' ' || sqlerrm;
+            insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
             values(null, rec_es_vedtak.trans_id, p_out_error_melding, sysdate, 'SLETT_GAMLE_VEDTAK:ES');
             commit;
             exit;
@@ -278,8 +278,8 @@ create or replace PACKAGE BODY                                                  
           end if;
         exception
           when others then
-            p_out_error_melding := sqlcode || ' ' || sqlerrm;          
-            insert into fk_sensitiv.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+            p_out_error_melding := sqlcode || ' ' || sqlerrm;
+            insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
             values(null, rec_fp_vedtak.trans_id, p_out_error_melding, sysdate, 'SLETT_GAMLE_VEDTAK:FP');
             commit;
             exit;
@@ -296,15 +296,15 @@ create or replace PACKAGE BODY                                                  
           end if;
         exception
           when others then
-            p_out_error_melding := sqlcode || ' ' || sqlerrm;          
-            insert into fk_sensitiv.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+            p_out_error_melding := sqlcode || ' ' || sqlerrm;
+            insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
             values(null, rec_svp_vedtak.trans_id, p_out_error_melding, sysdate, 'SLETT_GAMLE_VEDTAK:SVP');
             commit;
             exit;
         end;
       end loop;
     end if;
-  end SLETT_GAMLE_VEDTAK;  
+  end SLETT_GAMLE_VEDTAK;
 
   --****************************************************************************************************
   -- NAME:     FP_ENGANGSSTONAD_XML_UTBRETT_PROC
@@ -314,8 +314,8 @@ create or replace PACKAGE BODY                                                  
   -- Version  Date           Author                  Description
   -- 0.1      29.10.2018     Helen Rong              Initial
   -- 0.2      19.12.2018     Helen Rong              Fjernet tidsbegrense for å laste inn alle data
-  --                                                 som ikke eksisterer i fk_sensitiv.FP_ENGANGSSTONAD,
-  --                                                 fra delta tabellen fk_sensitiv.lagret_vedtak.
+  --                                                 som ikke eksisterer i dvh_fam_fp.FP_ENGANGSSTONAD,
+  --                                                 fra delta tabellen dvh_fam_fp.lagret_vedtak.
   --                                                 Det er historisk prosedyre som ikke kjøres lenger.
   --****************************************************************************************************
   procedure FP_ENGANGSSTONAD_XML_UTBRETT(dummy in varchar2, p_error_melding out varchar2) as
@@ -323,8 +323,8 @@ create or replace PACKAGE BODY                                                  
     l_error_melding varchar2(1000);
     cursor cur_vedtak_engangsstonad is
       select lv.id
-      from fk_sensitiv.lagret_vedtak lv
-      left outer join fk_sensitiv.FP_ENGANGSSTONAD fe
+      from dvh_fam_fp.lagret_vedtak lv
+      left outer join dvh_fam_fp.FP_ENGANGSSTONAD fe
       on lv.id = fe.id
       --where lv.opprettet_tid > p_opprettet_tid
       where lv.opprettet_tid < to_date('20.10.2018','dd.mm.yyyy')--Tidspunktet for skift av de 2 xml-versjoner fra kilde
@@ -335,7 +335,7 @@ create or replace PACKAGE BODY                                                  
     begin
       select nvl(max(opprettet_tid),to_date('01.01.1900','dd.mm.yyyy'))
       into l_max_opprettet_tid
-      from fk_sensitiv.FP_ENGANGSSTONAD;
+      from dvh_fam_fp.FP_ENGANGSSTONAD;
     exception
       when others then
         p_error_melding := sqlcode || ' ' || sqlerrm;
@@ -347,7 +347,7 @@ create or replace PACKAGE BODY                                                  
     --Ikke stopp om det feiler tilfeldigvis
     for rec_vedtak_engangsstonad in cur_vedtak_engangsstonad loop
       begin
-        insert into fk_sensitiv.FP_ENGANGSSTONAD(id,
+        insert into dvh_fam_fp.FP_ENGANGSSTONAD(id,
                                                  fagsak_id,
                                                  behandling_id,
                                                  behandlendeEnhet,
@@ -394,7 +394,7 @@ create or replace PACKAGE BODY                                                  
               ,to_date(substr(extractValue(xmltype(xml_clob), '/*/vedtaksdato'), 1, 10), 'yyyy-mm-dd') as vedtaksdato
               ,cast(to_number(nvl(extractValue(xmltype(xml_clob), '/*/behandlingsresultat/beregningsresultat/tilkjentYtelse/beloep'), '0'), '999999.9') as decimal(7,1)) as beloep
               --,xmltype(xml_clob).getNamespace() as xml_ns_versjon
-              ,(select xmltype(xml_clob).getNamespace() from fk_sensitiv.lagret_vedtak where id = rec_vedtak_engangsstonad.id) as xml_ns_versjon--Funksjonen over fungerte ikke
+              ,(select xmltype(xml_clob).getNamespace() from dvh_fam_fp.lagret_vedtak where id = rec_vedtak_engangsstonad.id) as xml_ns_versjon--Funksjonen over fungerte ikke
               ,lagret_vedtak_type
               ,versjon
               ,opprettet_av
@@ -404,14 +404,14 @@ create or replace PACKAGE BODY                                                  
               ,kl_lagret_vedtak_type
               ,kildesystem
               ,lastet_dato
-        from fk_sensitiv.lagret_vedtak
+        from dvh_fam_fp.lagret_vedtak
         where id = rec_vedtak_engangsstonad.id;
         --dbms_output.put_line(l_create); -- Debug
         commit;
       exception
         when others then
           l_error_melding := sqlcode || ' ' || sqlerrm;
-          insert into fk_sensitiv.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+          insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
           values(null, rec_vedtak_engangsstonad.id, l_error_melding, sysdate, 'FP_ENGANGSSTONAD_XML_UTBRETT');
           commit;--Fortsett med neste rad
       end;
@@ -430,7 +430,7 @@ create or replace PACKAGE BODY                                                  
   -- Version  Date           Author                  Description
   -- 0.1      03.12.2018     Helen Rong              Initial
   -- 0.2      08.01.2019     Helen Rong              Fjernet tidsbegrense for å laste inn alle data
-  --                                                 som ikke eksisterer i fk_sensitiv.FP_ENGANGSSTONAD_DVH,
+  --                                                 som ikke eksisterer i dvh_fam_fp.FP_ENGANGSSTONAD_DVH,
   --                                                 fra tabellen fk_sensitiv.hist_vedtak_utbetaling_dvh.
   -- 0.3      16.05.2019     Helen Rong              Endret source tabellen til fam_fp_vedtak_utbetaling.
   --****************************************************************************************************
@@ -440,8 +440,8 @@ create or replace PACKAGE BODY                                                  
     l_error_melding varchar2(1000);
     cursor cur_vedtak_engangsstonad is
       select vud.trans_id
-      from fk_sensitiv.fam_fp_vedtak_utbetaling vud
-      left outer join fk_sensitiv.FP_ENGANGSSTONAD_DVH fed
+      from dvh_fam_fp.fam_fp_vedtak_utbetaling vud
+      left outer join dvh_fam_fp.FP_ENGANGSSTONAD_DVH fed
       on vud.trans_id = fed.trans_id
       where vud.fagsak_type = 'ES'--Engangsstønad
       --and vud.trans_tid > p_trans_tid
@@ -467,7 +467,7 @@ create or replace PACKAGE BODY                                                  
       --Ikke stopp om det feiler tilfeldigvis
       for rec_vedtak_engangsstonad in cur_vedtak_engangsstonad loop
         begin
-          insert into fk_sensitiv.FP_ENGANGSSTONAD_DVH(trans_id,
+          insert into dvh_fam_fp.FP_ENGANGSSTONAD_DVH(trans_id,
                                                        trans_tid,
                                                        fagsak_id,
                                                        behandling_id,
@@ -581,24 +581,24 @@ create or replace PACKAGE BODY                                                  
                  --(select xml_clob.getNamespace() from fk_sensitiv.fam_fp_vedtak_utbetaling where trans_id = rec_vedtak_engangsstonad.trans_id) as xml_ns_versjon,
                  t.kildesystem,
                  t.lastet_dato
-          FROM  FK_SENSITIV.fam_fp_vedtak_utbetaling t
+          FROM  dvh_fam_fp.fam_fp_vedtak_utbetaling t
           LEFT JOIN XMLTABLE
           (
                XMLNamespaces(
                         'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:es:v2'       AS "ns2" --2
                        ,'urn:no:nav:vedtak:felles:xml:felles:v2'                             AS "ns3" --3
                        ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:v2'          AS "ns4" --4
-                       ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:es:v2'   AS "ns5" --5 
+                       ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:es:v2'   AS "ns5" --5
                        ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:fp:v2'   AS "ns6" --6
                        ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:fp:v2'       AS "ns7" --7
                        ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'            AS "ns8" --8
                        ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:es:v2'         AS "ns9" --9
-                       ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:fp:v2'         AS "ns10"--10 
+                       ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:fp:v2'         AS "ns10"--10
                        ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                   AS "ns11"--11
                        ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                   AS "ns12"--12
-                       ,'urn:no:nav:vedtak:felles:xml:vedtak:beregningsgrunnlag:es:v2'       AS "ns13"--13 
+                       ,'urn:no:nav:vedtak:felles:xml:vedtak:beregningsgrunnlag:es:v2'       AS "ns13"--13
                        ,'urn:no:nav:vedtak:felles:xml:vedtak:beregningsgrunnlag:fp:v2'       AS "ns14"--14
-                       ,'urn:no:nav:vedtak:felles:xml:vedtak:v2'                             AS "ns15"--15 
+                       ,'urn:no:nav:vedtak:felles:xml:vedtak:v2'                             AS "ns15"--15
                        ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                     AS "ns16"--16
                        ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:fp:v2'                    AS "ns17"--17
                        ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:es:v2'              AS "ns18"--18
@@ -620,7 +620,7 @@ create or replace PACKAGE BODY                                                  
           --,FAGSAKTYPE                                 VARCHAR2(100) PATH './ns15:fagsakType'
           ,BEHANDLINGSTEMAKODE                        VARCHAR2(110) PATH './ns15:behandlingsTema/@kode'
           ,BEHANDLINGSTEMA                            VARCHAR2(300) PATH './ns15:behandlingsTema'
-          ,BEHANDLENDEENHET                           VARCHAR2(120) PATH './ns15:behandlendeEnhet'    
+          ,BEHANDLENDEENHET                           VARCHAR2(120) PATH './ns15:behandlendeEnhet'
           ,VEDTAKSRESULTAT                            VARCHAR2(120) PATH './ns15:vedtaksresultat'
           ,VEDTAKSDATO                                VARCHAR2(10)  PATH './ns15:vedtaksdato'
           ,BEREGNING_BELOEP                           VARCHAR2(19)  PATH './ns15:behandlingsresultat/ns15:beregningsresultat/ns15:tilkjentYtelse/ns12:ytelseEngangsstoenad/ns12:beloep'
@@ -648,7 +648,7 @@ create or replace PACKAGE BODY                                                  
           ,VILKAARMEDLEM_ERBRUKERBORGEREU             VARCHAR2(10)  PATH './ns15:behandlingsresultat/ns15:vurderteVilkaar/ns15:vilkaar[(@vurdert="AUTOMATISK")][(ns15:type/@kode="FP_VK_2")]/ns15:vilkaarsgrunnlag/ns8:vilkaarsgrunnlag/ns8:erBrukerBorgerAvEUEOS'
           ,OPPDRAGSID                                 VARCHAR2(30)  PATH './ns15:oppdrag/ns16:oppdragId'
           ,LINJE_ID                                   VARCHAR2(30)  PATH './ns15:oppdrag/ns18:linjeId'
-          ,FAGSYSTEM_ID                               VARCHAR2(30)  PATH './ns15:oppdrag/ns16:fagsystemId'    
+          ,FAGSYSTEM_ID                               VARCHAR2(30)  PATH './ns15:oppdrag/ns16:fagsystemId'
           ,DELYTELSE_ID                               VARCHAR2(30)  PATH './ns15:oppdrag/ns18:delytelseId'
           ,DELYTELSE_ID2                              VARCHAR2(30)  PATH './ns15:oppdrag/ns16:delytelseId'
           ) q
@@ -665,12 +665,12 @@ create or replace PACKAGE BODY                                                  
             --Fortsett med neste rad
             l_feil_trans_id := rec_vedtak_engangsstonad.trans_id;
             l_error_melding := sqlcode || ' ' || sqlerrm;
-            insert into fk_sensitiv.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+            insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
             values(null, rec_vedtak_engangsstonad.trans_id, l_error_melding, sysdate, 'ENGANGSSTONAD_DVH_XML_UTBRETT');
         end;
       end loop;
       if l_error_melding is not null then
-        insert into fk_sensitiv.fp_xml_utbrett_error(id, error_msg, opprettet_tid, kilde)
+        insert into dvh_fam_fp.fp_xml_utbrett_error(id, error_msg, opprettet_tid, kilde)
         values(l_feil_trans_id, l_error_melding, sysdate, 'PL/SQL: FP_ENGANGSSTONAD_DVH');
       end if;
       commit;--commit til slutt
@@ -688,7 +688,7 @@ create or replace PACKAGE BODY                                                  
   -- REVISION:
   -- Version  Date           Author                  Description
   -- 0.1      23.05.2019     Helen Rong              Utpakke FP xml som ligger i felles tabellen
-  --                                                 fk_sensitiv.fam_fp_vedtak_utbetaling.
+  --                                                 dvh_fam_fp.fam_fp_vedtak_utbetaling.
   --****************************************************************************************************
   procedure FP_DVH_XML_UTBRETT(dummy in varchar2, p_error_melding out varchar2) as
     l_commit number := 0;
@@ -697,8 +697,8 @@ create or replace PACKAGE BODY                                                  
     l_feil_trans_id number;
     cursor cur_vedtak_fp is
       select vud.trans_id
-      from fk_sensitiv.fam_fp_vedtak_utbetaling vud
-      left outer join fk_sensitiv.fam_fp_fagsak fed
+      from dvh_fam_fp.fam_fp_vedtak_utbetaling vud
+      left outer join dvh_fam_fp.fam_fp_fagsak fed
       on vud.trans_id = fed.trans_id
       where vud.fagsak_type = 'FP'--Foreldrepenger
       --and rownum <= 1000--Test!!!
@@ -712,7 +712,7 @@ create or replace PACKAGE BODY                                                  
       for rec_vedtak_fp in cur_vedtak_fp loop
         begin
           if l_error_melding is not null then
-            insert into fk_sensitiv.fp_xml_utbrett_error(id, error_msg, opprettet_tid, kilde)
+            insert into dvh_fam_fp.fp_xml_utbrett_error(id, error_msg, opprettet_tid, kilde)
             values(l_feil_trans_id, l_error_melding, sysdate, l_feil_kilde_navn);
             l_commit := l_commit +1;
             l_error_melding := null;
@@ -723,28 +723,28 @@ create or replace PACKAGE BODY                                                  
           --Insert utbrettede data
           --FP_FAGSAK
           begin
-            INSERT INTO FK_SENSITIV.FAM_FP_FAGSAK
+            INSERT INTO dvh_fam_fp.FAM_FP_FAGSAK
             (
-               TRANS_ID	               
-              ,TRANS_TID	              
-              ,VEDTAK_ID	              
-              ,FUNKSJONELL_TID         
-              ,FAGSAK_ID               
-              ,BEHANDLINGS_ID          
-              ,FAGSAKANNENFORELDER_ID  
-              ,FAGSAK_TYPE             
-              ,TEMA                    
-              ,TEMA_KODEVERK           
-              ,BEHANDLINGSTEMA         
+               TRANS_ID
+              ,TRANS_TID
+              ,VEDTAK_ID
+              ,FUNKSJONELL_TID
+              ,FAGSAK_ID
+              ,BEHANDLINGS_ID
+              ,FAGSAKANNENFORELDER_ID
+              ,FAGSAK_TYPE
+              ,TEMA
+              ,TEMA_KODEVERK
+              ,BEHANDLINGSTEMA
               ,BEHANDLINGSTEMA_KODEVERK
-              ,SOEKNADSDATO            
-              ,VEDTAKSDATO             
-              ,BEHANDLENDEENHET        
-              ,VEDTAKSRESULTAT         
-              ,BEHANDLINGSRESULTAT     
-              ,BEHANDLINGSTYPE         
-              ,KILDESYSTEM             
-              ,LASTET_DATO             
+              ,SOEKNADSDATO
+              ,VEDTAKSDATO
+              ,BEHANDLENDEENHET
+              ,VEDTAKSRESULTAT
+              ,BEHANDLINGSRESULTAT
+              ,BEHANDLINGSTYPE
+              ,KILDESYSTEM
+              ,LASTET_DATO
             )
             SELECT   t.TRANS_ID
                     ,t.TRANS_TID
@@ -757,7 +757,7 @@ create or replace PACKAGE BODY                                                  
                     ,q.TEMA
                     ,q.TEMA_KODEVERK
                     ,q.BEHANDLINGSTEMA
-                    ,q.BEHANDLINGSTEMA_KODEVERK 
+                    ,q.BEHANDLINGSTEMA_KODEVERK
                     ,to_date(q.SOEKNADSDATO,'YYYY-MM-DD')
                     ,to_date(q.VEDTAKSDATO,'YYYY-MM-DD')
                     ,q.BEHANDLENDEENHET
@@ -766,23 +766,23 @@ create or replace PACKAGE BODY                                                  
                     ,q.BEHANDLINGSTYPE
                     ,t.kildesystem
                     ,t.lastet_dato
-            FROM FK_SENSITIV.fam_fp_vedtak_utbetaling t,
+            FROM dvh_fam_fp.fam_fp_vedtak_utbetaling t,
             XMLTABLE
             (
                XMLNamespaces
-               (                    
+               (
                             'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:es:v2'          AS "ns2" --2
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:es:v2'      AS "ns3" --3
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:fp:v2'      AS "ns4" --4
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:fp:v2'          AS "ns5" --5
                            ,'urn:no:nav:vedtak:felles:xml:felles:v2'                                AS "ns6" --6
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:v2'             AS "ns7" --7
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8  
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:es:v2'            AS "ns9" --9
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:fp:v2'            AS "ns10"--10
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                      AS "ns11"--11
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                      AS "ns12"--12
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13   
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:es:v2'                 AS "ns14"--14
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:fp:v2'                 AS "ns15"--15
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:fp:v2'                       AS "ns16"--16
@@ -792,21 +792,21 @@ create or replace PACKAGE BODY                                                  
                )
                ,'/ns19:vedtak'
                PASSING t.XML_CLOB
-               COLUMNS            
+               COLUMNS
                  FAGSAK_ID                   NUMBER(19,0)       PATH './ns19:fagsakId'
                 ,BEHANDLINGS_ID              NUMBER(19,0)       PATH './ns19:behandlingsresultat/ns19:behandlingsId'
-                ,FAGSAKANNENFORELDER_ID      VARCHAR2(100 CHAR) PATH './ns19:fagsakAnnenForelderId' 
-                ,FAGSAK_TYPE                 VARCHAR2(100 CHAR) PATH './ns19:fagsakType'  
+                ,FAGSAKANNENFORELDER_ID      VARCHAR2(100 CHAR) PATH './ns19:fagsakAnnenForelderId'
+                ,FAGSAK_TYPE                 VARCHAR2(100 CHAR) PATH './ns19:fagsakType'
                 ,TEMA                        VARCHAR2(100 CHAR) PATH './ns19:tema/@kode'
-                ,TEMA_KODEVERK               VARCHAR2(100 CHAR) PATH './ns19:tema/@kodeverk' 
+                ,TEMA_KODEVERK               VARCHAR2(100 CHAR) PATH './ns19:tema/@kodeverk'
                 ,BEHANDLINGSTEMA             VARCHAR2(100 CHAR) PATH './ns19:behandlingsTema/@kode'
                 ,BEHANDLINGSTEMA_KODEVERK    VARCHAR2(100 CHAR) PATH './ns19:behandlingsTema/@kodeverk'
                 ,SOEKNADSDATO                VARCHAR2(100 CHAR) PATH './ns19:soeknadsdato'
-                ,VEDTAKSDATO                 VARCHAR2(100 CHAR) PATH './ns19:vedtaksdato' 
-                ,BEHANDLENDEENHET            VARCHAR2(100 CHAR) PATH './ns19:behandlendeEnhet' 
-                ,VEDTAKSRESULTAT             VARCHAR2(100 CHAR) PATH './ns19:vedtaksresultat' 
+                ,VEDTAKSDATO                 VARCHAR2(100 CHAR) PATH './ns19:vedtaksdato'
+                ,BEHANDLENDEENHET            VARCHAR2(100 CHAR) PATH './ns19:behandlendeEnhet'
+                ,VEDTAKSRESULTAT             VARCHAR2(100 CHAR) PATH './ns19:vedtaksresultat'
                 ,BEHANDLINGSRESULTAT         VARCHAR2(100 CHAR) PATH './ns19:behandlingsresultat/ns19:behandlingsresultat/@kode'
-                ,BEHANDLINGSTYPE             VARCHAR2(100 CHAR) PATH './ns19:behandlingsresultat/ns19:behandlingstype'       
+                ,BEHANDLINGSTYPE             VARCHAR2(100 CHAR) PATH './ns19:behandlingsresultat/ns19:behandlingstype'
             ) q
             where t.trans_id = rec_vedtak_fp.trans_id;
           exception
@@ -819,19 +819,19 @@ create or replace PACKAGE BODY                                                  
 
           --FAM_FP_ADRESSE
           begin
-            INSERT INTO  FK_SENSITIV.FAM_FP_ADRESSE
+            INSERT INTO  dvh_fam_fp.FAM_FP_ADRESSE
             (
-               TRANS_ID	      
+               TRANS_ID
               ,TRANS_TID
-              ,VEDTAK_ID	     
+              ,VEDTAK_ID
               ,FUNKSJONELL_TID
-              ,FAGSAK_ID      
-              ,BEHANDLINGS_ID 
-              ,ADRESSE_TYPE   
-              ,POSTNUMMER     
-              ,LAND           
-              ,KILDESYSTEM    
-              ,LASTET_DATO    
+              ,FAGSAK_ID
+              ,BEHANDLINGS_ID
+              ,ADRESSE_TYPE
+              ,POSTNUMMER
+              ,LAND
+              ,KILDESYSTEM
+              ,LASTET_DATO
             )
             SELECT   t.TRANS_ID
                     ,t.TRANS_TID
@@ -844,63 +844,63 @@ create or replace PACKAGE BODY                                                  
                     ,b.LAND
                     ,t.kildesystem
                     ,t.lastet_dato
-            FROM FK_SENSITIV.fam_fp_vedtak_utbetaling t,     
+            FROM dvh_fam_fp.fam_fp_vedtak_utbetaling t,
             XMLTABLE
             (
               XMLNamespaces
-              (                                    
+              (
                  'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:es:v2'          AS "ns2" --2
                 ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:es:v2'      AS "ns3" --3
                 ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:fp:v2'      AS "ns4" --4
                 ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:fp:v2'          AS "ns5" --5
                 ,'urn:no:nav:vedtak:felles:xml:felles:v2'                                AS "ns6" --6
                 ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:v2'             AS "ns7" --7
-                ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8  
+                ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8
                 ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:es:v2'            AS "ns9" --9
                 ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:fp:v2'            AS "ns10"--10
                 ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                      AS "ns11"--11
                 ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                      AS "ns12"--12
-                ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13   
+                ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13
                 ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:es:v2'                 AS "ns14"--14
                 ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:fp:v2'                 AS "ns15"--15
                 ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:fp:v2'                       AS "ns16"--16
                 ,'urn:no:nav:vedtak:felles:xml:vedtak:beregningsgrunnlag:es:v2'          AS "ns17"--17
                 ,'urn:no:nav:vedtak:felles:xml:vedtak:beregningsgrunnlag:fp:v2'          AS "ns18"--18
-                ,'urn:no:nav:vedtak:felles:xml:vedtak:v2'                                AS "ns19"--19                                                  
+                ,'urn:no:nav:vedtak:felles:xml:vedtak:v2'                                AS "ns19"--19
               )
               ,'/ns19:vedtak'
               PASSING t.XML_CLOB
-              COLUMNS             
-                FAGSAK_ID               NUMBER(19,0)  PATH './ns19:fagsakId' 
+              COLUMNS
+                FAGSAK_ID               NUMBER(19,0)  PATH './ns19:fagsakId'
                ,BEHANDLINGS_ID          NUMBER(19,0)  PATH './ns19:behandlingsresultat/ns19:behandlingsId'
-               ,ADRESSE                 XMLTYPE       PATH './ns19:personOpplysninger/ns4:PersonopplysningerDvhForeldrepenger/ns4:adresse'        
+               ,ADRESSE                 XMLTYPE       PATH './ns19:personOpplysninger/ns4:PersonopplysningerDvhForeldrepenger/ns4:adresse'
             ) q,
             XMLTABLE
             (
               XMLNamespaces
-              (                               
+              (
                  'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:es:v2'          AS "ns2" --2
                 ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:es:v2'      AS "ns3" --3
                 ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:fp:v2'      AS "ns4" --4
                 ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:fp:v2'          AS "ns5" --5
                 ,'urn:no:nav:vedtak:felles:xml:felles:v2'                                AS "ns6" --6
                 ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:v2'             AS "ns7" --7
-                ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8  
+                ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8
                 ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:es:v2'            AS "ns9" --9
                 ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:fp:v2'            AS "ns10"--10
                 ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                      AS "ns11"--11
                 ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                      AS "ns12"--12
-                ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13   
+                ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13
                 ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:es:v2'                 AS "ns14"--14
                 ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:fp:v2'                 AS "ns15"--15
                 ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:fp:v2'                       AS "ns16"--16
                 ,'urn:no:nav:vedtak:felles:xml:vedtak:beregningsgrunnlag:es:v2'          AS "ns17"--17
                 ,'urn:no:nav:vedtak:felles:xml:vedtak:beregningsgrunnlag:fp:v2'          AS "ns18"--18
-                ,'urn:no:nav:vedtak:felles:xml:vedtak:v2'                                AS "ns19"--19    
+                ,'urn:no:nav:vedtak:felles:xml:vedtak:v2'                                AS "ns19"--19
               )
               ,'ns4:adresse'
               PASSING q.ADRESSE
-              COLUMNS   
+              COLUMNS
                 ADRESSE_TYPE            VARCHAR2(100) PATH 'ns4:adressetype/@kode'
                ,POSTNUMMER              VARCHAR2(100) PATH 'ns4:postnummer'
                ,LAND                    VARCHAR2(100) PATH 'ns4:land'
@@ -916,24 +916,24 @@ create or replace PACKAGE BODY                                                  
 
           --FAM_FP_PERSONOPPLYSNINGER
           begin
-            INSERT INTO FK_SENSITIV.FAM_FP_PERSONOPPLYSNINGER
+            INSERT INTO dvh_fam_fp.FAM_FP_PERSONOPPLYSNINGER
             (
-               TRANS_ID	              
-              ,TRANS_TID	             
-              ,VEDTAK_ID	             
-              ,FUNKSJONELL_TID        
-              ,FAGSAK_ID              
-              ,BEHANDLINGS_ID         
-              ,AKTOER_ID              
-              ,REGION                 
-              ,KJONN                  
-              ,STATSBORGERSKAP        
-              ,SIVILSTAND             
-              ,FOEDSELSDATO           
-              ,PERSONSTATUS           
+               TRANS_ID
+              ,TRANS_TID
+              ,VEDTAK_ID
+              ,FUNKSJONELL_TID
+              ,FAGSAK_ID
+              ,BEHANDLINGS_ID
+              ,AKTOER_ID
+              ,REGION
+              ,KJONN
+              ,STATSBORGERSKAP
+              ,SIVILSTAND
+              ,FOEDSELSDATO
+              ,PERSONSTATUS
               ,ANNENFORELDER_AKTOER_ID
-              ,KILDESYSTEM            
-              ,LASTET_DATO             
+              ,KILDESYSTEM
+              ,LASTET_DATO
             )
             SELECT   t.TRANS_ID
                     ,t.TRANS_TID
@@ -947,27 +947,27 @@ create or replace PACKAGE BODY                                                  
                     ,q.STATSBORGERSKAP
                     ,q.SIVILSTAND
                     ,to_date(q.FOEDSELSDATO,'YYYY-MM-DD')
-                    ,q.PERSONSTATUS        
-                    ,q.ANNENFORELDER_AKTOER_ID    
+                    ,q.PERSONSTATUS
+                    ,q.ANNENFORELDER_AKTOER_ID
                     ,t.kildesystem
                     ,t.lastet_dato
-            FROM FK_SENSITIV.fam_fp_vedtak_utbetaling t,          
+            FROM dvh_fam_fp.fam_fp_vedtak_utbetaling t,
             XMLTABLE
             (
               XMLNamespaces
-              (                  
+              (
                  'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:es:v2'          AS "ns2" --2
                 ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:es:v2'      AS "ns3" --3
                 ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:fp:v2'      AS "ns4" --4
                 ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:fp:v2'          AS "ns5" --5
                 ,'urn:no:nav:vedtak:felles:xml:felles:v2'                                AS "ns6" --6
                 ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:v2'             AS "ns7" --7
-                ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8  
+                ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8
                 ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:es:v2'            AS "ns9" --9
                 ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:fp:v2'            AS "ns10"--10
                 ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                      AS "ns11"--11
                 ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                      AS "ns12"--12
-                ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13   
+                ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13
                 ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:es:v2'                 AS "ns14"--14
                 ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:fp:v2'                 AS "ns15"--15
                 ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:fp:v2'                       AS "ns16"--16
@@ -977,8 +977,8 @@ create or replace PACKAGE BODY                                                  
                )
                ,'/ns19:vedtak'
                PASSING t.XML_CLOB
-               COLUMNS        
-                FAGSAK_ID                  NUMBER(19,0)       PATH './ns19:fagsakId' 
+               COLUMNS
+                FAGSAK_ID                  NUMBER(19,0)       PATH './ns19:fagsakId'
                ,BEHANDLINGS_ID             NUMBER(19,0)       PATH './ns19:behandlingsresultat/ns19:behandlingsId'
                ,AKTOER_ID                  VARCHAR2(50 CHAR)  PATH './ns19:personOpplysninger/ns4:PersonopplysningerDvhForeldrepenger/ns4:bruker/ns7:aktoerId'
                ,REGION                     VARCHAR2(100 CHAR) PATH './ns19:personOpplysninger/ns4:PersonopplysningerDvhForeldrepenger/ns4:bruker/ns7:region'
@@ -987,7 +987,7 @@ create or replace PACKAGE BODY                                                  
                ,SIVILSTAND                 VARCHAR2(100 CHAR) PATH './ns19:personOpplysninger/ns4:PersonopplysningerDvhForeldrepenger/ns4:bruker/ns7:sivilstand/@kode'
                ,FOEDSELSDATO               VARCHAR2(200 CHAR) PATH './ns19:personOpplysninger/ns4:PersonopplysningerDvhForeldrepenger/ns4:bruker/ns7:foedselsdato'
                ,PERSONSTATUS               VARCHAR2(100 CHAR) PATH './ns19:personOpplysninger/ns4:PersonopplysningerDvhForeldrepenger/ns4:bruker/ns7:personstatus/@kode'
-               ,ANNENFORELDER_AKTOER_ID    VARCHAR2(50 CHAR)  PATH './ns19:personOpplysninger/ns4:PersonopplysningerDvhForeldrepenger/ns4:annenForelder/ns4:aktoerId'    
+               ,ANNENFORELDER_AKTOER_ID    VARCHAR2(50 CHAR)  PATH './ns19:personOpplysninger/ns4:PersonopplysningerDvhForeldrepenger/ns4:annenForelder/ns4:aktoerId'
             ) q
             where t.trans_id = rec_vedtak_fp.trans_id;
           exception
@@ -1000,24 +1000,24 @@ create or replace PACKAGE BODY                                                  
 
           --FAM_FP_FAMILIEHENDELSE
           begin
-            INSERT INTO FK_SENSITIV.FAM_FP_FAMILIEHENDELSE
+            INSERT INTO dvh_fam_fp.FAM_FP_FAMILIEHENDELSE
             (
-               TRANS_ID	      
-              ,TRANS_TID	     
-              ,VEDTAK_ID	     
+               TRANS_ID
+              ,TRANS_TID
+              ,VEDTAK_ID
               ,FUNKSJONELL_TID
-              ,FAGSAK_ID      
-              ,BEHANDLINGS_ID 
-              ,RELASJON       
-              ,TIL_AKTOER_ID  
-              ,KJOENN         
+              ,FAGSAK_ID
+              ,BEHANDLINGS_ID
+              ,RELASJON
+              ,TIL_AKTOER_ID
+              ,KJOENN
               ,STATSBORGERSKAP
-              ,PERSONSTATUS   
-              ,REGION         
-              ,SIVILSTAND     
-              ,FOEDSELSDATO   
-              ,KILDESYSTEM    
-              ,LASTET_DATO    
+              ,PERSONSTATUS
+              ,REGION
+              ,SIVILSTAND
+              ,FOEDSELSDATO
+              ,KILDESYSTEM
+              ,LASTET_DATO
             )
             SELECT
                  t.TRANS_ID
@@ -1026,73 +1026,73 @@ create or replace PACKAGE BODY                                                  
                 ,t.FUNKSJONELL_TID
                 ,q.FAGSAK_ID
                 ,q.BEHANDLINGS_ID
-                ,a.RELASJON               
-                ,a.TIL_AKTOER_ID        
-                ,a.KJOENN                 
-                ,a.STATSBORGERSKAP       
-                ,a.PERSONSTATUS          
-                ,a.REGION               
-                ,a.SIVILSTAND     
+                ,a.RELASJON
+                ,a.TIL_AKTOER_ID
+                ,a.KJOENN
+                ,a.STATSBORGERSKAP
+                ,a.PERSONSTATUS
+                ,a.REGION
+                ,a.SIVILSTAND
                 ,to_date(a.FOEDSELSDATO,'YYYY-MM-DD')
                 ,t.kildesystem
                 ,t.lastet_dato
-            FROM FK_SENSITIV.fam_fp_vedtak_utbetaling t,       
+            FROM dvh_fam_fp.fam_fp_vedtak_utbetaling t,
             XMLTABLE
             (
                XMLNamespaces
-               (                   
+               (
                   'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:es:v2'          AS "ns2" --2
                  ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:es:v2'      AS "ns3" --3
                  ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:fp:v2'      AS "ns4" --4
                  ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:fp:v2'          AS "ns5" --5
                  ,'urn:no:nav:vedtak:felles:xml:felles:v2'                                AS "ns6" --6
                  ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:v2'             AS "ns7" --7
-               ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8  
+               ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8
                  ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:es:v2'            AS "ns9" --9
                  ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:fp:v2'            AS "ns10"--10
                  ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                      AS "ns11"--11
                  ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                      AS "ns12"--12
-                 ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13   
+                 ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13
                  ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:es:v2'                 AS "ns14"--14
                  ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:fp:v2'                 AS "ns15"--15
                  ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:fp:v2'                       AS "ns16"--16
                  ,'urn:no:nav:vedtak:felles:xml:vedtak:beregningsgrunnlag:es:v2'          AS "ns17"--17
                  ,'urn:no:nav:vedtak:felles:xml:vedtak:beregningsgrunnlag:fp:v2'          AS "ns18"--18
-                 ,'urn:no:nav:vedtak:felles:xml:vedtak:v2'                                AS "ns19"--19  
+                 ,'urn:no:nav:vedtak:felles:xml:vedtak:v2'                                AS "ns19"--19
                )
                ,'/ns19:vedtak'
                PASSING t.XML_CLOB
-               COLUMNS        
+               COLUMNS
                FAGSAK_ID                    NUMBER(19,0) PATH './ns19:fagsakId'
               ,BEHANDLINGS_ID               NUMBER(19,0) PATH './ns19:behandlingsresultat/ns19:behandlingsId'
               ,FAMILIERELASJON              XMLTYPE      PATH  './ns19:personOpplysninger/ns4:PersonopplysningerDvhForeldrepenger/ns4:familierelasjoner/ns4:familierelasjon'
-            ) q,       
+            ) q,
             XMLTABLE
             (
               XMLNamespaces
-              (                               
+              (
                   'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:es:v2'          AS "ns2" --2
                  ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:es:v2'      AS "ns3" --3
                  ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:fp:v2'      AS "ns4" --4
                  ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:fp:v2'          AS "ns5" --5
                  ,'urn:no:nav:vedtak:felles:xml:felles:v2'                                AS "ns6" --6
                  ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:v2'             AS "ns7" --7
-                 ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8  
+                 ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8
                  ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:es:v2'            AS "ns9" --9
                  ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:fp:v2'            AS "ns10"--10
                  ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                      AS "ns11"--11
                  ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                      AS "ns12"--12
-                 ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13   
+                 ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13
                  ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:es:v2'                 AS "ns14"--14
                  ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:fp:v2'                 AS "ns15"--15
                  ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:fp:v2'                       AS "ns16"--16
                  ,'urn:no:nav:vedtak:felles:xml:vedtak:beregningsgrunnlag:es:v2'          AS "ns17"--17
                  ,'urn:no:nav:vedtak:felles:xml:vedtak:beregningsgrunnlag:fp:v2'          AS "ns18"--18
-                 ,'urn:no:nav:vedtak:felles:xml:vedtak:v2'                                AS "ns19"--19 
+                 ,'urn:no:nav:vedtak:felles:xml:vedtak:v2'                                AS "ns19"--19
               )
               ,'ns4:familierelasjon'
               PASSING q.FAMILIERELASJON
-              COLUMNS      
+              COLUMNS
                RELASJON               VARCHAR2(100 CHAR) PATH 'ns7:relasjon/@kode'
               ,TIL_AKTOER_ID          VARCHAR2(100 CHAR) PATH 'ns4:tilPerson/ns7:aktoerId'
               ,KJOENN                 VARCHAR2(100 CHAR) PATH 'ns4:tilPerson/ns7:kjoenn'
@@ -1113,21 +1113,21 @@ create or replace PACKAGE BODY                                                  
 
           --FAM_FP_UTTAK_FP_KONTOER
           begin
-            INSERT INTO  FK_SENSITIV.FAM_FP_UTTAK_FP_KONTOER
+            INSERT INTO  dvh_fam_fp.FAM_FP_UTTAK_FP_KONTOER
             (
-               TRANS_ID	                
-              ,TRANS_TID	               
-              ,VEDTAK_ID	               
-              ,FUNKSJONELL_TID          
-              ,FAGSAK_ID                
-              ,BEHANDLINGS_ID           
+               TRANS_ID
+              ,TRANS_TID
+              ,VEDTAK_ID
+              ,FUNKSJONELL_TID
+              ,FAGSAK_ID
+              ,BEHANDLINGS_ID
               ,FOERSTE_LOVLIGE_UTTAKSDAG
-              ,STOENADSKONTOTYPE        
-              ,MAX_DAGER                
-              ,KILDESYSTEM              
-              ,LASTET_DATO              
+              ,STOENADSKONTOTYPE
+              ,MAX_DAGER
+              ,KILDESYSTEM
+              ,LASTET_DATO
             )
-            SELECT 
+            SELECT
                     t.TRANS_ID
                    ,t.TRANS_TID
                    ,t.VEDTAK_ID
@@ -1135,33 +1135,33 @@ create or replace PACKAGE BODY                                                  
                    ,q.FAGSAK_ID
                    ,q.BEHANDLINGS_ID
                    ,to_date(a.FOERSTE_LOVLIGE_UTTAKSDAG,'YYYY-MM-DD')
-                   ,b.STOENADSKONTOTYPE      
+                   ,b.STOENADSKONTOTYPE
                    ,b.MAX_DAGER
                    ,t.kildesystem
                    ,t.lastet_dato
-            FROM FK_SENSITIV.fam_fp_vedtak_utbetaling t,
+            FROM dvh_fam_fp.fam_fp_vedtak_utbetaling t,
             XMLTABLE
             (
                XMLNamespaces
-               (                   
+               (
                             'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:es:v2'          AS "ns2" --2
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:es:v2'      AS "ns3" --3
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:fp:v2'      AS "ns4" --4
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:fp:v2'          AS "ns5" --5
                            ,'urn:no:nav:vedtak:felles:xml:felles:v2'                                AS "ns6" --6
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:v2'             AS "ns7" --7
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8  
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:es:v2'            AS "ns9" --9
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:fp:v2'            AS "ns10"--10
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                      AS "ns11"--11
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                      AS "ns12"--12
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13   
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:es:v2'                 AS "ns14"--14
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:fp:v2'                 AS "ns15"--15
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:fp:v2'                       AS "ns16"--16
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:beregningsgrunnlag:es:v2'          AS "ns17"--17
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:beregningsgrunnlag:fp:v2'          AS "ns18"--18
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:v2'                                AS "ns19"--19 
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:v2'                                AS "ns19"--19
                )
                ,'/ns19:vedtak'
                PASSING t.XML_CLOB
@@ -1181,21 +1181,21 @@ create or replace PACKAGE BODY                                                  
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:fp:v2'          AS "ns5" --5
                            ,'urn:no:nav:vedtak:felles:xml:felles:v2'                                AS "ns6" --6
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:v2'             AS "ns7" --7
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8  
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:es:v2'            AS "ns9" --9
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:fp:v2'            AS "ns10"--10
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                      AS "ns11"--11
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                      AS "ns12"--12
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13   
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:es:v2'                 AS "ns14"--14
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:fp:v2'                 AS "ns15"--15
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:fp:v2'                       AS "ns16"--16
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:beregningsgrunnlag:es:v2'          AS "ns17"--17
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:beregningsgrunnlag:fp:v2'          AS "ns18"--18
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:v2'                                AS "ns19"--19     
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:v2'                                AS "ns19"--19
                )
                ,'ns19:uttak' PASSING q.UTTAK
-               COLUMNS      
+               COLUMNS
                  FOERSTE_LOVLIGE_UTTAKSDAG       VARCHAR2(200) PATH 'ns16:uttak/ns16:foersteLovligeUttaksdag'
             ) a,
             XMLTABLE
@@ -1208,22 +1208,22 @@ create or replace PACKAGE BODY                                                  
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:fp:v2'          AS "ns5" --5
                            ,'urn:no:nav:vedtak:felles:xml:felles:v2'                                AS "ns6" --6
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:v2'             AS "ns7" --7
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8  
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:es:v2'            AS "ns9" --9
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:fp:v2'            AS "ns10"--10
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                      AS "ns11"--11
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                      AS "ns12"--12
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13   
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:es:v2'                 AS "ns14"--14
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:fp:v2'                 AS "ns15"--15
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:fp:v2'                       AS "ns16"--16
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:beregningsgrunnlag:es:v2'          AS "ns17"--17
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:beregningsgrunnlag:fp:v2'          AS "ns18"--18
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:v2'                                AS "ns19"--19      
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:v2'                                AS "ns19"--19
                )
                ,'ns16:stoenadskontoer'
                PASSING q.STOENADSKONTOER
-               COLUMNS      
+               COLUMNS
                   STOENADSKONTOTYPE      VARCHAR2(100 CHAR) PATH 'ns16:stoenadskontotype'
                  ,MAX_DAGER              NUMBER(3,0)        PATH 'ns16:maxdager'
             ) b
@@ -1238,7 +1238,7 @@ create or replace PACKAGE BODY                                                  
 
           --FAM_FP_UTTAK_RES_PER_AKTIV
           begin
-            INSERT INTO FK_SENSITIV.FAM_FP_UTTAK_RES_PER_AKTIV
+            INSERT INTO dvh_fam_fp.FAM_FP_UTTAK_RES_PER_AKTIV
             (
                TRANS_ID
               ,TRANS_TID
@@ -1251,11 +1251,11 @@ create or replace PACKAGE BODY                                                  
               ,SAMTIDIG_UTTAK
               ,UTTAK_UTSETTELSE_TYPE
               ,GRADERING_INNVILGET
-              ,TREKKONTO              
-              ,TREKKDAGER             
-              ,VIRKSOMHET              
-              ,ARBEIDSTIDSPROSENT   
-              ,UTBETALINGSPROSENT 
+              ,TREKKONTO
+              ,TREKKDAGER
+              ,VIRKSOMHET
+              ,ARBEIDSTIDSPROSENT
+              ,UTBETALINGSPROSENT
               ,UTTAK_ARBEID_TYPE
               ,GRADERING
               ,GRADERINGSDAGER
@@ -1276,9 +1276,9 @@ create or replace PACKAGE BODY                                                  
                 ,b.SAMTIDIG_UTTAK
                 ,b.UTTAK_UTSETTELSE_TYPE
                 ,b.GRADERING_INNVILGET
-                ,d.TREKKONTO              
+                ,d.TREKKONTO
                 ,d.TREKKDAGER
-                ,d.VIRKSOMHET              
+                ,d.VIRKSOMHET
                 ,d.ARBEIDSTIDSPROSENT
                 ,d.UTBETALINGSPROSENT
                 ,d.UTTAK_ARBEID_TYPE
@@ -1288,7 +1288,7 @@ create or replace PACKAGE BODY                                                  
                 ,b.PERIODE_RESULTAT_AARSAK
                 ,t.kildesystem
                 ,t.lastet_dato
-            FROM FK_SENSITIV.fam_fp_vedtak_utbetaling t,
+            FROM dvh_fam_fp.fam_fp_vedtak_utbetaling t,
             XMLTABLE
             (
                XMLNamespaces
@@ -1299,22 +1299,22 @@ create or replace PACKAGE BODY                                                  
                              ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:fp:v2'          AS "ns5" --5
                              ,'urn:no:nav:vedtak:felles:xml:felles:v2'                                AS "ns6" --6
                              ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:v2'             AS "ns7" --7
-                             ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8 
+                             ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8
                              ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:es:v2'            AS "ns9" --9
                              ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:fp:v2'            AS "ns10"--10
                              ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                      AS "ns11"--11
                              ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                      AS "ns12"--12
-                             ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13  
+                             ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13
                              ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:es:v2'                 AS "ns14"--14
                              ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:fp:v2'                 AS "ns15"--15
                              ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:fp:v2'                       AS "ns16"--16
                              ,'urn:no:nav:vedtak:felles:xml:vedtak:beregningsgrunnlag:es:v2'          AS "ns17"--17
                              ,'urn:no:nav:vedtak:felles:xml:vedtak:beregningsgrunnlag:fp:v2'          AS "ns18"--18
-                             ,'urn:no:nav:vedtak:felles:xml:vedtak:v2'                                AS "ns19"--19    
+                             ,'urn:no:nav:vedtak:felles:xml:vedtak:v2'                                AS "ns19"--19
                )
                ,'/ns19:vedtak'
                PASSING t.XML_CLOB
-               COLUMNS 
+               COLUMNS
                    FAGSAK_ID                 NUMBER(19,0)  PATH 'ns19:fagsakId'
                   ,BEHANDLINGS_ID            NUMBER(19,0)  PATH 'ns19:behandlingsresultat/ns19:behandlingsId'
                   ,UTTAKSRESULTATPERIODER   XMLTYPE        PATH 'ns19:behandlingsresultat/ns19:beregningsresultat/ns19:uttak/ns16:uttak/ns16:uttaksresultatPerioder'
@@ -1329,25 +1329,25 @@ create or replace PACKAGE BODY                                                  
                              ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:fp:v2'          AS "ns5" --5
                              ,'urn:no:nav:vedtak:felles:xml:felles:v2'                                AS "ns6" --6
                              ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:v2'             AS "ns7" --7
-                             ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8 
+                             ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8
                              ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:es:v2'            AS "ns9" --9
                              ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:fp:v2'            AS "ns10"--10
                              ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                      AS "ns11"--11
                              ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                      AS "ns12"--12
-                             ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13  
+                             ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13
                              ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:es:v2'                 AS "ns14"--14
                              ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:fp:v2'                 AS "ns15"--15
                              ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:fp:v2'                       AS "ns16"--16
                              ,'urn:no:nav:vedtak:felles:xml:vedtak:beregningsgrunnlag:es:v2'          AS "ns17"--17
                              ,'urn:no:nav:vedtak:felles:xml:vedtak:beregningsgrunnlag:fp:v2'          AS "ns18"--18
-                             ,'urn:no:nav:vedtak:felles:xml:vedtak:v2'                                AS "ns19"--19     
+                             ,'urn:no:nav:vedtak:felles:xml:vedtak:v2'                                AS "ns19"--19
                )
                ,'ns16:uttaksresultatPerioder'
                PASSING a.UTTAKSRESULTATPERIODER
-               COLUMNS   
+               COLUMNS
                  GRADERING_INNVILGET       VARCHAR2(50 CHAR)  PATH 'ns16:graderingInnvilget'
                 ,PERIODE_RESULTAT_TYPE     VARCHAR2(100 CHAR) PATH 'ns16:periodeResultatType/@kode'
-                ,PERIODE_RESULTAT_AARSAK   VARCHAR2(100 CHAR) PATH 'ns16:perioderesultataarsak/@kode'   
+                ,PERIODE_RESULTAT_AARSAK   VARCHAR2(100 CHAR) PATH 'ns16:perioderesultataarsak/@kode'
                 ,FOM                       VARCHAR2(100 CHAR) PATH 'ns16:periode/ns6:fom'
                 ,TOM                       VARCHAR2(100 CHAR) PATH 'ns16:periode/ns6:tom'
                 ,SAMTIDIG_UTTAK            VARCHAR2(50 CHAR)  PATH 'ns16:samtidiguttak'
@@ -1357,29 +1357,29 @@ create or replace PACKAGE BODY                                                  
             XMLTABLE
             (
                XMLNamespaces
-               (                  
+               (
                             'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:es:v2'          AS "ns2" --2
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:es:v2'      AS "ns3" --3
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:fp:v2'      AS "ns4" --4
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:fp:v2'          AS "ns5" --5
                            ,'urn:no:nav:vedtak:felles:xml:felles:v2'                                AS "ns6" --6
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:v2'             AS "ns7" --7
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8 
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:es:v2'            AS "ns9" --9
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:fp:v2'            AS "ns10"--10
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                      AS "ns11"--11
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                      AS "ns12"--12
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13  
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:es:v2'                 AS "ns14"--14
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:fp:v2'                 AS "ns15"--15
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:fp:v2'                       AS "ns16"--16
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:beregningsgrunnlag:es:v2'          AS "ns17"--17
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:beregningsgrunnlag:fp:v2'          AS "ns18"--18
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:v2'                                AS "ns19"--19  
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:v2'                                AS "ns19"--19
                ) ,'ns16:uttaksresultatPeriodeAktiviteter'
                PASSING b.PERIODEAKTIVITETER
-               COLUMNS     
-                 TREKKONTO              VARCHAR2(100 CHAR)  PATH 'ns16:trekkkonto/@kode' 
+               COLUMNS
+                 TREKKONTO              VARCHAR2(100 CHAR)  PATH 'ns16:trekkkonto/@kode'
                 ,TREKKDAGER             NUMBER(3,0)         PATH 'ns16:trekkdager'
                 ,VIRKSOMHET             VARCHAR2(100 CHAR)  PATH 'ns16:virksomhet'
                 ,ARBEIDSTIDSPROSENT     NUMBER(5,2)         PATH 'ns16:arbeidstidsprosent'
@@ -1399,29 +1399,29 @@ create or replace PACKAGE BODY                                                  
 
           --FAM_FP_DELYTELSEID
           begin
-            INSERT INTO FK_SENSITIV.FAM_FP_DELYTELSEID
+            INSERT INTO dvh_fam_fp.FAM_FP_DELYTELSEID
             (
-               TRANS_ID	        
-              ,TRANS_TID	       
-              ,VEDTAK_ID	       
-              ,FUNKSJONELL_TID  
-              ,FAGSAK_ID        
-              ,BEHANDLINGS_ID   
-              ,DATO_VEDTAK_FOM  
-              ,DATO_VEDTAK_TOM  
-              ,LINJE_ID         
-              ,DELYTELSE_ID     
-              ,REF_DELYTELSE_ID 
-              ,UTBETALES_TIL_ID 
-              ,REFUNDERES_ID    
+               TRANS_ID
+              ,TRANS_TID
+              ,VEDTAK_ID
+              ,FUNKSJONELL_TID
+              ,FAGSAK_ID
+              ,BEHANDLINGS_ID
+              ,DATO_VEDTAK_FOM
+              ,DATO_VEDTAK_TOM
+              ,LINJE_ID
+              ,DELYTELSE_ID
+              ,REF_DELYTELSE_ID
+              ,UTBETALES_TIL_ID
+              ,REFUNDERES_ID
               ,KODE_STATUS_LINJE
-              ,DATO_STATUS_FOM  
-              ,OPPDRAG_ID       
-              ,FAGSYSTEM_ID     
-              ,KILDESYSTEM      
+              ,DATO_STATUS_FOM
+              ,OPPDRAG_ID
+              ,FAGSYSTEM_ID
+              ,KILDESYSTEM
               ,LASTET_DATO
             )
-            SELECT        
+            SELECT
                  t.TRANS_ID
                 ,t.TRANS_TID
                 ,t.VEDTAK_ID
@@ -1433,15 +1433,15 @@ create or replace PACKAGE BODY                                                  
                 ,a.LINJE_ID
                 ,a.DELYTELSE_ID
                 ,a.REF_DELYTELSE_ID
-                ,a.UTBETALES_TIL_ID    
+                ,a.UTBETALES_TIL_ID
                 ,a.REFUNDERES_ID
-                ,a.KODE_STATUS_LINJE 
+                ,a.KODE_STATUS_LINJE
                 ,to_date(a.DATO_STATUS_FOM,'YYYY-MM-DD')
                 ,c.OPPDRAG_ID
                 ,c.FAGSYSTEM_ID
                 ,t.kildesystem
                 ,t.lastet_dato
-            FROM FK_SENSITIV.fam_fp_vedtak_utbetaling t,            
+            FROM dvh_fam_fp.fam_fp_vedtak_utbetaling t,
             XMLTABLE
             (
                XMLNamespaces
@@ -1452,18 +1452,18 @@ create or replace PACKAGE BODY                                                  
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:fp:v2'          AS "ns5" --5
                            ,'urn:no:nav:vedtak:felles:xml:felles:v2'                                AS "ns6" --6
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:v2'             AS "ns7" --7
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8  
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:es:v2'            AS "ns9" --9
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:fp:v2'            AS "ns10"--10
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                      AS "ns11"--11
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                      AS "ns12"--12
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13   
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:es:v2'                 AS "ns14"--14
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:fp:v2'                 AS "ns15"--15
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:fp:v2'                       AS "ns16"--16
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:beregningsgrunnlag:es:v2'          AS "ns17"--17
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:beregningsgrunnlag:fp:v2'          AS "ns18"--18
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:v2'                                AS "ns19"--19   
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:v2'                                AS "ns19"--19
                )
                ,'/ns19:vedtak'
                PASSING t.XML_CLOB
@@ -1471,23 +1471,23 @@ create or replace PACKAGE BODY                                                  
                  FAGSAK_ID                 NUMBER(19,0)  PATH 'ns19:fagsakId'
                 ,BEHANDLINGS_ID            NUMBER(19,0)  PATH 'ns19:behandlingsresultat/ns19:behandlingsId'
                 ,UTTAKSRESULTATPERIODER   XMLTYPE        PATH 'ns19:oppdrag'
-            ) b,       
+            ) b,
             XMLTABLE
             (
                XMLNamespaces
-               (                    
+               (
                             'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:es:v2'          AS "ns2" --2
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:es:v2'      AS "ns3" --3
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:fp:v2'      AS "ns4" --4
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:fp:v2'          AS "ns5" --5
                            ,'urn:no:nav:vedtak:felles:xml:felles:v2'                                AS "ns6" --6
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:v2'             AS "ns7" --7
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8  
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:es:v2'            AS "ns9" --9
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:fp:v2'            AS "ns10"--10
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                      AS "ns11"--11
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                      AS "ns12"--12
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13   
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:es:v2'                 AS "ns14"--14
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:fp:v2'                 AS "ns15"--15
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:fp:v2'                       AS "ns16"--16
@@ -1498,27 +1498,27 @@ create or replace PACKAGE BODY                                                  
                )
                ,'ns19:oppdrag'
                PASSING b.UTTAKSRESULTATPERIODER
-               COLUMNS      
+               COLUMNS
                  OPPDRAG_ID          VARCHAR2(200) PATH 'ns13:oppdragId'
                 ,FAGSYSTEM_ID        VARCHAR2(200) PATH 'ns13:fagsystemId'
                 ,OPPDRAGSLINJE       XMLTYPE       PATH 'ns15:oppdragslinje'
-            ) c,   
+            ) c,
             XMLTABLE
             (
                XMLNamespaces
-               (                     
+               (
                             'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:es:v2'          AS "ns2" --2
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:es:v2'      AS "ns3" --3
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:fp:v2'      AS "ns4" --4
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:fp:v2'          AS "ns5" --5
                            ,'urn:no:nav:vedtak:felles:xml:felles:v2'                                AS "ns6" --6
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:v2'             AS "ns7" --7
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8  
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:es:v2'            AS "ns9" --9
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:fp:v2'            AS "ns10"--10
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                      AS "ns11"--11
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                      AS "ns12"--12
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13   
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:es:v2'                 AS "ns14"--14
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:fp:v2'                 AS "ns15"--15
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:fp:v2'                       AS "ns16"--16
@@ -1533,12 +1533,12 @@ create or replace PACKAGE BODY                                                  
                  DATO_VEDTAK_FOM          VARCHAR2(100 CHAR) PATH  'ns15:periode/ns6:fom'
                 ,DATO_VEDTAK_TOM          VARCHAR2(100 CHAR) PATH  'ns15:periode/ns6:tom'
                 ,LINJE_ID                 NUMBER(19,0)       PATH  'ns15:linjeId'
-                ,DELYTELSE_ID             NUMBER(19,0)       PATH  'ns15:delytelseId' 
+                ,DELYTELSE_ID             NUMBER(19,0)       PATH  'ns15:delytelseId'
                 ,REF_DELYTELSE_ID         NUMBER(19,0)       PATH  'ns15:ref_delytelse_id'
-                ,UTBETALES_TIL_ID         VARCHAR2(20 CHAR)  PATH  'ns15:utbetales_til_id' 
+                ,UTBETALES_TIL_ID         VARCHAR2(20 CHAR)  PATH  'ns15:utbetales_til_id'
                 ,REFUNDERES_ID            VARCHAR2(20 CHAR)  PATH  'ns15:refunderes_id'
-                ,KODE_STATUS_LINJE        VARCHAR2(10 CHAR)  PATH  'ns15:kode_status_linje' 
-                ,DATO_STATUS_FOM          VARCHAR2(100 CHAR) PATH  'ns15:status_fom'      
+                ,KODE_STATUS_LINJE        VARCHAR2(10 CHAR)  PATH  'ns15:kode_status_linje'
+                ,DATO_STATUS_FOM          VARCHAR2(100 CHAR) PATH  'ns15:status_fom'
             ) a
             where t.trans_id = rec_vedtak_fp.trans_id;
           exception
@@ -1551,22 +1551,22 @@ create or replace PACKAGE BODY                                                  
 
           --FAM_FP_BEREG_GRUNNLAGPERIODE
           begin
-            INSERT INTO FK_SENSITIV.FAM_FP_BEREG_GRUNNLAGPERIODE
+            INSERT INTO dvh_fam_fp.FAM_FP_BEREG_GRUNNLAGPERIODE
             (
-               TRANS_ID	          
-              ,TRANS_TID	         
-              ,VEDTAK_ID	         
-              ,FUNKSJONELL_TID    
-              ,FAGSAK_ID          
-              ,BEHANDLINGS_ID     
-              ,BG_PERIODE_FOM     
-              ,BRUTTO_PR_AAR      
-              ,AVKORTET_PR_AAR    
-              ,REDUSERT_PR_AAR    
-              ,DAGSATS            
-              ,DEKNINGSGRAD       
+               TRANS_ID
+              ,TRANS_TID
+              ,VEDTAK_ID
+              ,FUNKSJONELL_TID
+              ,FAGSAK_ID
+              ,BEHANDLINGS_ID
+              ,BG_PERIODE_FOM
+              ,BRUTTO_PR_AAR
+              ,AVKORTET_PR_AAR
+              ,REDUSERT_PR_AAR
+              ,DAGSATS
+              ,DEKNINGSGRAD
               ,SKJAERINGSTIDSPUNKT
-              ,KILDESYSTEM        
+              ,KILDESYSTEM
               ,LASTET_DATO
             )
             SELECT   t.TRANS_ID
@@ -1584,7 +1584,7 @@ create or replace PACKAGE BODY                                                  
                     ,to_date(d.SKJAERINGSTIDSPUNKT,'YYYY-MM-DD')
                     ,t.kildesystem
                     ,t.lastet_dato
-            FROM FK_SENSITIV.fam_fp_vedtak_utbetaling t,
+            FROM dvh_fam_fp.fam_fp_vedtak_utbetaling t,
             XMLTABLE
             (
                XMLNamespaces
@@ -1595,18 +1595,18 @@ create or replace PACKAGE BODY                                                  
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:fp:v2'          AS "ns5" --5
                            ,'urn:no:nav:vedtak:felles:xml:felles:v2'                                AS "ns6" --6
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:v2'             AS "ns7" --7
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8  
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:es:v2'            AS "ns9" --9
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:fp:v2'            AS "ns10"--10
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                      AS "ns11"--11
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                      AS "ns12"--12
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13   
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:es:v2'                 AS "ns14"--14
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:fp:v2'                 AS "ns15"--15
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:fp:v2'                       AS "ns16"--16
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:beregningsgrunnlag:es:v2'          AS "ns17"--17
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:beregningsgrunnlag:fp:v2'          AS "ns18"--18
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:v2'                                AS "ns19"--19   
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:v2'                                AS "ns19"--19
                )
                ,'/ns19:vedtak'
                PASSING t.XML_CLOB
@@ -1618,19 +1618,19 @@ create or replace PACKAGE BODY                                                  
             XMLTABLE
             (
                   XMLNamespaces
-                  (       
+                  (
                             'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:es:v2'          AS "ns2" --2
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:es:v2'      AS "ns3" --3
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:fp:v2'      AS "ns4" --4
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:fp:v2'          AS "ns5" --5
                            ,'urn:no:nav:vedtak:felles:xml:felles:v2'                                AS "ns6" --6
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:v2'             AS "ns7" --7
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8  
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:es:v2'            AS "ns9" --9
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:fp:v2'            AS "ns10"--10
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                      AS "ns11"--11
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                      AS "ns12"--12
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13   
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:es:v2'                 AS "ns14"--14
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:fp:v2'                 AS "ns15"--15
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:fp:v2'                       AS "ns16"--16
@@ -1642,7 +1642,7 @@ create or replace PACKAGE BODY                                                  
                   PASSING b.BEREGNINGSGRUNNLAG
                   COLUMNS
                     DEKNINGSGRAD                   NUMBER(19,0)       PATH 'ns18:dekningsgrad',
-                    SKJAERINGSTIDSPUNKT            VARCHAR2(100 CHAR) PATH 'ns18:skjaeringstidspunkt'  
+                    SKJAERINGSTIDSPUNKT            VARCHAR2(100 CHAR) PATH 'ns18:skjaeringstidspunkt'
                    ,BEREGNINGSGRUNNLAGPERIODE      XMLTYPE            PATH 'ns18:beregningsgrunnlagPeriode'
             ) d,
             XMLTABLE
@@ -1655,12 +1655,12 @@ create or replace PACKAGE BODY                                                  
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:fp:v2'          AS "ns5" --5
                            ,'urn:no:nav:vedtak:felles:xml:felles:v2'                                AS "ns6" --6
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:v2'             AS "ns7" --7
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8  
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:es:v2'            AS "ns9" --9
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:fp:v2'            AS "ns10"--10
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                      AS "ns11"--11
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                      AS "ns12"--12
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13   
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:es:v2'                 AS "ns14"--14
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:fp:v2'                 AS "ns15"--15
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:fp:v2'                       AS "ns16"--16
@@ -1689,7 +1689,7 @@ create or replace PACKAGE BODY                                                  
 
           --FAM_FP_TILKJENTYTELSE
           begin
-            INSERT INTO FK_SENSITIV.FAM_FP_TILKJENTYTELSE
+            INSERT INTO dvh_fam_fp.FAM_FP_TILKJENTYTELSE
             (
                TRANS_ID
               ,TRANS_TID
@@ -1711,7 +1711,7 @@ create or replace PACKAGE BODY                                                  
               ,KILDESYSTEM
               ,LASTET_DATO
             )
-            SELECT 
+            SELECT
                      t.TRANS_ID
                     ,t.TRANS_TID
                     ,t.VEDTAK_ID
@@ -1721,43 +1721,43 @@ create or replace PACKAGE BODY                                                  
                     ,q.BRUKERERMOTTAKER
                     ,to_date(q.FOM,'YYYY-MM-DD')
                     ,to_date(q.TOM,'YYYY-MM-DD')
-                    ,q.ORGNR                     
-                    ,q.ORGNAVN                   
-                    ,q.ARBEIDSFORHOLD_ID          
-                    ,q.AKTIVITETSSTATUS          
-                    ,q.INNTEKTSKATEGORI          
+                    ,q.ORGNR
+                    ,q.ORGNAVN
+                    ,q.ARBEIDSFORHOLD_ID
+                    ,q.AKTIVITETSSTATUS
+                    ,q.INNTEKTSKATEGORI
                     ,q.DAGSATS
                     ,q.STILLINGSPROSENT
                     ,q.UTBETALINGSGRAD
                     ,t.kildesystem
                     ,t.lastet_dato
-            FROM FK_SENSITIV.fam_fp_vedtak_utbetaling t,
+            FROM dvh_fam_fp.fam_fp_vedtak_utbetaling t,
             XMLTABLE
             (
                XMLNamespaces
-               (                       
+               (
                             'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:es:v2'          AS "ns2" --2
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:es:v2'      AS "ns3" --3
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:fp:v2'      AS "ns4" --4
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:fp:v2'          AS "ns5" --5
                            ,'urn:no:nav:vedtak:felles:xml:felles:v2'                                AS "ns6" --6
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:v2'             AS "ns7" --7
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8  
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:es:v2'            AS "ns9" --9
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:fp:v2'            AS "ns10"--10
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                      AS "ns11"--11
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                      AS "ns12"--12
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13   
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:es:v2'                 AS "ns14"--14
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:fp:v2'                 AS "ns15"--15
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:fp:v2'                       AS "ns16"--16
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:beregningsgrunnlag:es:v2'          AS "ns17"--17
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:beregningsgrunnlag:fp:v2'          AS "ns18"--18
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:v2'                                AS "ns19"--19   
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:v2'                                AS "ns19"--19
                )
                ,'/ns19:vedtak'
                PASSING t.XML_CLOB
-               COLUMNS        
+               COLUMNS
                  FAGSAK_ID                 NUMBER(19,0)  PATH 'ns19:fagsakId'
                 ,BEHANDLINGS_ID            NUMBER(19,0)  PATH 'ns19:behandlingsresultat/ns19:behandlingsId'
                 ,BEREGNINGSRESULTAT        XMLTYPE       PATH 'ns19:behandlingsresultat/ns19:beregningsresultat/ns19:tilkjentYtelse/ns12:YtelseForeldrepenger/ns12:beregningsresultat'
@@ -1772,12 +1772,12 @@ create or replace PACKAGE BODY                                                  
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:fp:v2'          AS "ns5" --5
                            ,'urn:no:nav:vedtak:felles:xml:felles:v2'                                AS "ns6" --6
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:v2'             AS "ns7" --7
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8  
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:es:v2'            AS "ns9" --9
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:fp:v2'            AS "ns10"--10
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                      AS "ns11"--11
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                      AS "ns12"--12
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13   
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:es:v2'                 AS "ns14"--14
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:fp:v2'                 AS "ns15"--15
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:fp:v2'                       AS "ns16"--16
@@ -1787,12 +1787,12 @@ create or replace PACKAGE BODY                                                  
                )
                ,'ns12:beregningsresultat'
                PASSING b.BEREGNINGSRESULTAT
-               COLUMNS            
+               COLUMNS
                      BRUKERERMOTTAKER         VARCHAR2(100 CHAR) PATH 'ns12:brukerErMottaker'
                     ,FOM                      VARCHAR2(100 CHAR) PATH 'ns12:periode/ns6:fom'
                     ,TOM                      VARCHAR2(100 CHAR) PATH 'ns12:periode/ns6:tom'
-                    ,ORGNR                    VARCHAR2(100 CHAR) PATH 'ns12:virksomhet/ns12:orgnr'   
-                    ,ORGNAVN                  VARCHAR2(100 CHAR) PATH 'ns12:virksomhet/ns12:navn'  
+                    ,ORGNR                    VARCHAR2(100 CHAR) PATH 'ns12:virksomhet/ns12:orgnr'
+                    ,ORGNAVN                  VARCHAR2(100 CHAR) PATH 'ns12:virksomhet/ns12:navn'
                     ,ARBEIDSFORHOLD_ID        VARCHAR2(100 CHAR) PATH 'ns12:virksomhet/ns12:arbeidsforholdid'
                     ,AKTIVITETSSTATUS         VARCHAR2(100 CHAR) PATH 'ns12:aktivitetstatus/@kode'
                     ,INNTEKTSKATEGORI         VARCHAR2(100 CHAR) PATH 'ns12:inntektskategori/@kode'
@@ -1812,7 +1812,7 @@ create or replace PACKAGE BODY                                                  
 
           --FAM_FP_FODSELTERMIN
           begin
-            INSERT INTO FK_SENSITIV.FAM_FP_FODSELTERMIN
+            INSERT INTO dvh_fam_fp.FAM_FP_FODSELTERMIN
             (
                TRANS_ID
               ,TRANS_TID
@@ -1830,7 +1830,7 @@ create or replace PACKAGE BODY                                                  
               ,KILDESYSTEM
               ,LASTET_DATO
             )
-            SELECT               
+            SELECT
                      t.TRANS_ID
                     ,t.TRANS_TID
                     ,t.VEDTAK_ID
@@ -1846,24 +1846,24 @@ create or replace PACKAGE BODY                                                  
                     ,q.EREKTEFELLES_BARN
                     ,t.kildesystem
                     ,t.lastet_dato
-            FROM FK_SENSITIV.fam_fp_vedtak_utbetaling t
-            left join       
+            FROM dvh_fam_fp.fam_fp_vedtak_utbetaling t
+            left join
             XMLTABLE
             (
                XMLNamespaces
-               (                    
+               (
                             'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:es:v2'          AS "ns2" --2
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:es:v2'      AS "ns3" --3
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:fp:v2'      AS "ns4" --4
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:fp:v2'          AS "ns5" --5
                            ,'urn:no:nav:vedtak:felles:xml:felles:v2'                                AS "ns6" --6
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:v2'             AS "ns7" --7
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8 
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:es:v2'            AS "ns9" --9
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:fp:v2'            AS "ns10"--10
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                      AS "ns11"--11
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                      AS "ns12"--12
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13  
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:es:v2'                 AS "ns14"--14
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:fp:v2'                 AS "ns15"--15
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:fp:v2'                       AS "ns16"--16
@@ -1873,7 +1873,7 @@ create or replace PACKAGE BODY                                                  
                )
                ,'/ns19:vedtak'
                PASSING t.XML_CLOB
-               COLUMNS            
+               COLUMNS
                  FAGSAK_ID                    NUMBER(19,0)         PATH './ns19:fagsakId'
                 ,BEHANDLINGS_ID               NUMBER(19,0)         PATH './ns19:behandlingsresultat/ns19:behandlingsId'
                 ,ANTALL_BARN_FOEDSEL          NUMBER(19,0)         PATH './ns19:personOpplysninger/ns4:PersonopplysningerDvhForeldrepenger/ns4:familiehendelse/ns4:foedsel/ns7:antallBarn'
@@ -1890,29 +1890,29 @@ create or replace PACKAGE BODY                                                  
             xmltable
             (
                XMLNamespaces
-               (                         
+               (
                             'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:es:v2'          AS "ns2" --2
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:es:v2'      AS "ns3" --3
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:fp:v2'      AS "ns4" --4
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:fp:v2'          AS "ns5" --5
                            ,'urn:no:nav:vedtak:felles:xml:felles:v2'                                AS "ns6" --6
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:v2'             AS "ns7" --7
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8 
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:es:v2'            AS "ns9" --9
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:fp:v2'            AS "ns10"--10
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                      AS "ns11"--11
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                      AS "ns12"--12
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13  
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:es:v2'                 AS "ns14"--14
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:fp:v2'                 AS "ns15"--15
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:fp:v2'                       AS "ns16"--16
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:beregningsgrunnlag:es:v2'          AS "ns17"--17
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:beregningsgrunnlag:fp:v2'          AS "ns18"--18
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:v2'                                AS "ns19"--19  
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:v2'                                AS "ns19"--19
                )
                ,'ns4:adopsjonsbarn'
                PASSING q.ADOPSBARN
-               COLUMNS        
+               COLUMNS
                 FOEDSELSDATO_ADOPSJON        VARCHAR2(100 CHAR)   PATH 'ns4:foedselsdato'
 
             ) a
@@ -1928,40 +1928,40 @@ create or replace PACKAGE BODY                                                  
 
           --FAM_FP_VILKAAR
           begin
-            INSERT INTO FK_SENSITIV.FAM_FP_VILKAAR
+            INSERT INTO dvh_fam_fp.FAM_FP_VILKAAR
             (
                TRANS_ID
-              ,TRANS_TID	                    
-              ,VEDTAK_ID	                    
-              ,FUNKSJONELL_TID               
-              ,FAGSAK_ID                     
-              ,BEHANDLINGS_ID                
-              ,EKTEFELLES_BARN               
-              ,SOEKERS_KJOEN                 
-              ,MANN_ADOPTERER_ALENE          
-              ,OMSORGS_OVERTAKELSESDATO      
-              ,PERSON_STATUS                 
-              ,ER_BRUKER_MEDLEM              
-              ,ER_BRUKER_BOSATT              
-              ,HAR_OPPHOLDSRETT              
-              ,HAR_LOVLIGOPPHOLD_I_NORGE     
-              ,ER_NORDISK_STATSBORGER        
-              ,ER_BORGER_AV_EU_EOS           
+              ,TRANS_TID
+              ,VEDTAK_ID
+              ,FUNKSJONELL_TID
+              ,FAGSAK_ID
+              ,BEHANDLINGS_ID
+              ,EKTEFELLES_BARN
+              ,SOEKERS_KJOEN
+              ,MANN_ADOPTERER_ALENE
+              ,OMSORGS_OVERTAKELSESDATO
+              ,PERSON_STATUS
+              ,ER_BRUKER_MEDLEM
+              ,ER_BRUKER_BOSATT
+              ,HAR_OPPHOLDSRETT
+              ,HAR_LOVLIGOPPHOLD_I_NORGE
+              ,ER_NORDISK_STATSBORGER
+              ,ER_BORGER_AV_EU_EOS
               ,PLIKTIG_ELLER_FRIVILLIG_MEDLEM
-              ,ELEKTRONISK_SOEKNAD           
-              ,SKJAERINGS_TIDSPUNKT          
-              ,SOEKNAD_MOTTAT_DATO           
-              ,BEHANDLINGS_DATO              
-              ,FOM                           
-              ,TOM                           
-              ,MAKS_MELLOM_LIGGENDE_PERIODE  
-              ,MIN_MELLOM_LIGGENDE_PERIODE   
-              ,MIN_STEANTALLDAGER_FORVENT    
-              ,MIN_STEANTALLDAGER_GODKJENT   
-              ,MIN_STEANTALLMANEDER_GODKJENT 
-              ,MIN_STEINNTEKT                
-              ,PERIODE_ANTATT_GODKJENT       
-              ,KILDESYSTEM                   
+              ,ELEKTRONISK_SOEKNAD
+              ,SKJAERINGS_TIDSPUNKT
+              ,SOEKNAD_MOTTAT_DATO
+              ,BEHANDLINGS_DATO
+              ,FOM
+              ,TOM
+              ,MAKS_MELLOM_LIGGENDE_PERIODE
+              ,MIN_MELLOM_LIGGENDE_PERIODE
+              ,MIN_STEANTALLDAGER_FORVENT
+              ,MIN_STEANTALLDAGER_GODKJENT
+              ,MIN_STEANTALLMANEDER_GODKJENT
+              ,MIN_STEINNTEKT
+              ,PERIODE_ANTATT_GODKJENT
+              ,KILDESYSTEM
               ,LASTET_DATO
             )
             SELECT   t.TRANS_ID
@@ -1974,56 +1974,56 @@ create or replace PACKAGE BODY                                                  
                     ,q.SOEKERS_KJOEN
                     ,q.MANN_ADOPTERER_ALENE
                     ,to_date(q.OMSORGS_OVERTAKELSESDATO,'YYYY-MM-DD')
-                    ,q.PERSON_STATUS                        
-                    ,q.ER_BRUKER_MEDLEM                        
-                    ,q.ER_BRUKER_BOSATT                       
-                    ,q.HAR_OPPHOLDSRETT                 
-                    ,q.HAR_LOVLIGOPPHOLD_I_NORGE          
-                    ,q.ER_NORDISK_STATSBORGER            
-                    ,q.ER_BORGER_AV_EU_EOS                
-                    ,q.PLIKTIG_ELLER_FRIVILLIG_MEDLEM               
-                    ,q.ELEKTRONISK_SOEKNAD   
+                    ,q.PERSON_STATUS
+                    ,q.ER_BRUKER_MEDLEM
+                    ,q.ER_BRUKER_BOSATT
+                    ,q.HAR_OPPHOLDSRETT
+                    ,q.HAR_LOVLIGOPPHOLD_I_NORGE
+                    ,q.ER_NORDISK_STATSBORGER
+                    ,q.ER_BORGER_AV_EU_EOS
+                    ,q.PLIKTIG_ELLER_FRIVILLIG_MEDLEM
+                    ,q.ELEKTRONISK_SOEKNAD
                     ,to_date(q.SKJAERINGS_TIDSPUNKT,'YYYY-MM-DD')
                     ,to_date(q.SOEKNAD_MOTTAT_DATO,'YYYY-MM-DD')
                    ,to_date(q.BEHANDLINGS_DATO,'YYYY-MM-DD')
                    ,to_date(q.FOM,'YYYY-MM-DD')
                    ,to_date(q.TOM,'YYYY-MM-DD')
-                   ,q.MAKS_MELLOM_LIGGENDE_PERIODE    
-                   ,q.MIN_MELLOM_LIGGENDE_PERIODE     
-                   ,q.MIN_STEANTALLDAGER_FORVENT    
-                   ,q.MIN_STEANTALLDAGER_GODKJENT    
-                   ,q.MIN_STEANTALLMANEDER_GODKJENT  
-                   ,q.MIN_STEINNTEKT                
+                   ,q.MAKS_MELLOM_LIGGENDE_PERIODE
+                   ,q.MIN_MELLOM_LIGGENDE_PERIODE
+                   ,q.MIN_STEANTALLDAGER_FORVENT
+                   ,q.MIN_STEANTALLDAGER_GODKJENT
+                   ,q.MIN_STEANTALLMANEDER_GODKJENT
+                   ,q.MIN_STEINNTEKT
                    ,q.PERIODE_ANTATT_GODKJENT
                    ,t.kildesystem
                    ,t.lastet_dato
-            FROM FK_SENSITIV.fam_fp_vedtak_utbetaling t,
+            FROM dvh_fam_fp.fam_fp_vedtak_utbetaling t,
             XMLTABLE
             (
                XMLNamespaces
-               (                         
+               (
                             'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:es:v2'          AS "ns2" --2
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:es:v2'      AS "ns3" --3
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:fp:v2'      AS "ns4" --4
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:fp:v2'          AS "ns5" --5
                            ,'urn:no:nav:vedtak:felles:xml:felles:v2'                                AS "ns6" --6
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:v2'             AS "ns7" --7
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8  
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:es:v2'            AS "ns9" --9
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:fp:v2'            AS "ns10"--10
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                      AS "ns11"--11
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                      AS "ns12"--12
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13   
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:es:v2'                 AS "ns14"--14
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:fp:v2'                 AS "ns15"--15
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:fp:v2'                       AS "ns16"--16
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:beregningsgrunnlag:es:v2'          AS "ns17"--17
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:beregningsgrunnlag:fp:v2'          AS "ns18"--18
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:v2'                                AS "ns19"--19   
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:v2'                                AS "ns19"--19
                )
                ,'/ns19:vedtak'
                PASSING t.XML_CLOB
-               COLUMNS            
+               COLUMNS
                  FAGSAK_ID                 NUMBER(19,0)  PATH 'ns19:fagsakId'
                 ,BEHANDLINGS_ID            NUMBER(19,0)  PATH 'ns19:behandlingsresultat/ns19:behandlingsId'
                 ,VILKAARSGRUNNLAG          XMLTYPE       PATH './ns19:behandlingsresultat/ns19:vurderteVilkaar/ns19:vilkaar/ns19:vilkaarsgrunnlag/ns8:vilkaarsgrunnlag'
@@ -2031,19 +2031,19 @@ create or replace PACKAGE BODY                                                  
             XMLTABLE
             (
                XMLNamespaces
-               (                     
+               (
                             'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:es:v2'          AS "ns2" --2
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:es:v2'      AS "ns3" --3
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:fp:v2'      AS "ns4" --4
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:fp:v2'          AS "ns5" --5
                            ,'urn:no:nav:vedtak:felles:xml:felles:v2'                                AS "ns6" --6
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:v2'             AS "ns7" --7
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8  
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:es:v2'            AS "ns9" --9
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:fp:v2'            AS "ns10"--10
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                      AS "ns11"--11
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                      AS "ns12"--12
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13   
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:es:v2'                 AS "ns14"--14
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:fp:v2'                 AS "ns15"--15
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:fp:v2'                       AS "ns16"--16
@@ -2052,8 +2052,8 @@ create or replace PACKAGE BODY                                                  
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:v2'                                AS "ns19"--19
                )
                ,'ns8:vilkaarsgrunnlag'
-               PASSING b.VILKAARSGRUNNLAG  
-               COLUMNS      
+               PASSING b.VILKAARSGRUNNLAG
+               COLUMNS
                     EKTEFELLES_BARN                  VARCHAR2(100 CHAR) PATH 'ns10:ektefellesBarn',
                     SOEKERS_KJOEN                    VARCHAR2(100 CHAR) PATH 'ns10:soekersKjoenn/@kode',
                     MANN_ADOPTERER_ALENE             VARCHAR2(100 CHAR) PATH 'ns10:mannAdoptererAlene',
@@ -2092,19 +2092,19 @@ create or replace PACKAGE BODY                                                  
 
           --FAM_FP_UTTAK_FORDELINGSPER
           begin
-            INSERT INTO FK_SENSITIV.FAM_FP_UTTAK_FORDELINGSPER
+            INSERT INTO dvh_fam_fp.FAM_FP_UTTAK_FORDELINGSPER
             (
-               TRANS_ID	      
-              ,TRANS_TID	     
-              ,VEDTAK_ID	     
+               TRANS_ID
+              ,TRANS_TID
+              ,VEDTAK_ID
               ,FUNKSJONELL_TID
-              ,FAGSAK_ID      
-              ,BEHANDLINGS_ID 
-              ,FOM            
-              ,TOM            
-              ,PERIODE_TYPE   
-              ,MORS_AKTIVITET 
-              ,KILDESYSTEM    
+              ,FAGSAK_ID
+              ,BEHANDLINGS_ID
+              ,FOM
+              ,TOM
+              ,PERIODE_TYPE
+              ,MORS_AKTIVITET
+              ,KILDESYSTEM
               ,LASTET_DATO
             )
             SELECT   t.TRANS_ID
@@ -2112,40 +2112,40 @@ create or replace PACKAGE BODY                                                  
                     ,t.VEDTAK_ID
                     ,t.FUNKSJONELL_TID
                     ,b.FAGSAK_ID
-                    ,b.BEHANDLINGS_ID 
+                    ,b.BEHANDLINGS_ID
                     ,to_date(q.FOM,'YYYY-MM-DD')
                     ,to_date(q.TOM,'YYYY-MM-DD')
-                    ,q.PERIODE_TYPE                
+                    ,q.PERIODE_TYPE
                     ,q.MORS_AKTIVITET
                     ,t.kildesystem
                     ,t.lastet_dato
-            FROM FK_SENSITIV.fam_fp_vedtak_utbetaling t,          
+            FROM dvh_fam_fp.fam_fp_vedtak_utbetaling t,
             XMLTABLE
             (
                XMLNamespaces
-               (                          
+               (
                             'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:es:v2'          AS "ns2" --2
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:es:v2'      AS "ns3" --3
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:fp:v2'      AS "ns4" --4
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:fp:v2'          AS "ns5" --5
                            ,'urn:no:nav:vedtak:felles:xml:felles:v2'                                AS "ns6" --6
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:v2'             AS "ns7" --7
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8  
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:es:v2'            AS "ns9" --9
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:fp:v2'            AS "ns10"--10
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                      AS "ns11"--11
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                      AS "ns12"--12
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13   
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:es:v2'                 AS "ns14"--14
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:fp:v2'                 AS "ns15"--15
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:fp:v2'                       AS "ns16"--16
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:beregningsgrunnlag:es:v2'          AS "ns17"--17
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:beregningsgrunnlag:fp:v2'          AS "ns18"--18
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:v2'                                AS "ns19"--19   
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:v2'                                AS "ns19"--19
                )
                ,'/ns19:vedtak'
                PASSING t.XML_CLOB
-               COLUMNS        
+               COLUMNS
                  FAGSAK_ID                 NUMBER(19,0)  PATH 'ns19:fagsakId'
                 ,BEHANDLINGS_ID            NUMBER(19,0)  PATH 'ns19:behandlingsresultat/ns19:behandlingsId'
                 ,FORDELINGPERIODE          XMLTYPE       PATH 'ns19:behandlingsresultat/ns19:beregningsresultat/ns19:uttak/ns16:uttak/ns16:fordelingPerioder/ns16:fordelingPeriode'
@@ -2153,19 +2153,19 @@ create or replace PACKAGE BODY                                                  
             XMLTABLE
             (
                XMLNamespaces
-               (                     
+               (
                             'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:es:v2'          AS "ns2" --2
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:es:v2'      AS "ns3" --3
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:fp:v2'      AS "ns4" --4
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:fp:v2'          AS "ns5" --5
                            ,'urn:no:nav:vedtak:felles:xml:felles:v2'                                AS "ns6" --6
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:v2'             AS "ns7" --7
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8  
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:es:v2'            AS "ns9" --9
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:fp:v2'            AS "ns10"--10
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                      AS "ns11"--11
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                      AS "ns12"--12
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13   
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:es:v2'                 AS "ns14"--14
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:fp:v2'                 AS "ns15"--15
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:fp:v2'                       AS "ns16"--16
@@ -2175,7 +2175,7 @@ create or replace PACKAGE BODY                                                  
                )
                ,'ns16:fordelingPeriode'
                PASSING b.FORDELINGPERIODE
-               COLUMNS            
+               COLUMNS
                     FOM                         VARCHAR2(100 CHAR) PATH 'ns16:periode/ns6:fom',
                     TOM                         VARCHAR2(100 CHAR) PATH 'ns16:periode/ns6:tom',
                     PERIODE_TYPE                VARCHAR2(100 CHAR) PATH 'ns16:periodetype/@kode',
@@ -2193,42 +2193,42 @@ create or replace PACKAGE BODY                                                  
 
           --FAM_FP_BEREGNINGSGRUNNLAG
           begin
-            INSERT INTO FK_SENSITIV.FAM_FP_BEREGNINGSGRUNNLAG
+            INSERT INTO dvh_fam_fp.FAM_FP_BEREGNINGSGRUNNLAG
             (
-               TRANS_ID	                    
-              ,TRANS_TID	                   
-              ,VEDTAK_ID	                   
-              ,FUNKSJONELL_TID              
-              ,FAGSAK_ID                    
-              ,BEHANDLINGS_ID               
-              ,FOM                          
-              ,TOM                          
-              ,BRUTTO                       
-              ,AVKORTET                     
-              ,REDUSERT                     
-              ,DAGSATS                      
-              ,DEKNINGSGRAD                 
-              ,SKJARINGSTIDSPUNKT           
-              ,STATUS_OG_ANDEL_FOM          
-              ,STATUS_OG_ANDEL_TOM          
-              ,AKTIVITET_STATUS             
-              ,VIRKSOMHETSNUMMER            
-              ,STATUS_OG_ANDEL_BRUTTO       
-              ,STATUS_OG_ANDEL_AVKORTET     
-              ,STATUS_OG_ANDEL_REDUSERT     
-              ,STATUS_OG_ANDEL_BEREGNET     
-              ,STATUS_OG_ANDEL_INNTEKTSKAT  
-              ,NATURALYTELSEBORTFALL        
-              ,TIL_STOETENDEYTELSE_TYPE     
-              ,TIL_STOETENDEYTELSE          
-              ,AVKORTET_BRUKERS_ANDEL       
-              ,REDUSERT_BRUKERS_ANDEL       
-              ,DAGSATS_BRUKER               
-              ,DAGSATS_ARBEIDSGIVER         
-              ,REFUSJON_MAKSIMAL            
-              ,REFUSJON_AVKORTET            
-              ,REFUSJON_REDUSERT            
-              ,KILDESYSTEM                  
+               TRANS_ID
+              ,TRANS_TID
+              ,VEDTAK_ID
+              ,FUNKSJONELL_TID
+              ,FAGSAK_ID
+              ,BEHANDLINGS_ID
+              ,FOM
+              ,TOM
+              ,BRUTTO
+              ,AVKORTET
+              ,REDUSERT
+              ,DAGSATS
+              ,DEKNINGSGRAD
+              ,SKJARINGSTIDSPUNKT
+              ,STATUS_OG_ANDEL_FOM
+              ,STATUS_OG_ANDEL_TOM
+              ,AKTIVITET_STATUS
+              ,VIRKSOMHETSNUMMER
+              ,STATUS_OG_ANDEL_BRUTTO
+              ,STATUS_OG_ANDEL_AVKORTET
+              ,STATUS_OG_ANDEL_REDUSERT
+              ,STATUS_OG_ANDEL_BEREGNET
+              ,STATUS_OG_ANDEL_INNTEKTSKAT
+              ,NATURALYTELSEBORTFALL
+              ,TIL_STOETENDEYTELSE_TYPE
+              ,TIL_STOETENDEYTELSE
+              ,AVKORTET_BRUKERS_ANDEL
+              ,REDUSERT_BRUKERS_ANDEL
+              ,DAGSATS_BRUKER
+              ,DAGSATS_ARBEIDSGIVER
+              ,REFUSJON_MAKSIMAL
+              ,REFUSJON_AVKORTET
+              ,REFUSJON_REDUSERT
+              ,KILDESYSTEM
               ,LASTET_DATO
             )
             SELECT   t.TRANS_ID
@@ -2246,14 +2246,14 @@ create or replace PACKAGE BODY                                                  
                     ,d.DEKNINGSGRAD
                     ,to_date(d.SKJAERINGSTIDSPUNKT,'YYYY-MM-DD')
                     ,to_date(c.STATUS_OG_ANDEL_FOM,'YYYY-MM-DD')
-                    ,to_date(c.STATUS_OG_ANDEL_TOM,'YYYY-MM-DD')   
+                    ,to_date(c.STATUS_OG_ANDEL_TOM,'YYYY-MM-DD')
                     ,c.AKTIVITET_STATUS
                     ,c.VIRKSOMHETSNUMMER
                     ,c.STATUS_OG_ANDEL_BRUTTO
                     ,c.STATUS_OG_ANDEL_AVKORTET
                     ,c.STATUS_OG_ANDEL_REDUSERT
                     ,c.STATUS_OG_ANDEL_BEREGNET
-                    ,c.STATUS_OG_ANDEL_INNTEKTSKAT     
+                    ,c.STATUS_OG_ANDEL_INNTEKTSKAT
                     ,c.NATURALYTELSEBORTFALL
                     ,c.TIL_STOETENDEYTELSE_TYPE
                     ,c.TIL_STOETENDEYTELSE
@@ -2266,33 +2266,33 @@ create or replace PACKAGE BODY                                                  
                     ,c.REFUSJON_REDUSERT
                     ,t.kildesystem
                     ,t.lastet_dato
-            FROM FK_SENSITIV.fam_fp_vedtak_utbetaling t,
+            FROM dvh_fam_fp.fam_fp_vedtak_utbetaling t,
             XMLTABLE
             (
                XMLNamespaces
-               (                          
+               (
                             'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:es:v2'          AS "ns2" --2
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:es:v2'      AS "ns3" --3
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:fp:v2'      AS "ns4" --4
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:fp:v2'          AS "ns5" --5
                            ,'urn:no:nav:vedtak:felles:xml:felles:v2'                                AS "ns6" --6
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:v2'             AS "ns7" --7
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8  
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:es:v2'            AS "ns9" --9
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:fp:v2'            AS "ns10"--10
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                      AS "ns11"--11
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                      AS "ns12"--12
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13   
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:es:v2'                 AS "ns14"--14
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:fp:v2'                 AS "ns15"--15
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:fp:v2'                       AS "ns16"--16
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:beregningsgrunnlag:es:v2'          AS "ns17"--17
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:beregningsgrunnlag:fp:v2'          AS "ns18"--18
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:v2'                                AS "ns19"--19   
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:v2'                                AS "ns19"--19
                )
                ,'/ns19:vedtak'
                PASSING t.XML_CLOB
-               COLUMNS        
+               COLUMNS
                  FAGSAK_ID                 NUMBER(19,0)  PATH 'ns19:fagsakId'
                 ,BEHANDLINGS_ID            NUMBER(19,0)  PATH 'ns19:behandlingsresultat/ns19:behandlingsId'
                 ,BEREGNINGSGRUNNLAG        XMLTYPE       PATH 'ns19:behandlingsresultat/ns19:beregningsresultat/ns19:beregningsgrunnlag/ns18:beregningsgrunnlag'
@@ -2301,19 +2301,19 @@ create or replace PACKAGE BODY                                                  
             XMLTABLE
             (
                XMLNamespaces
-               (                     
+               (
                             'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:es:v2'          AS "ns2" --2
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:es:v2'      AS "ns3" --3
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:fp:v2'      AS "ns4" --4
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:fp:v2'          AS "ns5" --5
                            ,'urn:no:nav:vedtak:felles:xml:felles:v2'                                AS "ns6" --6
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:v2'             AS "ns7" --7
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8  
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:es:v2'            AS "ns9" --9
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:fp:v2'            AS "ns10"--10
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                      AS "ns11"--11
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                      AS "ns12"--12
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13   
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:es:v2'                 AS "ns14"--14
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:fp:v2'                 AS "ns15"--15
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:fp:v2'                       AS "ns16"--16
@@ -2323,27 +2323,27 @@ create or replace PACKAGE BODY                                                  
                )
                ,'ns18:beregningsgrunnlag'
                PASSING b.BEREGNINGSGRUNNLAG
-               COLUMNS   
+               COLUMNS
                     DEKNINGSGRAD                   NUMBER(3,0)        PATH 'ns18:dekningsgrad',
-                    SKJAERINGSTIDSPUNKT            VARCHAR2(100 CHAR) PATH 'ns18:skjaeringstidspunkt'  
+                    SKJAERINGSTIDSPUNKT            VARCHAR2(100 CHAR) PATH 'ns18:skjaeringstidspunkt'
                    ,BEREGNINGSGRUNNLAGPERIODE      XMLTYPE            PATH 'ns18:beregningsgrunnlagPeriode'
             ) d,
             XMLTABLE
             (
                XMLNamespaces
-               (                     
+               (
                             'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:es:v2'          AS "ns2" --2
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:es:v2'      AS "ns3" --3
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:fp:v2'      AS "ns4" --4
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:fp:v2'          AS "ns5" --5
-                           ,'urn:no:nav:vedtak:felles:xml:felles:v2'                                AS "ns6" --6  
+                           ,'urn:no:nav:vedtak:felles:xml:felles:v2'                                AS "ns6" --6
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:v2'             AS "ns7" --7
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8  
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:es:v2'            AS "ns9" --9
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:fp:v2'            AS "ns10"--10
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                      AS "ns11"--11
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                      AS "ns12"--12
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13   
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:es:v2'                 AS "ns14"--14
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:fp:v2'                 AS "ns15"--15
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:fp:v2'                       AS "ns16"--16
@@ -2353,7 +2353,7 @@ create or replace PACKAGE BODY                                                  
                )
                ,'ns18:beregningsgrunnlagPeriode'
                PASSING d.BEREGNINGSGRUNNLAGPERIODE
-               COLUMNS            
+               COLUMNS
                     FOM                   VARCHAR2(100 CHAR) PATH 'ns18:periode/ns6:fom',
                     TOM                   VARCHAR2(100 CHAR) PATH 'ns18:periode/ns6:tom',
                     BRUTTO                NUMBER(19,2)       PATH 'ns18:brutto',
@@ -2366,19 +2366,19 @@ create or replace PACKAGE BODY                                                  
             XMLTABLE
             (
                XMLNamespaces
-               (                     
+               (
                             'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:es:v2'          AS "ns2" --2
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:es:v2'      AS "ns3" --3
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:fp:v2'      AS "ns4" --4
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:fp:v2'          AS "ns5" --5
-                           ,'urn:no:nav:vedtak:felles:xml:felles:v2'                                AS "ns6" --6  
+                           ,'urn:no:nav:vedtak:felles:xml:felles:v2'                                AS "ns6" --6
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:v2'             AS "ns7" --7
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8  
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:es:v2'            AS "ns9" --9
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:fp:v2'            AS "ns10"--10
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                      AS "ns11"--11
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                      AS "ns12"--12
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13   
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:es:v2'                 AS "ns14"--14
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:fp:v2'                 AS "ns15"--15
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:fp:v2'                       AS "ns16"--16
@@ -2388,26 +2388,26 @@ create or replace PACKAGE BODY                                                  
                )
                ,'ns18:beregningsgrunnlagPrStatusOgAndel'
                PASSING q.xyz
-               COLUMNS            
+               COLUMNS
                     STATUS_OG_ANDEL_FOM         VARCHAR2(100 CHAR) PATH 'ns18:periode/ns6:fom',
                     STATUS_OG_ANDEL_TOM         VARCHAR2(100 CHAR) PATH 'ns18:periode/ns6:tom',
                     AKTIVITET_STATUS            VARCHAR2(100 CHAR) PATH 'ns18:aktivitetstatus/@kode',
                     VIRKSOMHETSNUMMER           VARCHAR2(100 CHAR) PATH 'ns18:virksomhetsnummer',
-                    STATUS_OG_ANDEL_BRUTTO      NUMBER(19,2)       PATH 'ns18:brutto', 
-                    STATUS_OG_ANDEL_AVKORTET    NUMBER(19,2)       PATH 'ns18:avkortet', 
-                    STATUS_OG_ANDEL_REDUSERT    NUMBER(19,2)       PATH 'ns18:redusert',    
-                    STATUS_OG_ANDEL_BEREGNET    NUMBER(19,2)       PATH 'ns18:beregnet', 
-                    STATUS_OG_ANDEL_INNTEKTSKAT VARCHAR2(100 CHAR) PATH 'ns18:inntektskategori/@kode',       
+                    STATUS_OG_ANDEL_BRUTTO      NUMBER(19,2)       PATH 'ns18:brutto',
+                    STATUS_OG_ANDEL_AVKORTET    NUMBER(19,2)       PATH 'ns18:avkortet',
+                    STATUS_OG_ANDEL_REDUSERT    NUMBER(19,2)       PATH 'ns18:redusert',
+                    STATUS_OG_ANDEL_BEREGNET    NUMBER(19,2)       PATH 'ns18:beregnet',
+                    STATUS_OG_ANDEL_INNTEKTSKAT VARCHAR2(100 CHAR) PATH 'ns18:inntektskategori/@kode',
                     NATURALYTELSEBORTFALL       NUMBER(19,2)       PATH 'ns18:naturalytelseBortfall',
                     TIL_STOETENDEYTELSE_TYPE    VARCHAR2(100 CHAR) PATH 'ns18:tilstoetendeYtelseType',
                     TIL_STOETENDEYTELSE         NUMBER(19,2)       PATH 'ns18:tilstoetendeYtelse',
                     AVKORTET_BRUKERS_ANDEL      NUMBER(19,2)       PATH 'ns18:avkortetBrukersAndel',
                     REDUSERT_BRUKERS_ANDEL      NUMBER(19,2)       PATH 'ns18:redusertBrukersAndel',
                     DAGSATS_BRUKER              VARCHAR2(100 CHAR) PATH 'ns18:dagsatsBruker',
-                    DAGSATS_ARBEIDSGIVER        VARCHAR2(100 CHAR) PATH 'ns18:dagsatsArbeidsgiver',               
-                    REFUSJON_MAKSIMAL           NUMBER(19,2)       PATH 'ns18:refusjonTilArbeidsgiver/ns18:maksimal', 
-                    REFUSJON_AVKORTET           NUMBER(19,2)       PATH 'ns18:refusjonTilArbeidsgiver/ns18:avkortet', 
-                    REFUSJON_REDUSERT           NUMBER(19,2)       PATH 'ns18:refusjonTilArbeidsgiver/ns18:redusert'              
+                    DAGSATS_ARBEIDSGIVER        VARCHAR2(100 CHAR) PATH 'ns18:dagsatsArbeidsgiver',
+                    REFUSJON_MAKSIMAL           NUMBER(19,2)       PATH 'ns18:refusjonTilArbeidsgiver/ns18:maksimal',
+                    REFUSJON_AVKORTET           NUMBER(19,2)       PATH 'ns18:refusjonTilArbeidsgiver/ns18:avkortet',
+                    REFUSJON_REDUSERT           NUMBER(19,2)       PATH 'ns18:refusjonTilArbeidsgiver/ns18:redusert'
             ) c
             where t.trans_id = rec_vedtak_fp.trans_id;
           exception
@@ -2420,7 +2420,7 @@ create or replace PACKAGE BODY                                                  
 
           --FAM_FP_DOKUMENTASJONSPERIODER
           begin
-            INSERT INTO FK_SENSITIV.FAM_FP_DOKUMENTASJONSPERIODER(
+            INSERT INTO dvh_fam_fp.FAM_FP_DOKUMENTASJONSPERIODER(
                    TRANS_ID
                   ,TRANS_TID
                   ,VEDTAK_ID
@@ -2432,7 +2432,7 @@ create or replace PACKAGE BODY                                                  
                   ,DOKUMENTASJON_TYPE
                   ,kildesystem
                   ,lastet_dato)
-            SELECT 
+            SELECT
               t.TRANS_ID
              ,t.TRANS_TID
              ,t.VEDTAK_ID
@@ -2444,23 +2444,23 @@ create or replace PACKAGE BODY                                                  
              ,d.DOKUMENTASJON_TYPE
              ,t.kildesystem
              ,t.lastet_dato
-            FROM FK_SENSITIV.fam_fp_vedtak_utbetaling t,
+            FROM dvh_fam_fp.fam_fp_vedtak_utbetaling t,
             XMLTABLE
             (
                XMLNamespaces
-               (       
+               (
                             'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:es:v2'          AS "ns2" --2
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:es:v2'      AS "ns3" --3
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:fp:v2'      AS "ns4" --4
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:fp:v2'          AS "ns5" --5
                            ,'urn:no:nav:vedtak:felles:xml:felles:v2'                                AS "ns6" --6
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:v2'             AS "ns7" --7
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8  
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:es:v2'            AS "ns9" --9
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:fp:v2'            AS "ns10"--10
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                      AS "ns11"--11
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                      AS "ns12"--12
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13   
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:es:v2'                 AS "ns14"--14
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:fp:v2'                 AS "ns15"--15
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:fp:v2'                       AS "ns16"--16
@@ -2470,27 +2470,27 @@ create or replace PACKAGE BODY                                                  
                )
                ,'/ns19:vedtak'
                PASSING t.XML_CLOB
-               COLUMNS            
-                 FAGSAK_ID                    NUMBER(19,0)  PATH './ns19:fagsakId'    
+               COLUMNS
+                 FAGSAK_ID                    NUMBER(19,0)  PATH './ns19:fagsakId'
                 ,BEHANDLINGS_ID               NUMBER(19,0)  PATH './ns19:behandlingsresultat/ns19:behandlingsId'
                 ,DOKUMENTASJONPERIODE         XMLTYPE       PATH './ns19:personOpplysninger/ns4:PersonopplysningerDvhForeldrepenger/ns4:dokumentasjonsperioder/ns4:dokumentasjonperiode'
             ) q,
             XMLTABLE
             (
                XMLNamespaces
-               (       
+               (
                             'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:es:v2'          AS "ns2" --2
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:es:v2'      AS "ns3" --3
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:fp:v2'      AS "ns4" --4
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:fp:v2'          AS "ns5" --5
                            ,'urn:no:nav:vedtak:felles:xml:felles:v2'                                AS "ns6" --6
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:v2'             AS "ns7" --7
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8  
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:es:v2'            AS "ns9" --9
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:fp:v2'            AS "ns10"--10
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                      AS "ns11"--11
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                      AS "ns12"--12
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13   
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:es:v2'                 AS "ns14"--14
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:fp:v2'                 AS "ns15"--15
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:fp:v2'                       AS "ns16"--16
@@ -2500,10 +2500,10 @@ create or replace PACKAGE BODY                                                  
                )
                ,'ns4:dokumentasjonperiode'
                PASSING q.DOKUMENTASJONPERIODE
-               COLUMNS 
+               COLUMNS
                         FOM                          VARCHAR2(100 CHAR) PATH 'ns4:periode/ns6:fom'
                        ,TOM                          VARCHAR2(100 CHAR) PATH 'ns4:periode/ns6:tom'
-                       ,DOKUMENTASJON_TYPE           VARCHAR2(100 CHAR) PATH 'ns4:dokumentasjontype/@kode' 
+                       ,DOKUMENTASJON_TYPE           VARCHAR2(100 CHAR) PATH 'ns4:dokumentasjontype/@kode'
             ) d
             where t.trans_id = rec_vedtak_fp.trans_id;
           exception
@@ -2516,17 +2516,17 @@ create or replace PACKAGE BODY                                                  
 
           --FAM_FP_AKTIVITETSTATUS
           begin
-            INSERT INTO  FK_SENSITIV.FAM_FP_AKTIVITETSTATUS
+            INSERT INTO  dvh_fam_fp.FAM_FP_AKTIVITETSTATUS
             (
-               TRANS_ID	       
-              ,TRANS_TID	      
-              ,VEDTAK_ID	      
-              ,FUNKSJONELL_TID 
-              ,FAGSAK_ID       
-              ,BEHANDLINGS_ID  
+               TRANS_ID
+              ,TRANS_TID
+              ,VEDTAK_ID
+              ,FUNKSJONELL_TID
+              ,FAGSAK_ID
+              ,BEHANDLINGS_ID
               ,AKTIVITET_STATUS
-              ,HJEMMEL         
-              ,KILDESYSTEM     
+              ,HJEMMEL
+              ,KILDESYSTEM
               ,LASTET_DATO
             )
             SELECT   t.TRANS_ID
@@ -2535,11 +2535,11 @@ create or replace PACKAGE BODY                                                  
                     ,t.FUNKSJONELL_TID
                     ,q.FAGSAK_ID
                     ,q.BEHANDLINGS_ID
-                    ,b.AKTIVITET_STATUS                  
+                    ,b.AKTIVITET_STATUS
                     ,b.HJEMMEL
                     ,t.kildesystem
                     ,t.lastet_dato
-            FROM FK_SENSITIV.fam_fp_vedtak_utbetaling t,       
+            FROM dvh_fam_fp.fam_fp_vedtak_utbetaling t,
             XMLTABLE
             (
                XMLNamespaces
@@ -2550,12 +2550,12 @@ create or replace PACKAGE BODY                                                  
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:fp:v2'          AS "ns5" --5
                            ,'urn:no:nav:vedtak:felles:xml:felles:v2'                                AS "ns6" --6
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:v2'             AS "ns7" --7
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8  
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:es:v2'            AS "ns9" --9
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:fp:v2'            AS "ns10"--10
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                      AS "ns11"--11
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                      AS "ns12"--12
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13   
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:es:v2'                 AS "ns14"--14
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:fp:v2'                 AS "ns15"--15
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:fp:v2'                       AS "ns16"--16
@@ -2566,8 +2566,8 @@ create or replace PACKAGE BODY                                                  
                )
                ,'/ns19:vedtak'
                PASSING t.XML_CLOB
-               COLUMNS       
-                 FAGSAK_ID               NUMBER(19,0)  PATH './ns19:fagsakId' 
+               COLUMNS
+                 FAGSAK_ID               NUMBER(19,0)  PATH './ns19:fagsakId'
                 ,BEHANDLINGS_ID          NUMBER(19,0)  PATH './ns19:behandlingsresultat/ns19:behandlingsId'
                 ,AKTIVITETSTATUSER       XMLTYPE       PATH './ns19:behandlingsresultat/ns19:beregningsresultat/ns19:beregningsgrunnlag/ns18:beregningsgrunnlag/ns18:aktivitetstatuser'
 
@@ -2575,31 +2575,31 @@ create or replace PACKAGE BODY                                                  
             XMLTABLE
             (
                XMLNamespaces
-               (       
+               (
                             'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:es:v2'          AS "ns2" --2
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:es:v2'      AS "ns3" --3
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:dvh:fp:v2'      AS "ns4" --4
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:fp:v2'          AS "ns5" --5
                            ,'urn:no:nav:vedtak:felles:xml:felles:v2'                                AS "ns6" --6
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:v2'             AS "ns7" --7
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8  
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:v2'               AS "ns8" --8
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:es:v2'            AS "ns9" --9
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:vilkaarsgrunnlag:fp:v2'            AS "ns10"--10
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                      AS "ns11"--11
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                      AS "ns12"--12
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13   
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:v2'                        AS "ns13"--13
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:es:v2'                 AS "ns14"--14
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:oppdrag:dvh:fp:v2'                 AS "ns15"--15
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:fp:v2'                       AS "ns16"--16
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:beregningsgrunnlag:es:v2'          AS "ns17"--17
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:beregningsgrunnlag:fp:v2'          AS "ns18"--18
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:v2'                                AS "ns19"--19    
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:v2'                                AS "ns19"--19
                )
                ,'ns18:aktivitetstatuser'
                PASSING q.AKTIVITETSTATUSER
-               COLUMNS       
+               COLUMNS
                     AKTIVITET_STATUS           VARCHAR2(100 CHAR) PATH 'ns18:aktivitetStatus/@kode',
-                    HJEMMEL                    VARCHAR2(100 CHAR) PATH 'ns18:hjemmel/@kode'               
+                    HJEMMEL                    VARCHAR2(100 CHAR) PATH 'ns18:hjemmel/@kode'
             ) b
             where t.trans_id = rec_vedtak_fp.trans_id;
           exception
@@ -2620,13 +2620,13 @@ create or replace PACKAGE BODY                                                  
         exception
           when others then
             --Fortsett med neste rad
-            l_error_melding := sqlcode || ' ' || sqlerrm;          
-            insert into fk_sensitiv.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+            l_error_melding := sqlcode || ' ' || sqlerrm;
+            insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
             values(null, rec_vedtak_fp.trans_id, l_error_melding, sysdate, 'FP_DVH_XML_UTBRETT');
         end;
       end loop;
       if l_error_melding is not null then
-        insert into fk_sensitiv.fp_xml_utbrett_error(id, error_msg, opprettet_tid, kilde)
+        insert into dvh_fam_fp.fp_xml_utbrett_error(id, error_msg, opprettet_tid, kilde)
         values(l_feil_trans_id, l_error_melding, sysdate, l_feil_kilde_navn);
       end if;
       commit;--commit til slutt
@@ -2644,7 +2644,7 @@ create or replace PACKAGE BODY                                                  
   -- REVISION:
   -- Version  Date           Author                                 Description
   -- 0.1      23.10.2019     Helen Rong og Sohaib Khan              Utpakke SP xml som ligger i felles tabellen
-  --                                                                 fk_sensitiv.fam_fp_vedtak_utbetaling.
+  --                                                                 dvh_fam_fp.fam_fp_vedtak_utbetaling.
   --****************************************************************************************************
   procedure SP_DVH_XML_UTBRETT(dummy in varchar2, p_error_melding out varchar2) as
     l_commit number := 0;
@@ -2653,8 +2653,8 @@ create or replace PACKAGE BODY                                                  
     l_feil_trans_id number;
     cursor cur_vedtak_sp is
       select vud.trans_id
-      from fk_sensitiv.fam_fp_vedtak_utbetaling vud
-      left outer join fk_sensitiv.fam_sp_fagsak fed
+      from dvh_fam_fp.fam_fp_vedtak_utbetaling vud
+      left outer join dvh_fam_fp.fam_sp_fagsak fed
       on vud.trans_id = fed.trans_id
       where vud.fagsak_type = 'SVP'--Svangeskapspenger
       --and rownum <= 1000--Test!!!
@@ -2668,7 +2668,7 @@ create or replace PACKAGE BODY                                                  
       for rec_vedtak_sp in cur_vedtak_sp loop
         begin
           if l_error_melding is not null then
-            insert into fk_sensitiv.fp_xml_utbrett_error(id, error_msg, opprettet_tid, kilde)
+            insert into dvh_fam_fp.fp_xml_utbrett_error(id, error_msg, opprettet_tid, kilde)
             values(l_feil_trans_id, l_error_melding, sysdate, l_feil_kilde_navn);
             l_commit := l_commit +1;
             l_error_melding := null;
@@ -2679,53 +2679,53 @@ create or replace PACKAGE BODY                                                  
           --Insert utbrettede data
           --SP_FAGSAK
           begin
-            INSERT INTO FK_SENSITIV.FAM_SP_FAGSAK
+            INSERT INTO dvh_fam_fp.FAM_SP_FAGSAK
             (
-              TRANS_ID	               
-             ,TRANS_TID	              
-             ,VEDTAK_ID	              
-             ,FUNKSJONELL_TID         
-             ,FAGSAK_ID               
-             ,BEHANDLINGS_ID          
-             ,FAGSAKANNENFORELDER_ID  
-             ,FAGSAK_TYPE             
-             ,TEMA                    
-             ,TEMA_KODEVERK           
-             ,BEHANDLINGSTEMA         
+              TRANS_ID
+             ,TRANS_TID
+             ,VEDTAK_ID
+             ,FUNKSJONELL_TID
+             ,FAGSAK_ID
+             ,BEHANDLINGS_ID
+             ,FAGSAKANNENFORELDER_ID
+             ,FAGSAK_TYPE
+             ,TEMA
+             ,TEMA_KODEVERK
+             ,BEHANDLINGSTEMA
              ,BEHANDLINGSTEMA_KODEVERK
-             ,SOEKNADSDATO            
-             ,VEDTAKSDATO             
-             ,BEHANDLENDEENHET        
-             ,VEDTAKSRESULTAT         
-             ,BEHANDLINGSRESULTAT     
-             ,BEHANDLINGSTYPE         
-             ,KILDESYSTEM             
+             ,SOEKNADSDATO
+             ,VEDTAKSDATO
+             ,BEHANDLENDEENHET
+             ,VEDTAKSRESULTAT
+             ,BEHANDLINGSRESULTAT
+             ,BEHANDLINGSTYPE
+             ,KILDESYSTEM
              ,LASTET_DATO
              ,VERSJON
             )
             SELECT
-              t.TRANS_ID	                
-             ,t.TRANS_TID	               
-             ,t.VEDTAK_ID	                
-             ,t.FUNKSJONELL_TID              
-             ,q.FAGSAK_ID                   
-             ,q.BEHANDLINGS_ID               
-             ,q.FAGSAKANNENFORELDER_ID             
-             ,q.FAGSAK_TYPE                  
-             ,q.TEMA                       
-             ,q.TEMA_KODEVERK               
-             ,q.BEHANDLINGSTEMA             
-             ,q.BEHANDLINGSTEMA_KODEVERK    
-             ,to_date(q.SOEKNADSDATO,'YYYY-MM-DD') SOEKNADSDATO                
-             ,to_date(q.VEDTAKSDATO,'YYYY-MM-DD')  VEDTAKSDATO                 
-             ,q.BEHANDLENDEENHET            
-             ,q.VEDTAKSRESULTAT             
-             ,q.BEHANDLINGSRESULTAT         
-             ,q.BEHANDLINGSTYPE            
-             ,t.KILDESYSTEM                
+              t.TRANS_ID
+             ,t.TRANS_TID
+             ,t.VEDTAK_ID
+             ,t.FUNKSJONELL_TID
+             ,q.FAGSAK_ID
+             ,q.BEHANDLINGS_ID
+             ,q.FAGSAKANNENFORELDER_ID
+             ,q.FAGSAK_TYPE
+             ,q.TEMA
+             ,q.TEMA_KODEVERK
+             ,q.BEHANDLINGSTEMA
+             ,q.BEHANDLINGSTEMA_KODEVERK
+             ,to_date(q.SOEKNADSDATO,'YYYY-MM-DD') SOEKNADSDATO
+             ,to_date(q.VEDTAKSDATO,'YYYY-MM-DD')  VEDTAKSDATO
+             ,q.BEHANDLENDEENHET
+             ,q.VEDTAKSRESULTAT
+             ,q.BEHANDLINGSRESULTAT
+             ,q.BEHANDLINGSTYPE
+             ,t.KILDESYSTEM
              ,t.LASTET_DATO
              ,t.VERSJON
-            FROM FK_SENSITIV.fam_fp_vedtak_utbetaling t,  
+            FROM dvh_fam_fp.fam_fp_vedtak_utbetaling t,
                  XMLTABLE
                  (
                   XMLNamespaces(
@@ -2755,19 +2755,19 @@ create or replace PACKAGE BODY                                                  
                     )
                     ,'/ns13:vedtak'
                     PASSING t.XML_CLOB
-                    COLUMNS     
-                    FAGSAK_ID                 NUMBER (19,0) PATH './ns13:fagsakId'  
-                   ,BEHANDLINGS_ID             NUMBER(19,0) PATH './ns13:behandlingsresultat/ns13:behandlingsId'  
-                   ,FAGSAKANNENFORELDER_ID    VARCHAR2(200) PATH './ns13:fagsakAnnenForelderId'  --Finnes ikke i XML         
-                   ,FAGSAK_TYPE                  VARCHAR2 (100 CHAR)  PATH './ns13:fagsakType' 
-                   ,TEMA                       VARCHAR2(200) PATH './ns13:tema' 
-                   ,TEMA_KODEVERK               VARCHAR2(200) PATH './ns13:tema/@kodeverk' 
+                    COLUMNS
+                    FAGSAK_ID                 NUMBER (19,0) PATH './ns13:fagsakId'
+                   ,BEHANDLINGS_ID             NUMBER(19,0) PATH './ns13:behandlingsresultat/ns13:behandlingsId'
+                   ,FAGSAKANNENFORELDER_ID    VARCHAR2(200) PATH './ns13:fagsakAnnenForelderId'  --Finnes ikke i XML
+                   ,FAGSAK_TYPE                  VARCHAR2 (100 CHAR)  PATH './ns13:fagsakType'
+                   ,TEMA                       VARCHAR2(200) PATH './ns13:tema'
+                   ,TEMA_KODEVERK               VARCHAR2(200) PATH './ns13:tema/@kodeverk'
                    ,BEHANDLINGSTEMA             VARCHAR2(200) PATH './ns13:behandlingsTema'
                    ,BEHANDLINGSTEMA_KODEVERK    VARCHAR2(200) PATH './ns13:behandlingsTema/@kodeverk'
                    ,SOEKNADSDATO                VARCHAR2(200) PATH './ns13:soeknadsdato'
-                   ,VEDTAKSDATO                 VARCHAR2(200) PATH './ns13:vedtaksdato' 
-                   ,BEHANDLENDEENHET            VARCHAR2(200) PATH './ns13:behandlendeEnhet' 
-                   ,VEDTAKSRESULTAT             VARCHAR2(200) PATH './ns13:vedtaksresultat' 
+                   ,VEDTAKSDATO                 VARCHAR2(200) PATH './ns13:vedtaksdato'
+                   ,BEHANDLENDEENHET            VARCHAR2(200) PATH './ns13:behandlendeEnhet'
+                   ,VEDTAKSRESULTAT             VARCHAR2(200) PATH './ns13:vedtaksresultat'
                    ,BEHANDLINGSRESULTAT         VARCHAR2(200) PATH './ns13:behandlingsresultat/ns13:behandlingsresultat'
                    ,BEHANDLINGSTYPE            VARCHAR2(200) PATH './ns13:behandlingsresultat/ns13:behandlingstype'
                  ) q
@@ -2782,33 +2782,33 @@ create or replace PACKAGE BODY                                                  
 
           --FAM_SP_ADRESSE
           begin
-          INSERT INTO FK_SENSITIV.FAM_SP_ADRESSE 
-          (         
-            TRANS_ID	      
+          INSERT INTO dvh_fam_fp.FAM_SP_ADRESSE
+          (
+            TRANS_ID
            ,TRANS_TID
-           ,VEDTAK_ID	     
+           ,VEDTAK_ID
            ,FUNKSJONELL_TID
-           ,FAGSAK_ID      
-           ,BEHANDLINGS_ID 
-           ,ADRESSE_TYPE   
-           ,POSTNUMMER     
-           ,LAND           
-           ,KILDESYSTEM    
-           ,LASTET_DATO 
+           ,FAGSAK_ID
+           ,BEHANDLINGS_ID
+           ,ADRESSE_TYPE
+           ,POSTNUMMER
+           ,LAND
+           ,KILDESYSTEM
+           ,LASTET_DATO
           )
           SELECT
-            t.TRANS_ID	      
+            t.TRANS_ID
            ,t.TRANS_TID
-           ,t.VEDTAK_ID	     
+           ,t.VEDTAK_ID
            ,t.FUNKSJONELL_TID
-           ,q.FAGSAK_ID      
-           ,q.BEHANDLINGS_ID 
-           ,b.ADRESSE_TYPE   
-           ,b.POSTNUMMER     
-           ,b.LAND           
-           ,t.KILDESYSTEM    
+           ,q.FAGSAK_ID
+           ,q.BEHANDLINGS_ID
+           ,b.ADRESSE_TYPE
+           ,b.POSTNUMMER
+           ,b.LAND
+           ,t.KILDESYSTEM
            ,t.LASTET_DATO
-          FROM FK_SENSITIV.fam_fp_vedtak_utbetaling t
+          FROM dvh_fam_fp.fam_fp_vedtak_utbetaling t
           LEFT JOIN XMLTABLE
           (
             XMLNamespaces(
@@ -2839,7 +2839,7 @@ create or replace PACKAGE BODY                                                  
             ,'/ns13:vedtak'
             PASSING t.XML_CLOB
             COLUMNS
-            FAGSAK_ID               NUMBER (19,0) PATH './ns13:fagsakId' 
+            FAGSAK_ID               NUMBER (19,0) PATH './ns13:fagsakId'
            ,BEHANDLINGS_ID          NUMBER(19,0) PATH './ns13:behandlingsresultat/ns13:behandlingsId'
           ) q
           ON ( 1 = 1 )
@@ -2868,14 +2868,14 @@ create or replace PACKAGE BODY                                                  
                          ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                                      AS "ns21" --21
                          ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:svp:v2'                                     AS "ns22" --22
                          ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                                      AS "ns23" --23
-                         ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:svp:v2'                                      AS "ns24" --24  
+                         ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:svp:v2'                                      AS "ns24" --24
                          )
             ,'/ns13:vedtak/ns13:personOpplysninger/ns6:PersonopplysningerDvhForeldrepenger/ns6:adresse'
             PASSING t.XML_CLOB
             COLUMNS
-            ADRESSE_TYPE            VARCHAR2(200) PATH 'ns6:adressetype'    
-           ,POSTNUMMER             VARCHAR2(200) PATH 'ns6:postnummer'     
-           ,LAND                   VARCHAR2(200) PATH 'ns6:land'           
+            ADRESSE_TYPE            VARCHAR2(200) PATH 'ns6:adressetype'
+           ,POSTNUMMER             VARCHAR2(200) PATH 'ns6:postnummer'
+           ,LAND                   VARCHAR2(200) PATH 'ns6:land'
           ) b
           ON ( 1 = 1 )
           where t.trans_id = rec_vedtak_sp.trans_id;
@@ -2889,30 +2889,30 @@ create or replace PACKAGE BODY                                                  
 
           --FAM_SP_PERSONOPPLYSNINGER
           begin
-          INSERT INTO FK_SENSITIV.FAM_SP_PERSONOPPLYSNINGER
+          INSERT INTO dvh_fam_fp.FAM_SP_PERSONOPPLYSNINGER
           (
-            TRANS_ID	              
-           ,TRANS_TID	             
-           ,VEDTAK_ID	             
-           ,FUNKSJONELL_TID        
-           ,FAGSAK_ID              
-           ,BEHANDLINGS_ID         
-           ,AKTOER_ID              
-           ,REGION                 
-           ,KJONN                  
-           ,STATSBORGERSKAP        
-           ,SIVILSTAND             
-           ,FOEDSELSDATO           
-           ,PERSONSTATUS           
+            TRANS_ID
+           ,TRANS_TID
+           ,VEDTAK_ID
+           ,FUNKSJONELL_TID
+           ,FAGSAK_ID
+           ,BEHANDLINGS_ID
+           ,AKTOER_ID
+           ,REGION
+           ,KJONN
+           ,STATSBORGERSKAP
+           ,SIVILSTAND
+           ,FOEDSELSDATO
+           ,PERSONSTATUS
            ,ANNENFORELDER_AKTOER_ID
-           ,KILDESYSTEM            
+           ,KILDESYSTEM
            ,LASTET_DATO
           )
           SELECT
             t.TRANS_ID
            ,t.TRANS_TID
            ,t.VEDTAK_ID
-           ,t.FUNKSJONELL_TID 
+           ,t.FUNKSJONELL_TID
            ,q.FAGSAK_ID
            ,q.BEHANDLINGS_ID
            ,q.AKTOER_ID
@@ -2923,9 +2923,9 @@ create or replace PACKAGE BODY                                                  
            ,to_date(q.FOEDSELSDATO,'YYYY-MM-DD')  FOEDSELSDATO
            ,q.PERSONSTATUS
            ,'N/A' ANNENFORELDER_AKTOER_ID
-           ,t.KILDESYSTEM                
+           ,t.KILDESYSTEM
            ,t.LASTET_DATO
-          FROM FK_SENSITIV.fam_fp_vedtak_utbetaling t
+          FROM dvh_fam_fp.fam_fp_vedtak_utbetaling t
           LEFT JOIN XMLTABLE
           (
             XMLNamespaces(
@@ -2956,7 +2956,7 @@ create or replace PACKAGE BODY                                                  
             ,'/ns13:vedtak'
             PASSING t.XML_CLOB
             COLUMNS
-            FAGSAK_ID               NUMBER (19,0) PATH './ns13:fagsakId' 
+            FAGSAK_ID               NUMBER (19,0) PATH './ns13:fagsakId'
            ,BEHANDLINGS_ID          NUMBER(19,0)  PATH './ns13:behandlingsresultat/ns13:behandlingsId'
           ,AKTOER_ID               VARCHAR2(200) PATH './ns13:personOpplysninger/ns6:PersonopplysningerDvhForeldrepenger/ns6:bruker/ns4:aktoerId'
           ,KJONN                  VARCHAR2(200) PATH './ns13:personOpplysninger/ns6:PersonopplysningerDvhForeldrepenger/ns6:bruker/ns4:kjoenn'
@@ -2978,49 +2978,49 @@ create or replace PACKAGE BODY                                                  
 
           --FAM_SP_BEREGNINGSGRUNNLAG
           begin
-            INSERT INTO FK_SENSITIV.FAM_SP_BEREGNINGSGRUNNLAG
+            INSERT INTO dvh_fam_fp.FAM_SP_BEREGNINGSGRUNNLAG
             (
-              TRANS_ID	                    
-              ,TRANS_TID	                   
-              ,VEDTAK_ID	                   
-              ,FUNKSJONELL_TID              
-              ,FAGSAK_ID                    
-              ,BEHANDLINGS_ID               
-              ,FOM                          
-              ,TOM                          
-              ,BRUTTO                       
-              ,AVKORTET                     
-              ,REDUSERT                     
-              ,DAGSATS                      
-              ,DEKNINGSGRAD                 
-              ,SKJARINGSTIDSPUNKT           
-              ,STATUS_OG_ANDEL_FOM          
-              ,STATUS_OG_ANDEL_TOM          
-              ,AKTIVITET_STATUS             
-              ,VIRKSOMHETSNUMMER            
-              ,STATUS_OG_ANDEL_BRUTTO       
-              ,STATUS_OG_ANDEL_AVKORTET     
-              ,STATUS_OG_ANDEL_REDUSERT     
-              ,STATUS_OG_ANDEL_BEREGNET     
-              ,STATUS_OG_ANDEL_INNTEKTSKAT  
-              ,NATURALYTELSEBORTFALL        
-              ,TIL_STOETENDEYTELSE_TYPE     
-              ,TIL_STOETENDEYTELSE          
-              ,AVKORTET_BRUKERS_ANDEL       
-              ,REDUSERT_BRUKERS_ANDEL       
-              ,DAGSATS_BRUKER               
-              ,DAGSATS_ARBEIDSGIVER         
-              ,REFUSJON_MAKSIMAL            
-              ,REFUSJON_AVKORTET            
-              ,REFUSJON_REDUSERT            
-              ,KILDESYSTEM                  
+              TRANS_ID
+              ,TRANS_TID
+              ,VEDTAK_ID
+              ,FUNKSJONELL_TID
+              ,FAGSAK_ID
+              ,BEHANDLINGS_ID
+              ,FOM
+              ,TOM
+              ,BRUTTO
+              ,AVKORTET
+              ,REDUSERT
+              ,DAGSATS
+              ,DEKNINGSGRAD
+              ,SKJARINGSTIDSPUNKT
+              ,STATUS_OG_ANDEL_FOM
+              ,STATUS_OG_ANDEL_TOM
+              ,AKTIVITET_STATUS
+              ,VIRKSOMHETSNUMMER
+              ,STATUS_OG_ANDEL_BRUTTO
+              ,STATUS_OG_ANDEL_AVKORTET
+              ,STATUS_OG_ANDEL_REDUSERT
+              ,STATUS_OG_ANDEL_BEREGNET
+              ,STATUS_OG_ANDEL_INNTEKTSKAT
+              ,NATURALYTELSEBORTFALL
+              ,TIL_STOETENDEYTELSE_TYPE
+              ,TIL_STOETENDEYTELSE
+              ,AVKORTET_BRUKERS_ANDEL
+              ,REDUSERT_BRUKERS_ANDEL
+              ,DAGSATS_BRUKER
+              ,DAGSATS_ARBEIDSGIVER
+              ,REFUSJON_MAKSIMAL
+              ,REFUSJON_AVKORTET
+              ,REFUSJON_REDUSERT
+              ,KILDESYSTEM
               ,LASTET_DATO
             )
-            SELECT 
+            SELECT
               t.TRANS_ID
              ,t.TRANS_TID
              ,t.VEDTAK_ID
-             ,t.FUNKSJONELL_TID 
+             ,t.FUNKSJONELL_TID
              ,b.FAGSAK_ID
              ,b.BEHANDLINGS_ID
              ,to_date(q.FOM,'YYYY-MM-DD') FOM
@@ -3030,29 +3030,29 @@ create or replace PACKAGE BODY                                                  
              ,q.REDUSERT
              ,q.DAGSATS
              ,d.DEKNINGSGRAD
-             ,to_date(d.SKJAERINGSTIDSPUNKT,'YYYY-MM-DD') SKJARINGSTIDSPUNKT   
+             ,to_date(d.SKJAERINGSTIDSPUNKT,'YYYY-MM-DD') SKJARINGSTIDSPUNKT
              ,to_date(c.STATUS_OG_ANDEL_FOM,'YYYY-MM-DD') STATUS_OG_ANDEL_FOM
              ,to_date(c.STATUS_OG_ANDEL_FOM,'YYYY-MM-DD') STATUS_OG_ANDEL_TOM
              ,c.AKTIVITET_STATUS
              ,c.VIRKSOMHETSNUMMER
-             ,c.STATUS_OG_ANDEL_BRUTTO     
-             ,c.STATUS_OG_ANDEL_AVKORTET   
-             ,c.STATUS_OG_ANDEL_REDUSERT      
-             ,c.STATUS_OG_ANDEL_BEREGNET   
-             ,c.STATUS_OG_ANDEL_INNTEKTSKAT   
+             ,c.STATUS_OG_ANDEL_BRUTTO
+             ,c.STATUS_OG_ANDEL_AVKORTET
+             ,c.STATUS_OG_ANDEL_REDUSERT
+             ,c.STATUS_OG_ANDEL_BEREGNET
+             ,c.STATUS_OG_ANDEL_INNTEKTSKAT
              ,c.NATURALYTELSEBORTFALL
              ,c.TIL_STOETENDEYTELSE_TYPE
              ,c.TIL_STOETENDEYTELSE
              ,c.AVKORTET_BRUKERS_ANDEL
              ,c.REDUSERT_BRUKERS_ANDEL
              ,c.DAGSATS_BRUKER
-             ,c.DAGSATS_ARBEIDSGIVER   
+             ,c.DAGSATS_ARBEIDSGIVER
              ,c.REFUSJON_MAKSIMAL
              ,c.REFUSJON_AVKORTET
              ,c.REFUSJON_REDUSERT
-             ,t.KILDESYSTEM                  
+             ,t.KILDESYSTEM
              ,t.LASTET_DATO
-            FROM FK_SENSITIV.fam_fp_vedtak_utbetaling t,
+            FROM dvh_fam_fp.fam_fp_vedtak_utbetaling t,
             XMLTABLE
             (
               XMLNamespaces(
@@ -3112,13 +3112,13 @@ create or replace PACKAGE BODY                                                  
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                                      AS "ns21" --21
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:svp:v2'                                     AS "ns22" --22
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                                      AS "ns23" --23
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:svp:v2'                                      AS "ns24" --24  
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:svp:v2'                                      AS "ns24" --24
                           )
               ,'ns20:beregningsgrunnlagSvangerskapspenger'
               PASSING b.BEREGNINGSGRUNNLAG
               COLUMNS
               DEKNINGSGRAD                   VARCHAR2(200) PATH 'ns20:dekningsgrad',
-              SKJAERINGSTIDSPUNKT            VARCHAR2(200) PATH 'ns20:skjaeringstidspunkt'  
+              SKJAERINGSTIDSPUNKT            VARCHAR2(200) PATH 'ns20:skjaeringstidspunkt'
              ,BEREGNINGSGRUNNLAGPERIODE   XMLTYPE       PATH 'ns20:beregningsgrunnlagPeriode'
             ) d,
             XMLTABLE
@@ -3146,7 +3146,7 @@ create or replace PACKAGE BODY                                                  
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                                      AS "ns21" --21
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:svp:v2'                                     AS "ns22" --22
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                                      AS "ns23" --23
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:svp:v2'                                      AS "ns24" --24  
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:svp:v2'                                      AS "ns24" --24
                            )
               ,'ns20:beregningsgrunnlagPeriode'
               PASSING d.BEREGNINGSGRUNNLAGPERIODE
@@ -3184,7 +3184,7 @@ create or replace PACKAGE BODY                                                  
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                                      AS "ns21" --21
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:svp:v2'                                     AS "ns22" --22
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                                      AS "ns23" --23
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:svp:v2'                                      AS "ns24" --24   
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:svp:v2'                                      AS "ns24" --24
                           )
               ,'ns20:beregningsgrunnlagPrStatusOgAndel'
               PASSING q.xyz
@@ -3193,20 +3193,20 @@ create or replace PACKAGE BODY                                                  
               STATUS_OG_ANDEL_TOM    VARCHAR2(200) PATH 'ns20:periode/ns3:tom',
               AKTIVITET_STATUS               VARCHAR2(200) PATH 'ns20:aktivitetstatus/@kode',
               VIRKSOMHETSNUMMER             VARCHAR2(200) PATH 'ns20:virksomhetsnummer',
-              STATUS_OG_ANDEL_BRUTTO      VARCHAR2(200) PATH 'ns20:brutto', 
-              STATUS_OG_ANDEL_AVKORTET    VARCHAR2(200) PATH 'ns20:avkortet', 
-              STATUS_OG_ANDEL_REDUSERT    VARCHAR2(200) PATH 'ns20:redusert',    
-              STATUS_OG_ANDEL_BEREGNET    VARCHAR2(200) PATH 'ns20:beregnet', 
-              STATUS_OG_ANDEL_INNTEKTSKAT   VARCHAR2(200) PATH 'ns20:inntektskategori/@kode',    
+              STATUS_OG_ANDEL_BRUTTO      VARCHAR2(200) PATH 'ns20:brutto',
+              STATUS_OG_ANDEL_AVKORTET    VARCHAR2(200) PATH 'ns20:avkortet',
+              STATUS_OG_ANDEL_REDUSERT    VARCHAR2(200) PATH 'ns20:redusert',
+              STATUS_OG_ANDEL_BEREGNET    VARCHAR2(200) PATH 'ns20:beregnet',
+              STATUS_OG_ANDEL_INNTEKTSKAT   VARCHAR2(200) PATH 'ns20:inntektskategori/@kode',
               NATURALYTELSEBORTFALL    VARCHAR2(200) PATH 'ns20:naturalytelseBortfall',                  --Finnes ikke i XML
               TIL_STOETENDEYTELSE_TYPE   VARCHAR2(200) PATH 'ns20:tilstoetendeYtelseType',
               TIL_STOETENDEYTELSE       VARCHAR2(200) PATH 'ns20:tilstoetendeYtelse',
               AVKORTET_BRUKERS_ANDEL     VARCHAR2(200) PATH 'ns20:avkortetBrukersAndel',
               REDUSERT_BRUKERS_ANDEL     VARCHAR2(200) PATH 'ns20:redusertBrukersAndel',
               DAGSATS_BRUKER            VARCHAR2(200) PATH 'ns20:dagsatsBruker',
-              DAGSATS_ARBEIDSGIVER      VARCHAR2(200) PATH 'ns20:dagsatsArbeidsgiver',    
-              REFUSJON_MAKSIMAL         VARCHAR2(200) PATH 'ns20:refusjonTilArbeidsgiver/ns20:maksimal', 
-              REFUSJON_AVKORTET         VARCHAR2(200) PATH 'ns20:refusjonTilArbeidsgiver/ns20:avkortet', 
+              DAGSATS_ARBEIDSGIVER      VARCHAR2(200) PATH 'ns20:dagsatsArbeidsgiver',
+              REFUSJON_MAKSIMAL         VARCHAR2(200) PATH 'ns20:refusjonTilArbeidsgiver/ns20:maksimal',
+              REFUSJON_AVKORTET         VARCHAR2(200) PATH 'ns20:refusjonTilArbeidsgiver/ns20:avkortet',
               REFUSJON_REDUSERT         VARCHAR2(200) PATH 'ns20:refusjonTilArbeidsgiver/ns20:redusert'
             ) c
             where t.trans_id = rec_vedtak_sp.trans_id;
@@ -3220,7 +3220,7 @@ create or replace PACKAGE BODY                                                  
 
           --FAM_SP_TILKJENTYTELSE
           begin
-            INSERT INTO FK_SENSITIV.FAM_SP_TILKJENTYTELSE
+            INSERT INTO dvh_fam_fp.FAM_SP_TILKJENTYTELSE
             (
               TRANS_ID
               ,TRANS_TID
@@ -3242,27 +3242,27 @@ create or replace PACKAGE BODY                                                  
               ,KILDESYSTEM
               ,LASTET_DATO
             )
-            SELECT 
+            SELECT
               t.TRANS_ID
              ,t.TRANS_TID
              ,t.VEDTAK_ID
              ,t.FUNKSJONELL_TID
              ,b.FAGSAK_ID
-             ,b.BEHANDLINGS_ID   
+             ,b.BEHANDLINGS_ID
              ,q.BRUKERERMOTTAKER
              ,to_date(q.FOM,'YYYY-MM-DD') FOM
-             ,to_date(q.TOM,'YYYY-MM-DD') TOM 
-             ,q.ORGNR                     
-             ,q.ORGNAVN                   
-             ,q.ARBEIDSFORHOLD_ID          
-             ,q.AKTIVITETSSTATUS          
-             ,q.INNTEKTSKATEGORI          
-             ,q.DAGSATS                   
-             ,q.STILLINGSPROSENT         
-             ,q.UTBETALINGSGRAD  
+             ,to_date(q.TOM,'YYYY-MM-DD') TOM
+             ,q.ORGNR
+             ,q.ORGNAVN
+             ,q.ARBEIDSFORHOLD_ID
+             ,q.AKTIVITETSSTATUS
+             ,q.INNTEKTSKATEGORI
+             ,q.DAGSATS
+             ,q.STILLINGSPROSENT
+             ,q.UTBETALINGSGRAD
              ,t.KILDESYSTEM
              ,t.LASTET_DATO
-            FROM FK_SENSITIV.fam_fp_vedtak_utbetaling t,
+            FROM dvh_fam_fp.fam_fp_vedtak_utbetaling t,
             XMLTABLE
             (
               XMLNamespaces(
@@ -3288,7 +3288,7 @@ create or replace PACKAGE BODY                                                  
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                                      AS "ns21" --21
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:svp:v2'                                     AS "ns22" --22
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                                      AS "ns23" --23
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:svp:v2'                                      AS "ns24" --24   
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:svp:v2'                                      AS "ns24" --24
                           )
               ,'/ns13:vedtak'
               PASSING t.XML_CLOB
@@ -3322,7 +3322,7 @@ create or replace PACKAGE BODY                                                  
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                                      AS "ns21" --21
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:svp:v2'                                     AS "ns22" --22
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                                      AS "ns23" --23
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:svp:v2'                                      AS "ns24" --24   
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:svp:v2'                                      AS "ns24" --24
                           )
               ,'ns22:beregningsresultat'
               PASSING b.BEREGNINGSRESULTAT
@@ -3350,49 +3350,49 @@ create or replace PACKAGE BODY                                                  
 
           --FAM_SP_DELYTELSEID
           begin
-            INSERT INTO FK_SENSITIV.FAM_SP_DELYTELSEID
+            INSERT INTO dvh_fam_fp.FAM_SP_DELYTELSEID
             (
-              TRANS_ID	        
-             ,TRANS_TID	       
-             ,VEDTAK_ID	       
-             ,FUNKSJONELL_TID  
-             ,FAGSAK_ID        
-             ,BEHANDLINGS_ID   
-             ,DATO_VEDTAK_FOM  
-             ,DATO_VEDTAK_TOM  
-             ,LINJE_ID         
-             ,DELYTELSE_ID     
-             ,REF_DELYTELSE_ID 
-             ,UTBETALES_TIL_ID 
-             ,REFUNDERES_ID    
+              TRANS_ID
+             ,TRANS_TID
+             ,VEDTAK_ID
+             ,FUNKSJONELL_TID
+             ,FAGSAK_ID
+             ,BEHANDLINGS_ID
+             ,DATO_VEDTAK_FOM
+             ,DATO_VEDTAK_TOM
+             ,LINJE_ID
+             ,DELYTELSE_ID
+             ,REF_DELYTELSE_ID
+             ,UTBETALES_TIL_ID
+             ,REFUNDERES_ID
              ,KODE_STATUS_LINJE
-             ,DATO_STATUS_FOM  
-             ,OPPDRAG_ID       
-             ,FAGSYSTEM_ID     
-             ,KILDESYSTEM      
+             ,DATO_STATUS_FOM
+             ,OPPDRAG_ID
+             ,FAGSYSTEM_ID
+             ,KILDESYSTEM
              ,LASTET_DATO
             )
             SELECT
               t.TRANS_ID
              ,t.TRANS_TID
              ,t.VEDTAK_ID
-             ,t.FUNKSJONELL_TID 
+             ,t.FUNKSJONELL_TID
              ,b.FAGSAK_ID
              ,b.BEHANDLINGS_ID
-             ,to_date(a.DATO_VEDTAK_FOM,'YYYY-MM-DD')  DATO_VEDTAK_FOM  
-             ,to_date(a.DATO_VEDTAK_TOM,'YYYY-MM-DD')  DATO_VEDTAK_TOM 
+             ,to_date(a.DATO_VEDTAK_FOM,'YYYY-MM-DD')  DATO_VEDTAK_FOM
+             ,to_date(a.DATO_VEDTAK_TOM,'YYYY-MM-DD')  DATO_VEDTAK_TOM
              ,a.LINJE_ID
              ,a.DELYTELSE_ID
              ,a.REF_DELYTELSE_ID
-             ,a.UTBETALES_TIL_ID    
+             ,a.UTBETALES_TIL_ID
              ,a.REFUNDERES_ID
-             ,a.KODE_STATUS_LINJE  
-             ,to_date(a.DATO_STATUS_FOM,'YYYY-MM-DD')  DATO_STATUS_FOM    
+             ,a.KODE_STATUS_LINJE
+             ,to_date(a.DATO_STATUS_FOM,'YYYY-MM-DD')  DATO_STATUS_FOM
              ,c.OPPDRAG_ID
              ,c.FAGSYSTEM_ID
-             ,t.KILDESYSTEM      
+             ,t.KILDESYSTEM
              ,t.LASTET_DATO
-            FROM FK_SENSITIV.fam_fp_vedtak_utbetaling t,
+            FROM dvh_fam_fp.fam_fp_vedtak_utbetaling t,
             XMLTABLE
             (
               XMLNamespaces(
@@ -3418,11 +3418,11 @@ create or replace PACKAGE BODY                                                  
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                                      AS "ns21" --21
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:svp:v2'                                     AS "ns22" --22
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                                      AS "ns23" --23
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:svp:v2'                                      AS "ns24" --24  
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:svp:v2'                                      AS "ns24" --24
                           )
               ,'/ns13:vedtak'
               PASSING t.XML_CLOB
-              COLUMNS      
+              COLUMNS
               FAGSAK_ID                 NUMBER (19,0) PATH 'ns13:fagsakId'
              ,BEHANDLINGS_ID            NUMBER(19,0)  PATH 'ns13:behandlingsresultat/ns13:behandlingsId'
              ,UTTAKSRESULTATPERIODER   XMLTYPE       PATH 'ns13:oppdrag'
@@ -3452,7 +3452,7 @@ create or replace PACKAGE BODY                                                  
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                                      AS "ns21" --21
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:svp:v2'                                     AS "ns22" --22
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                                      AS "ns23" --23
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:svp:v2'                                      AS "ns24" --24 
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:svp:v2'                                      AS "ns24" --24
                           )
               ,'ns13:oppdrag'
              PASSING b.UTTAKSRESULTATPERIODER
@@ -3460,7 +3460,7 @@ create or replace PACKAGE BODY                                                  
              OPPDRAG_ID          VARCHAR2(200) PATH 'ns14:oppdragId'
             ,FAGSYSTEM_ID        VARCHAR2(200) PATH 'ns14:fagsystemId'
             ,OPPDRAGSLINJE      XMLTYPE       PATH 'ns15:oppdragslinje'
-            ) c,   
+            ) c,
             XMLTABLE
             (
               XMLNamespaces(
@@ -3486,7 +3486,7 @@ create or replace PACKAGE BODY                                                  
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                                      AS "ns21" --21
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:svp:v2'                                     AS "ns22" --22
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                                      AS "ns23" --23
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:svp:v2'                                      AS "ns24" --24 
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:svp:v2'                                      AS "ns24" --24
                           )
               ,'ns15:oppdragslinje'
               PASSING c.OPPDRAGSLINJE
@@ -3494,12 +3494,12 @@ create or replace PACKAGE BODY                                                  
               DATO_VEDTAK_FOM                   VARCHAR2(200) PATH  'ns15:periode/ns3:fom'
              ,DATO_VEDTAK_TOM                   VARCHAR2(200) PATH  'ns15:periode/ns3:tom'
              ,LINJE_ID               VARCHAR2(200) PATH  'ns15:linjeId'
-             ,DELYTELSE_ID           VARCHAR2(200) PATH  'ns15:delytelseId' 
+             ,DELYTELSE_ID           VARCHAR2(200) PATH  'ns15:delytelseId'
              ,REF_DELYTELSE_ID        VARCHAR2(200) PATH  'ns15:ref_delytelse_id'
-             ,UTBETALES_TIL_ID      VARCHAR2(200) PATH  'ns15:utbetales_til_id' 
+             ,UTBETALES_TIL_ID      VARCHAR2(200) PATH  'ns15:utbetales_til_id'
              ,REFUNDERES_ID         VARCHAR2(200) PATH  'ns15:refunderes_id'
-             ,KODE_STATUS_LINJE     VARCHAR2(200) PATH  'ns15:kode_status_linje' 
-             ,DATO_STATUS_FOM            VARCHAR2(200) PATH  'ns15:status_fom'  
+             ,KODE_STATUS_LINJE     VARCHAR2(200) PATH  'ns15:kode_status_linje'
+             ,DATO_STATUS_FOM            VARCHAR2(200) PATH  'ns15:status_fom'
             ) a
             where t.trans_id = rec_vedtak_sp.trans_id;
           exception
@@ -3513,77 +3513,77 @@ create or replace PACKAGE BODY                                                  
 
           --FAM_SP_VILKAAR
           begin
-            INSERT INTO FK_SENSITIV.FAM_SP_VILKAAR 
+            INSERT INTO dvh_fam_fp.FAM_SP_VILKAAR
             (
               TRANS_ID
-             ,TRANS_TID	                    
-             ,VEDTAK_ID	                    
-             ,FUNKSJONELL_TID               
-             ,FAGSAK_ID                     
-             ,BEHANDLINGS_ID                
-             ,EKTEFELLES_BARN               
-             ,SOEKERS_KJOEN                 
-             ,MANN_ADOPTERER_ALENE          
-             ,OMSORGS_OVERTAKELSESDATO      
-             ,PERSON_STATUS                 
-             ,ER_BRUKER_MEDLEM              
-             ,ER_BRUKER_BOSATT              
-             ,HAR_OPPHOLDSRETT              
-             ,HAR_LOVLIGOPPHOLD_I_NORGE     
-             ,ER_NORDISK_STATSBORGER        
-             ,ER_BORGER_AV_EU_EOS           
+             ,TRANS_TID
+             ,VEDTAK_ID
+             ,FUNKSJONELL_TID
+             ,FAGSAK_ID
+             ,BEHANDLINGS_ID
+             ,EKTEFELLES_BARN
+             ,SOEKERS_KJOEN
+             ,MANN_ADOPTERER_ALENE
+             ,OMSORGS_OVERTAKELSESDATO
+             ,PERSON_STATUS
+             ,ER_BRUKER_MEDLEM
+             ,ER_BRUKER_BOSATT
+             ,HAR_OPPHOLDSRETT
+             ,HAR_LOVLIGOPPHOLD_I_NORGE
+             ,ER_NORDISK_STATSBORGER
+             ,ER_BORGER_AV_EU_EOS
              ,PLIKTIG_ELLER_FRIVILLIG_MEDLEM
-             ,ELEKTRONISK_SOEKNAD           
-             ,SKJAERINGS_TIDSPUNKT          
-             ,SOEKNAD_MOTTAT_DATO           
-             ,BEHANDLINGS_DATO              
-             ,FOM                           
-             ,TOM                           
-             ,MAKS_MELLOM_LIGGENDE_PERIODE  
-             ,MIN_MELLOM_LIGGENDE_PERIODE   
-             ,MIN_STEANTALLDAGER_FORVENT    
-             ,MIN_STEANTALLDAGER_GODKJENT   
-             ,MIN_STEANTALLMANEDER_GODKJENT 
-             ,MIN_STEINNTEKT                
-             ,PERIODE_ANTATT_GODKJENT       
-             ,KILDESYSTEM                   
+             ,ELEKTRONISK_SOEKNAD
+             ,SKJAERINGS_TIDSPUNKT
+             ,SOEKNAD_MOTTAT_DATO
+             ,BEHANDLINGS_DATO
+             ,FOM
+             ,TOM
+             ,MAKS_MELLOM_LIGGENDE_PERIODE
+             ,MIN_MELLOM_LIGGENDE_PERIODE
+             ,MIN_STEANTALLDAGER_FORVENT
+             ,MIN_STEANTALLDAGER_GODKJENT
+             ,MIN_STEANTALLMANEDER_GODKJENT
+             ,MIN_STEINNTEKT
+             ,PERIODE_ANTATT_GODKJENT
+             ,KILDESYSTEM
              ,LASTET_DATO
             )
             SELECT
               t.TRANS_ID
              ,t.TRANS_TID
              ,t.VEDTAK_ID
-             ,t.FUNKSJONELL_TID 
+             ,t.FUNKSJONELL_TID
              ,b.FAGSAK_ID
              ,b.BEHANDLINGS_ID
              ,q.EKTEFELLES_BARN
              ,q.SOEKERS_KJOEN
              ,q.MANN_ADOPTERER_ALENE
-             ,to_date(q.OMSORGS_OVERTAKELSESDATO,'YYYY-MM-DD') OMSORGS_OVERTAKELSESDATO    
-             ,q.PERSON_STATUS                        
-             ,q.ER_BRUKER_MEDLEM                        
-             ,q.ER_BRUKER_BOSATT                       
-             ,q.HAR_OPPHOLDSRETT                 
-             ,q.HAR_LOVLIGOPPHOLD_I_NORGE          
-             ,q.ER_NORDISK_STATSBORGER            
-             ,q.ER_BORGER_AV_EU_EOS                
-             ,q.PLIKTIG_ELLER_FRIVILLIG_MEDLEM          
-             ,q.ELEKTRONISK_SOEKNAD   
-             ,to_date(q.SKJAERINGS_TIDSPUNKT,'YYYY-MM-DD') SKJAERINGS_TIDSPUNKT    
-             ,to_date(q.SOEKNAD_MOTTAT_DATO,'YYYY-MM-DD')   SOEKNAD_MOTTAT_DATO           
-             ,to_date(q.BEHANDLINGS_DATO,'YYYY-MM-DD')  BEHANDLINGS_DATO              
-             ,to_date(q.FOM,'YYYY-MM-DD')  FOM    
-             ,to_date(q.TOM,'YYYY-MM-DD')  TOM                           
-             ,q.MAKS_MELLOM_LIGGENDE_PERIODE    
-             ,q.MIN_MELLOM_LIGGENDE_PERIODE     
-             ,q.MIN_STEANTALLDAGER_FORVENT    
-             ,q.MIN_STEANTALLDAGER_GODKJENT    
-             ,q.MIN_STEANTALLMANEDER_GODKJENT  
-             ,q.MIN_STEINNTEKT                
-             ,q.PERIODE_ANTATT_GODKJENT 
-             ,t.KILDESYSTEM                   
+             ,to_date(q.OMSORGS_OVERTAKELSESDATO,'YYYY-MM-DD') OMSORGS_OVERTAKELSESDATO
+             ,q.PERSON_STATUS
+             ,q.ER_BRUKER_MEDLEM
+             ,q.ER_BRUKER_BOSATT
+             ,q.HAR_OPPHOLDSRETT
+             ,q.HAR_LOVLIGOPPHOLD_I_NORGE
+             ,q.ER_NORDISK_STATSBORGER
+             ,q.ER_BORGER_AV_EU_EOS
+             ,q.PLIKTIG_ELLER_FRIVILLIG_MEDLEM
+             ,q.ELEKTRONISK_SOEKNAD
+             ,to_date(q.SKJAERINGS_TIDSPUNKT,'YYYY-MM-DD') SKJAERINGS_TIDSPUNKT
+             ,to_date(q.SOEKNAD_MOTTAT_DATO,'YYYY-MM-DD')   SOEKNAD_MOTTAT_DATO
+             ,to_date(q.BEHANDLINGS_DATO,'YYYY-MM-DD')  BEHANDLINGS_DATO
+             ,to_date(q.FOM,'YYYY-MM-DD')  FOM
+             ,to_date(q.TOM,'YYYY-MM-DD')  TOM
+             ,q.MAKS_MELLOM_LIGGENDE_PERIODE
+             ,q.MIN_MELLOM_LIGGENDE_PERIODE
+             ,q.MIN_STEANTALLDAGER_FORVENT
+             ,q.MIN_STEANTALLDAGER_GODKJENT
+             ,q.MIN_STEANTALLMANEDER_GODKJENT
+             ,q.MIN_STEINNTEKT
+             ,q.PERIODE_ANTATT_GODKJENT
+             ,t.KILDESYSTEM
              ,t.LASTET_DATO
-            FROM FK_SENSITIV.fam_fp_vedtak_utbetaling t,
+            FROM dvh_fam_fp.fam_fp_vedtak_utbetaling t,
             XMLTABLE
             (
               XMLNamespaces(
@@ -3609,7 +3609,7 @@ create or replace PACKAGE BODY                                                  
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                                      AS "ns21" --21
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:svp:v2'                                     AS "ns22" --22
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                                      AS "ns23" --23
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:svp:v2'                                      AS "ns24" --24   
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:svp:v2'                                      AS "ns24" --24
                           )
               ,'/ns13:vedtak'
               PASSING t.XML_CLOB
@@ -3643,10 +3643,10 @@ create or replace PACKAGE BODY                                                  
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                                      AS "ns21" --21
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:svp:v2'                                     AS "ns22" --22
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                                      AS "ns23" --23
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:svp:v2'                                      AS "ns24" --24 
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:svp:v2'                                      AS "ns24" --24
                           )
               ,'ns11:vilkaarsgrunnlag'
-              PASSING b.VILKAARSGRUNNLAG  
+              PASSING b.VILKAARSGRUNNLAG
               COLUMNS
               EKTEFELLES_BARN              VARCHAR2(200) PATH 'ns10:ektefellesBarn',               --Finnes ikke i XML
               SOEKERS_KJOEN                VARCHAR2(200) PATH 'ns10:soekersKjoenn/@kode',          --Finnes ikke i XML
@@ -3685,31 +3685,31 @@ create or replace PACKAGE BODY                                                  
 
           --FAM_SP_BEREG_GRUNNLAGPERIODE
           begin
-            INSERT INTO FK_SENSITIV.FAM_SP_BEREG_GRUNNLAGPERIODE
+            INSERT INTO dvh_fam_fp.FAM_SP_BEREG_GRUNNLAGPERIODE
             (
-              TRANS_ID	          
-             ,TRANS_TID	         
-             ,VEDTAK_ID	         
-             ,FUNKSJONELL_TID    
-             ,FAGSAK_ID          
-             ,BEHANDLINGS_ID     
+              TRANS_ID
+             ,TRANS_TID
+             ,VEDTAK_ID
+             ,FUNKSJONELL_TID
+             ,FAGSAK_ID
+             ,BEHANDLINGS_ID
              ,BG_PERIODE_FOM
-             ,BRUTTO_PR_AAR      
-             ,AVKORTET_PR_AAR 
+             ,BRUTTO_PR_AAR
+             ,AVKORTET_PR_AAR
              ,REDUSERT_PR_AAR
-             ,DAGSATS  
-             ,DEKNINGSGRAD       
+             ,DAGSATS
+             ,DEKNINGSGRAD
              ,SKJAERINGSTIDSPUNKT
-             ,KILDESYSTEM        
-             ,LASTET_DATO            
+             ,KILDESYSTEM
+             ,LASTET_DATO
             )
-            SELECT 
+            SELECT
               t.TRANS_ID
              ,t.TRANS_TID
              ,t.VEDTAK_ID
-             ,t.FUNKSJONELL_TID 
+             ,t.FUNKSJONELL_TID
              ,b.FAGSAK_ID
-             ,b.BEHANDLINGS_ID        
+             ,b.BEHANDLINGS_ID
              ,to_date(q.BG_PERIODE_FOM,'YYYY-MM-DD') BG_PERIODE_FOM
              ,q.BRUTTO_PR_AAR
              ,q.AVKORTET_PR_AAR
@@ -3717,9 +3717,9 @@ create or replace PACKAGE BODY                                                  
              ,q.DAGSATS
              ,d.DEKNINGSGRAD
              ,to_date(d.SKJAERINGSTIDSPUNKT,'YYYY-MM-DD') SKJAERINGSTIDSPUNKT
-             ,t.KILDESYSTEM                   
+             ,t.KILDESYSTEM
              ,t.LASTET_DATO
-            FROM FK_SENSITIV.fam_fp_vedtak_utbetaling t,
+            FROM dvh_fam_fp.fam_fp_vedtak_utbetaling t,
             XMLTABLE
             (
               XMLNamespaces(
@@ -3745,11 +3745,11 @@ create or replace PACKAGE BODY                                                  
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                                      AS "ns21" --21
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:svp:v2'                                     AS "ns22" --22
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                                      AS "ns23" --23
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:svp:v2'                                      AS "ns24" --24    
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:svp:v2'                                      AS "ns24" --24
                           )
               ,'/ns13:vedtak'
               PASSING t.XML_CLOB
-              COLUMNS       
+              COLUMNS
               FAGSAK_ID                 NUMBER (19,0) PATH 'ns13:fagsakId'
              ,BEHANDLINGS_ID            NUMBER(19,0)  PATH 'ns13:behandlingsresultat/ns13:behandlingsId'
              ,BEREGNINGSGRUNNLAG   XMLTYPE       PATH 'ns13:behandlingsresultat/ns13:beregningsresultat/ns13:beregningsgrunnlag/ns20:beregningsgrunnlagSvangerskapspenger'
@@ -3779,13 +3779,13 @@ create or replace PACKAGE BODY                                                  
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                                      AS "ns21" --21
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:svp:v2'                                     AS "ns22" --22
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                                      AS "ns23" --23
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:svp:v2'                                      AS "ns24" --24 
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:svp:v2'                                      AS "ns24" --24
                           )
               ,'ns20:beregningsgrunnlagSvangerskapspenger'
               PASSING b.BEREGNINGSGRUNNLAG
               COLUMNS
               DEKNINGSGRAD                   VARCHAR2(200) PATH 'ns20:dekningsgrad',
-              SKJAERINGSTIDSPUNKT            VARCHAR2(200) PATH 'ns20:skjaeringstidspunkt'  
+              SKJAERINGSTIDSPUNKT            VARCHAR2(200) PATH 'ns20:skjaeringstidspunkt'
              ,BEREGNINGSGRUNNLAGPERIODE   XMLTYPE       PATH 'ns20:beregningsgrunnlagPeriode'
             ) d,
             XMLTABLE
@@ -3813,7 +3813,7 @@ create or replace PACKAGE BODY                                                  
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                                      AS "ns21" --21
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:svp:v2'                                     AS "ns22" --22
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                                      AS "ns23" --23
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:svp:v2'                                      AS "ns24" --24 
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:svp:v2'                                      AS "ns24" --24
                            )
               ,'ns20:beregningsgrunnlagPeriode'
               PASSING d.BEREGNINGSGRUNNLAGPERIODE
@@ -3834,7 +3834,7 @@ create or replace PACKAGE BODY                                                  
           end;
           --FAM_SP_FODSELTERMIN
           begin
-            INSERT INTO FK_SENSITIV.FAM_SP_FODSELTERMIN
+            INSERT INTO dvh_fam_fp.FAM_SP_FODSELTERMIN
             (
                TRANS_ID
               ,TRANS_TID
@@ -3852,7 +3852,7 @@ create or replace PACKAGE BODY                                                  
               ,KILDESYSTEM
               ,LASTET_DATO
             )
-            SELECT               
+            SELECT
                      t.TRANS_ID
                     ,t.TRANS_TID
                     ,t.VEDTAK_ID
@@ -3868,13 +3868,13 @@ create or replace PACKAGE BODY                                                  
                     ,q.EREKTEFELLES_BARN
                     ,t.kildesystem
                     ,t.lastet_dato
-            FROM FK_SENSITIV.fam_fp_vedtak_utbetaling t
+            FROM dvh_fam_fp.fam_fp_vedtak_utbetaling t
 
-            left join       
+            left join
             XMLTABLE
             (
                XMLNamespaces
-               (                    
+               (
                    'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:fp:v2'                          AS "ns2" --2
                   ,'urn:no:nav:vedtak:felles:xml:felles:v2'                                                AS "ns3" --3
                   ,'urn:no:nav:vedtak:felles:xml:vedtak:personopplysninger:v2'                             AS "ns4" --4
@@ -3897,11 +3897,11 @@ create or replace PACKAGE BODY                                                  
                   ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                                      AS "ns21" --21
                   ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:svp:v2'                                     AS "ns22" --22
                   ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                                      AS "ns23" --23
-                  ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:svp:v2'                                      AS "ns24" --24 
+                  ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:svp:v2'                                      AS "ns24" --24
                )
                ,'/ns13:vedtak'
                PASSING t.XML_CLOB
-               COLUMNS            
+               COLUMNS
                  FAGSAK_ID                    NUMBER(19,0)         PATH './ns13:fagsakId'
                 ,BEHANDLINGS_ID               NUMBER(19,0)         PATH './ns13:behandlingsresultat/ns13:behandlingsId'
                 ,ANTALL_BARN_FOEDSEL          NUMBER(19,0)         PATH './ns13:personOpplysninger/ns6:PersonopplysningerDvhForeldrepenger/ns6:familiehendelse/ns6:foedsel/ns4:antallBarn'
@@ -3926,20 +3926,20 @@ create or replace PACKAGE BODY                                                  
           ----------------------------------------------
            --FAM_SP_INNTEKTER
           begin
-            INSERT INTO  FK_SENSITIV.FAM_SP_INNTEKTER
+            INSERT INTO  dvh_fam_fp.FAM_SP_INNTEKTER
             SELECT
               t.TRANS_ID
              ,t.TRANS_TID
              ,t.VEDTAK_ID
              ,q.FAGSAK_ID
              ,q.BEHANDLINGS_ID
-             ,a.MOTTAKER               
-             ,a.ARBEIDSGIVER        
-             ,to_date(b.FOM,'YYYY-MM-DD')  FOM              
-             ,to_date(b.TOM,'YYYY-MM-DD')  TOM   
-             ,b.BELOEP          
+             ,a.MOTTAKER
+             ,a.ARBEIDSGIVER
+             ,to_date(b.FOM,'YYYY-MM-DD')  FOM
+             ,to_date(b.TOM,'YYYY-MM-DD')  TOM
+             ,b.BELOEP
              ,b.YTELSETYPE
-            FROM FK_SENSITIV.fam_fp_vedtak_utbetaling t,
+            FROM dvh_fam_fp.fam_fp_vedtak_utbetaling t,
             XMLTABLE
             (
               XMLNamespaces(
@@ -3965,7 +3965,7 @@ create or replace PACKAGE BODY                                                  
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                                      AS "ns21" --21
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:svp:v2'                                     AS "ns22" --22
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                                      AS "ns23" --23
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:svp:v2'                                      AS "ns24" --24   
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:svp:v2'                                      AS "ns24" --24
                           )
               ,'/ns13:vedtak'
               PASSING t.XML_CLOB
@@ -4000,10 +4000,10 @@ create or replace PACKAGE BODY                                                  
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                                      AS "ns21" --21
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:svp:v2'                                     AS "ns22" --22
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                                      AS "ns23" --23
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:svp:v2'                                      AS "ns24" --24  
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:svp:v2'                                      AS "ns24" --24
                           )
               ,'ns6:inntekt' PASSING q.INNTEKT
-              COLUMNS      
+              COLUMNS
               MOTTAKER                    VARCHAR2(200) PATH 'ns6:mottaker'
              ,ARBEIDSGIVER                VARCHAR2(200) PATH 'ns6:arbeidsgiver'
              ,INNTEKTSPOSTER XMLTYPE PATH  '/ns6:inntektsposter'
@@ -4033,10 +4033,10 @@ create or replace PACKAGE BODY                                                  
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                                      AS "ns21" --21
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:svp:v2'                                     AS "ns22" --22
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                                      AS "ns23" --23
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:svp:v2'                                      AS "ns24" --24  
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:svp:v2'                                      AS "ns24" --24
                           )
               ,'ns6:inntektsposter' PASSING q.INNTEKTSPOSTER
-              COLUMNS      
+              COLUMNS
               FOM                         VARCHAR2(200) PATH 'ns6:periode/ns3:fom'
              ,TOM                         VARCHAR2(200) PATH 'ns6:periode/ns3:tom'
              ,BELOEP                      VARCHAR2(200) PATH 'ns6:beloep'
@@ -4052,14 +4052,14 @@ create or replace PACKAGE BODY                                                  
           end;
           ----------------------------------------------
           begin
-            INSERT INTO  FK_SENSITIV.FAM_SP_UTTAK_TILRETTELEGGING
+            INSERT INTO  dvh_fam_fp.FAM_SP_UTTAK_TILRETTELEGGING
             (
-              TRANS_ID	          
-             ,TRANS_TID	         
-             ,VEDTAK_ID	         
-             ,FUNKSJONELL_TID    
-             ,FAGSAK_ID          
-             ,BEHANDLINGS_ID                
+              TRANS_ID
+             ,TRANS_TID
+             ,VEDTAK_ID
+             ,FUNKSJONELL_TID
+             ,FAGSAK_ID
+             ,BEHANDLINGS_ID
              ,BEHOVFORTILRETTELEGGINGFOM
              ,SLUTTEARBEIDFOM
              ,ARBEIDTYPE
@@ -4068,17 +4068,17 @@ create or replace PACKAGE BODY                                                  
              ,ARBEIDSFORHOLDID
              ,ERVIRKSOMHET
              ,MOTTATTTIDSPUNKT
-             ,KILDESYSTEM        
-             ,LASTET_DATO           
+             ,KILDESYSTEM
+             ,LASTET_DATO
             )
             SELECT
               t.TRANS_ID
              ,t.TRANS_TID
              ,t.VEDTAK_ID
-             ,t.FUNKSJONELL_TID 
+             ,t.FUNKSJONELL_TID
              ,q.FAGSAK_ID
              ,q.BEHANDLINGS_ID
-             ,to_date(a.BEHOVFORTILRETTELEGGINGFOM,'YYYY-MM-DD') BEHOVFORTILRETTELEGGINGFOM 
+             ,to_date(a.BEHOVFORTILRETTELEGGINGFOM,'YYYY-MM-DD') BEHOVFORTILRETTELEGGINGFOM
              ,to_date(a.SLUTTEARBEIDFOM,'YYYY-MM-DD') SLUTTEARBEIDFOM
              ,a.ARBEIDTYPE
              ,a.TIDLIGEREBEHANDLING
@@ -4088,7 +4088,7 @@ create or replace PACKAGE BODY                                                  
              ,to_date(a.MOTTATTTIDSPUNKT,'YYYY-MM-DD') MOTTATTTIDSPUNKT
              ,t.KILDESYSTEM
              ,t.LASTET_DATO
-            FROM FK_SENSITIV.fam_fp_vedtak_utbetaling t,
+            FROM dvh_fam_fp.fam_fp_vedtak_utbetaling t,
             XMLTABLE
             (
               XMLNamespaces(
@@ -4118,7 +4118,7 @@ create or replace PACKAGE BODY                                                  
                             )
               ,'/ns13:vedtak'
               PASSING t.XML_CLOB
-              COLUMNS 
+              COLUMNS
               FAGSAK_ID                    NUMBER (19,0) PATH './ns13:fagsakId'
              ,BEHANDLINGS_ID               NUMBER (19,0) PATH './ns13:behandlingsresultat/ns13:behandlingsId'
              ,TILRETTELEGGING XMLTYPE PATH  './ns13:behandlingsresultat/ns13:beregningsresultat/ns13:uttak/ns24:uttak/ns24:tilrettelegging'
@@ -4148,10 +4148,10 @@ create or replace PACKAGE BODY                                                  
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                                      AS "ns21" --21
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:svp:v2'                                     AS "ns22" --22
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                                      AS "ns23" --23
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:svp:v2'                                      AS "ns24" --24  
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:svp:v2'                                      AS "ns24" --24
                           )
               ,'ns24:tilrettelegging' PASSING q.TILRETTELEGGING
-              COLUMNS 
+              COLUMNS
               BEHOVFORTILRETTELEGGINGFOM  VARCHAR2(200) PATH 'ns24:behovForTilretteleggingFom'
              ,SLUTTEARBEIDFOM             VARCHAR2(200) PATH 'ns24:slutteArbeidFom'
              ,ARBEIDTYPE                  VARCHAR2(200) PATH 'ns24:arbeidtype/@kode'
@@ -4171,13 +4171,13 @@ create or replace PACKAGE BODY                                                  
           end;
           ----------------------------------------------
           begin
-            INSERT INTO FK_SENSITIV.FAM_SP_UTTAK_RES_PER
+            INSERT INTO dvh_fam_fp.FAM_SP_UTTAK_RES_PER
             (
-              TRANS_ID	          
-             ,TRANS_TID	         
-             ,VEDTAK_ID	         
-             ,FUNKSJONELL_TID    
-             ,FAGSAK_ID          
+              TRANS_ID
+             ,TRANS_TID
+             ,VEDTAK_ID
+             ,FUNKSJONELL_TID
+             ,FAGSAK_ID
              ,BEHANDLINGS_ID
              ,FOERSTEUTTAKSDATO
              ,SISTEUTTAKSDATO
@@ -4187,8 +4187,8 @@ create or replace PACKAGE BODY                                                  
              ,PERIODERESULTATAARSAK
              ,VIRKSOMHET
              ,ARBEIDSFORHOLDID
-             ,KILDESYSTEM        
-             ,LASTET_DATO            
+             ,KILDESYSTEM
+             ,LASTET_DATO
             )
             SELECT
               t.TRANS_ID
@@ -4207,7 +4207,7 @@ create or replace PACKAGE BODY                                                  
              ,b.ARBEIDSFORHOLDID
              ,t.KILDESYSTEM
              ,t.LASTET_DATO
-            FROM FK_SENSITIV.fam_fp_vedtak_utbetaling t,
+            FROM dvh_fam_fp.fam_fp_vedtak_utbetaling t,
             XMLTABLE
             (
               XMLNamespaces(
@@ -4233,11 +4233,11 @@ create or replace PACKAGE BODY                                                  
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                                      AS "ns21" --21
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:svp:v2'                                     AS "ns22" --22
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                                      AS "ns23" --23
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:svp:v2'                                      AS "ns24" --24  
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:svp:v2'                                      AS "ns24" --24
                           )
               ,'/ns13:vedtak'
               PASSING t.XML_CLOB
-              COLUMNS      
+              COLUMNS
               FAGSAKID                 NUMBER (19,0) PATH './ns13:fagsakId'
              ,BEHANDLINGSID            NUMBER(19,0)  PATH './ns13:behandlingsresultat/ns13:behandlingsId'
              ,FOERSTEUTTAKSDATO        VARCHAR2(200) PATH './ns13:behandlingsresultat/ns13:beregningsresultat/ns13:uttak/ns24:uttak/ns24:foersteUttaksdato'
@@ -4270,7 +4270,7 @@ create or replace PACKAGE BODY                                                  
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                                      AS "ns21" --21
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:svp:v2'                                     AS "ns22" --22
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                                      AS "ns23" --23
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:svp:v2'                                      AS "ns24" --24    
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:svp:v2'                                      AS "ns24" --24
                           )
               ,'ns24:uttaksResultatArbeidsforhold'
               PASSING a.UTTAKSRESULTATARBEIDSFORHOLD
@@ -4303,7 +4303,7 @@ create or replace PACKAGE BODY                                                  
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:fp:v2'                                      AS "ns21" --21
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:svp:v2'                                     AS "ns22" --22
                            ,'urn:no:nav:vedtak:felles:xml:vedtak:ytelse:es:v2'                                      AS "ns23" --23
-                           ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:svp:v2'                                      AS "ns24" --24     
+                           ,'urn:no:nav:vedtak:felles:xml:vedtak:uttak:svp:v2'                                      AS "ns24" --24
                           )
               ,'ns24:uttaksresultatPerioder'
               PASSING a.UTTAKSRESULTATPERIODER
@@ -4334,13 +4334,13 @@ create or replace PACKAGE BODY                                                  
         exception
           when others then
             --Fortsett med neste rad
-            l_error_melding := sqlcode || ' ' || sqlerrm;          
-            insert into fk_sensitiv.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+            l_error_melding := sqlcode || ' ' || sqlerrm;
+            insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
             values(null, rec_vedtak_sp.trans_id, l_error_melding, sysdate, 'SP_DVH_XML_UTBRETT');
         end;
       end loop;
       if l_error_melding is not null then
-        insert into fk_sensitiv.fp_xml_utbrett_error(id, error_msg, opprettet_tid, kilde)
+        insert into dvh_fam_fp.fp_xml_utbrett_error(id, error_msg, opprettet_tid, kilde)
         values(l_feil_trans_id, l_error_melding, sysdate, l_feil_kilde_navn);
       end if;
       commit;--commit til slutt
@@ -4349,6 +4349,6 @@ create or replace PACKAGE BODY                                                  
     when others then
       rollback;
       p_error_melding := sqlcode || ' ' || sqlerrm;
-  END SP_DVH_XML_UTBRETT;  
+  END SP_DVH_XML_UTBRETT;
 
 END FP_XML_UTBRETT;

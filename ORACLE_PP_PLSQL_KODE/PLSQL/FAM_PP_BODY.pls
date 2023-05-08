@@ -26,10 +26,10 @@ procedure fam_pp_slett_offset(p_in_offset in varchar2, p_out_error out varchar2)
     select pk_pp_periode_utbet_grader
     from DVH_FAM_PP.fam_pp_periode_utbet_grader
     where fk_pp_perioder = p_fk_perioder;
-  cursor cur_relasjoner(p_fk_fagsak number) is
-    select pk_pp_relasjoner
-    from dvh_fam_pp.fam_pp_relasjoner
-    where fk_pp_fagsak = p_fk_fagsak;
+  cursor cur_periode_inngangsvilkaar_detaljertUtfall(p_fk_periode_inngangsvilkaar number) is
+    select pk_vilkaar_detaljert_utfall
+    from dvh_fam_pp.fam_vilkaar_detaljer_utfall
+    where fk_pp_periode_inngangsvilkaar = p_fk_periode_inngangsvilkaar;
 begin
   for rec_fagsak in cur_fagsak loop
     v_error_melding := null;
@@ -46,14 +46,38 @@ begin
         end;
       end loop;--periode_aarsak
       for rec_periode_inngangsvilkaar in cur_periode_inngangsvilkaar(rec_perioder.pk_pp_perioder) loop
-        begin
-          delete from dvh_fam_pp.fam_pp_periode_inngangsvilkaar
-          where pk_pp_periode_inngangsvilkaar = rec_periode_inngangsvilkaar.pk_pp_periode_inngangsvilkaar;
-        exception
-          when others then
-            v_error_melding := substr(v_error_melding || sqlcode || ' ' || sqlerrm, 1, 1000);
-        end;
-      end loop;--periode_inngangsvilkaar
+        for rec_periode_inngangsvilkaar_detUtfall in cur_periode_inngangsvilkaar_detaljertUtfall(rec_periode_inngangsvilkaar.pk_pp_periode_inngangsvilkaar) loop
+			begin
+			  delete from dvh_fam_pp.fam_vilkaar_detaljer_utfall
+			  where pk_vilkaar_detaljert_utfall = rec_periode_inngangsvilkaar_detUtfall.pk_vilkaar_detaljert_utfall;
+			exception
+              when others then
+               v_error_melding := substr(v_error_melding || sqlcode || ' ' || sqlerrm, 1, 1000);
+			end;
+        end loop;--inngangsvilkaar_detUtfall
+        if v_error_melding is not null then
+			rollback to do_delete; continue;
+			insert into fk_sensitiv.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+			values(null, null, v_error_melding, sysdate, 'FAM_PP_SLETT_OFFSET:øvrige periode tabeller');
+			commit;
+			p_out_error := substr(p_out_error || v_error_melding, 1, 1000);
+			exit;
+		else
+			begin
+			  delete from dvh_fam_pp.fam_pp_periode_inngangsvilkaar
+              where pk_pp_periode_inngangsvilkaar = rec_periode_inngangsvilkaar.pk_pp_periode_inngangsvilkaar;
+			exception
+			  when others then
+				rollback to do_delete; continue;
+				v_error_melding := substr(sqlcode || ' ' || sqlerrm, 1, 1000);
+				insert into fk_sensitiv.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+				values(null, null, v_error_melding, sysdate, 'FAM_PP_SLETT_OFFSET:periode tabellen');
+				commit;
+				p_out_error := substr(p_out_error || v_error_melding, 1, 1000);
+				exit;
+			end;
+		end if;
+	  end loop; -- periode_inngangsvilkaar
       for rec_periode_utbet_grader in cur_periode_utbet_grader(rec_perioder.pk_pp_perioder) loop
         begin
           delete from dvh_fam_pp.fam_pp_periode_utbet_grader
@@ -65,19 +89,25 @@ begin
       end loop;--periode_utbet_grader
 
       if v_error_melding is not null then
+        rollback to do_delete; continue;
+        insert into fk_sensitiv.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+        values(null, null, v_error_melding, sysdate, 'FAM_PP_SLETT_OFFSET:øvrige periode tabeller');
+        commit;
         p_out_error := substr(p_out_error || v_error_melding, 1, 1000);
-        --rollback to do_delete; continue;
-        rollback; exit;
+        exit;
       else
         begin
           delete from dvh_fam_pp.fam_pp_perioder
           where pk_pp_perioder = rec_perioder.pk_pp_perioder;
         exception
           when others then
+            rollback to do_delete; continue;
             v_error_melding := substr(sqlcode || ' ' || sqlerrm, 1, 1000);
+            insert into fk_sensitiv.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+            values(null, null, v_error_melding, sysdate, 'FAM_PP_SLETT_OFFSET:periode tabellen');
+            commit;
             p_out_error := substr(p_out_error || v_error_melding, 1, 1000);
-            --rollback to do_delete; continue;
-            rollback; exit;
+            exit;
         end;
       end if;
     end loop;--perioder
@@ -89,25 +119,15 @@ begin
           where pk_pp_diagnose = rec_diagnose.pk_pp_diagnose;
         exception
           when others then
+            rollback to do_delete; continue;
             v_error_melding := substr(sqlcode || ' ' || sqlerrm, 1, 1000);
+            insert into fk_sensitiv.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+            values(null, null, v_error_melding, sysdate, 'FAM_PP_SLETT_OFFSET:diagnose');
+            commit;
             p_out_error := substr(p_out_error || v_error_melding, 1, 1000);
-            --rollback to do_delete; continue;
-            rollback; exit;
+            exit;
         end;
       end loop;--diagnose
-
-      for rec_relasjoner in cur_relasjoner(rec_fagsak.pk_pp_fagsak) loop
-        begin
-          delete from dvh_fam_pp.fam_pp_relasjoner
-          where pk_pp_relasjoner = rec_relasjoner.pk_pp_relasjoner;
-        exception
-          when others then
-            v_error_melding := substr(sqlcode || ' ' || sqlerrm, 1, 1000);
-            p_out_error := substr(p_out_error || v_error_melding, 1, 1000);
-            --rollback to do_delete; continue;
-            rollback; exit;
-        end;
-      end loop;--relasjoner
     end if;--periode feiler ikke
     if v_error_melding is null then
       begin
@@ -116,11 +136,14 @@ begin
         commit;--commit for alle tabeller
       exception
         when others then
-          v_error_melding := substr(sqlcode || ' ' || sqlerrm, 1, 1000);
-          p_out_error := substr(p_out_error || v_error_melding, 1, 1000);
           rollback to do_delete; continue;
+          v_error_melding := substr(sqlcode || ' ' || sqlerrm, 1, 1000);
+          insert into fk_sensitiv.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+          values(null, null, v_error_melding, sysdate, 'FAM_PP_SLETT_OFFSET:fagsak');
+          commit;
+          p_out_error := substr(p_out_error || v_error_melding, 1, 1000);
       end;
-    end if;--b�de periode og diagnose feiler ikke
+    end if;--både periode og diagnose feiler ikke
   end loop;--fagsak
 exception
   when others then
@@ -141,7 +164,7 @@ procedure fam_pp_slett_kode67(p_out_antall_slettet out number, p_out_error out v
     where saksnummer in (select distinct saksnummer
                          from dvh_fam_pp.fam_pp_fagsak
                          where fk_person1_mottaker = -1
-                         or fk_person1_pleietrengende = -1);
+                         or (fk_person1_pleietrengende = -1 and ytelse_type!='OMP'));
     --and saksnummer = '1DMCGV0';--TEST!!!
 begin
   for rec_fagsak in cur_fagsak loop
@@ -155,7 +178,7 @@ begin
 exception
   when others then
     v_error_melding := substr(sqlcode || ' ' || sqlerrm, 1, 1000);
-    insert into fk_sensitiv.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+    insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
     values(null, null, v_error_melding, sysdate, 'FAM_PP_SLETT_KODE67');
     commit;
     p_out_error := substr(p_out_error || v_error_melding, 1, 1000);
@@ -206,7 +229,7 @@ procedure fam_pp_utpakking_offset(p_in_offset in number, p_out_error out varchar
           behandlings_id         varchar2 path '$.behandlingUuid'
          ,pleietrengende         varchar2 path '$.pleietrengende'
          ,saksnummer             varchar2 path '$.saksnummer'
-         ,soker                  varchar2 path '$.s�ker'
+         ,soker                  varchar2 path '$.søker'
          ,utbetalingsreferanse   varchar2 path '$.utbetalingsreferanse'
          ,ytelse_type            varchar2 path '$.ytelseType'
          ,vedtaks_tidspunkt      varchar2 path '$.vedtakstidspunkt'
@@ -254,17 +277,17 @@ procedure fam_pp_utpakking_offset(p_in_offset in number, p_out_error out varchar
          ,brutto_beregningsgrunnlag         varchar2 path '$.bruttoBeregningsgrunnlag'
          ,dato_fom                          varchar2 path '$.fom'
          ,dato_tom                          varchar2 path '$.tom'
-         ,gmt_andre_sokers_tilsyn           varchar2 path '$.graderingMotTilsyn.andreS�keresTilsyn'
+         ,gmt_andre_sokers_tilsyn           varchar2 path '$.graderingMotTilsyn.andreSøkeresTilsyn'
          ,gmt_etablert_tilsyn               varchar2 path '$.graderingMotTilsyn.etablertTilsyn'
-         ,gmt_overse_etablert_tilsyn_aarsak varchar2 path '$.graderingMotTilsyn.overseEtablertTilsyn�rsak'
-         ,gmt_tilgjengelig_for_soker        varchar2 path '$.graderingMotTilsyn.tilgjengeligForS�ker'
-         ,nattevaak                         varchar2 path '$.nattev�k'
+         ,gmt_overse_etablert_tilsyn_aarsak varchar2 path '$.graderingMotTilsyn.overseEtablertTilsynÅrsak'
+         ,gmt_tilgjengelig_for_soker        varchar2 path '$.graderingMotTilsyn.tilgjengeligForSøker'
+         ,nattevaak                         varchar2 path '$.nattevåk'
          ,oppgitt_tilsyn                    varchar2 path '$.oppgittTilsyn'
          ,pleiebehov                        varchar2 path '$.pleiebehov'
-         ,sokers_tapte_timer                varchar2 path '$.s�kersTapteTimer'
+         ,sokers_tapte_timer                varchar2 path '$.søkersTapteTimer'
          ,utfall                            varchar2 path '$.utfall'
          ,uttaksgrad                        varchar2 path '$.uttaksgrad'
-         ,sokers_tapte_arbeidstid           varchar2 path '$.s�kersTapteArbeidstid'
+         ,sokers_tapte_arbeidstid           varchar2 path '$.søkersTapteArbeidstid'
            )
         )
         ) t;
@@ -280,9 +303,9 @@ procedure fam_pp_utpakking_offset(p_in_offset in number, p_out_error out varchar
         ,json_table (
          doc, '$'
          columns (
-         nested path '$.perioder.inngangsvilk�r[*]' columns (
+         nested path '$.perioder.inngangsvilkår[*]' columns (
          utfall  varchar2 path '$.utfall'
-        ,vilkaar varchar2 path '$.vilk�r'
+        ,vilkaar varchar2 path '$.vilkår'
          )
         )
         ) t;
@@ -301,7 +324,7 @@ procedure fam_pp_utpakking_offset(p_in_offset in number, p_out_error out varchar
          doc, '$'
          columns (
          nested path '$.perioder.utbetalingsgrader[*]' columns (
-         arbeidsforhold_aktorid varchar2 path '$.arbeidsforhold.akt�rId'
+         arbeidsforhold_aktorid varchar2 path '$.arbeidsforhold.aktørId'
         ,arbeidsforhold_id      varchar2 path '$.arbeidsforhold.arbeidsforholdId'
         ,arbeidsforhold_orgnr   varchar2 path '$.arbeidsforhold.organisasjonsnummer'
         ,arbeidsforhold_type    varchar2 path '$.arbeidsforhold.type'
@@ -325,7 +348,780 @@ procedure fam_pp_utpakking_offset(p_in_offset in number, p_out_error out varchar
         ,json_table (
          doc, '$'
          columns (
-         nested path '$.perioder.�rsaker[*]' columns (
+         nested path '$.perioder.årsaker[*]' columns (
+         aarsak  varchar2 path '$[0]'
+         )
+        )
+        ) t;
+
+  v_pk_pp_fagsak number;
+  v_pk_pp_perioder number;
+
+  v_fk_person1_soker number;
+  v_fk_person1_pleietrengende number;
+
+  v_error_melding varchar2(4000);
+  v_commit number := 0;
+  v_feil_kilde_navn varchar2(100) := null;
+begin
+  for rec_fagsak in cur_fagsak(p_in_offset) loop
+    begin
+      savepoint do_insert;
+      v_pk_pp_fagsak := -1;
+      v_fk_person1_soker := -1;
+      v_fk_person1_pleietrengende := -1;
+      select dvh_fampp_kafka.hibernate_sequence.nextval into v_pk_pp_fagsak from dual;
+      --Hent fk_person1
+      v_fk_person1_soker := fam_pp_fk_person1(rec_fagsak.vedtaks_tidspunkt, rec_fagsak.soker);
+      v_fk_person1_pleietrengende := fam_pp_fk_person1(rec_fagsak.vedtaks_tidspunkt, rec_fagsak.pleietrengende);
+      insert into dvh_fam_pp.fam_pp_fagsak
+      (
+        pk_pp_fagsak, behandlings_id, fk_person1_mottaker, fk_person1_pleietrengende
+       ,kafka_offset, kafka_partition, kafka_topic, lastet_dato
+       ,pleietrengende, saksnummer, soker, utbetalingsreferanse
+       ,ytelse_type, fk_pp_metadata, vedtaks_tidspunkt, forrige_behandlings_id
+      )
+      values
+      (
+        v_pk_pp_fagsak, rec_fagsak.behandlings_id, v_fk_person1_soker, v_fk_person1_pleietrengende
+       ,rec_fagsak.kafka_offset, rec_fagsak.kafka_partition, rec_fagsak.kafka_topic, sysdate
+       ,rec_fagsak.pleietrengende, rec_fagsak.saksnummer, rec_fagsak.soker, rec_fagsak.utbetalingsreferanse
+       ,rec_fagsak.ytelse_type, rec_fagsak.pk_pp_meta_data, rec_fagsak.vedtaks_tidspunkt
+       ,rec_fagsak.forrige_behandlings_id
+      );
+
+      --Diagnose
+      for rec_diagnose in cur_diagnose(rec_fagsak.kafka_offset) loop
+        begin
+          insert into dvh_fam_pp.fam_pp_diagnose(kode, type, fk_pp_fagsak, lastet_dato)
+          values(rec_diagnose.kode, rec_diagnose.type, v_pk_pp_fagsak, sysdate);
+        exception
+          when others then
+            v_error_melding := substr(sqlcode||sqlerrm,1,1000);
+            v_feil_kilde_navn := 'FAM_PP_DIAGNOSE';
+            p_out_error := substr(v_error_melding||' '||v_feil_kilde_navn, 1, 1000);
+            rollback to do_insert; continue;
+            insert into dvh_fam_fp.fp_xml_utbrett_error(id, error_msg, opprettet_tid, kilde)
+            values(null, v_error_melding, sysdate, v_feil_kilde_navn);
+            commit;
+            exit;--Ut av diagnose
+        end;
+      end loop;--Diagnose
+
+      --Perioder
+      for rec_perioder in cur_perioder(rec_fagsak.kafka_offset) loop
+        begin
+          v_pk_pp_perioder := -1;
+          select dvh_fampp_kafka.hibernate_sequence.nextval into v_pk_pp_perioder from dual;
+          insert into dvh_fam_pp.fam_pp_perioder
+          (
+            pk_pp_perioder, beredskap, brutto_beregningsgrunnlag, dato_fom, dato_tom
+           ,gmt_andre_sokers_tilsyn, gmt_etablert_tilsyn, gmt_overse_etablert_tilsyn_aarsak
+           ,gmt_tilgjengelig_for_soker, nattevaak, oppgitt_tilsyn, pleiebehov
+           ,sokers_tapte_timer, utfall, uttaksgrad, fk_pp_fagsak, sokers_tapte_arbeidstid
+           ,lastet_dato
+          )
+          values
+          (
+            v_pk_pp_perioder, rec_perioder.beredskap, rec_perioder.brutto_beregningsgrunnlag
+           ,rec_perioder.dato_fom, rec_perioder.dato_tom
+           ,rec_perioder.gmt_andre_sokers_tilsyn, rec_perioder.gmt_etablert_tilsyn
+           ,rec_perioder.gmt_overse_etablert_tilsyn_aarsak, rec_perioder.gmt_tilgjengelig_for_soker
+           ,rec_perioder.nattevaak, rec_perioder.oppgitt_tilsyn, rec_perioder.pleiebehov
+          ,rec_perioder.sokers_tapte_timer, rec_perioder.utfall, rec_perioder.uttaksgrad
+          ,v_pk_pp_fagsak, rec_perioder.sokers_tapte_arbeidstid
+          ,sysdate
+          );
+
+          --Inngangsvilkaar
+          for rec_vilkaar in cur_periode_inngangsvilkaar(rec_fagsak.kafka_offset) loop
+            begin
+              insert into dvh_fam_pp.fam_pp_periode_inngangsvilkaar(utfall, vilkaar, fk_pp_perioder, lastet_dato)
+              values(rec_vilkaar.utfall, rec_vilkaar.vilkaar, v_pk_pp_perioder, sysdate);
+            exception
+              when others then
+                v_error_melding := substr(sqlcode||sqlerrm,1,1000);
+                v_feil_kilde_navn := 'FAM_PP_PERIODE_INNGANGSVILKAAR';
+                p_out_error := substr(v_error_melding||' '||v_feil_kilde_navn, 1, 1000);
+                rollback to do_insert; continue;
+                insert into dvh_fam_fp.fp_xml_utbrett_error(id, error_msg, opprettet_tid, kilde)
+                values(null, v_error_melding, sysdate, v_feil_kilde_navn);
+                commit;
+                exit;--Ut av inngangsvilkår
+            end;
+          end loop;--Inngangsvilkaar
+
+          --Utbet_grader
+          for rec_utbet in cur_periode_utbet_grader(rec_fagsak.kafka_offset) loop
+            begin
+              insert into dvh_fam_pp.fam_pp_periode_utbet_grader
+              (
+                arbeidsforhold_aktorid, arbeidsforhold_id, arbeidsforhold_orgnr
+               ,arbeidsforhold_type, dagsats, delytelse_id_direkte, delytelse_id_refusjon
+               ,faktisk_arbeidstid, normal_arbeidstid, utbetalingsgrad
+               ,bruker_er_mottaker, fk_pp_perioder, lastet_dato
+              )
+              values
+              (
+                rec_utbet.arbeidsforhold_aktorid, rec_utbet.arbeidsforhold_id, rec_utbet.arbeidsforhold_orgnr
+               ,rec_utbet.arbeidsforhold_type, rec_utbet.dagsats, rec_utbet.delytelse_id_direkte, rec_utbet.delytelse_id_refusjon
+               ,rec_utbet.faktisk_arbeidstid, rec_utbet.normal_arbeidstid, rec_utbet.utbetalingsgrad
+               ,rec_utbet.bruker_er_mottaker, v_pk_pp_perioder, sysdate
+              );
+            exception
+              when others then
+                v_error_melding := substr(sqlcode||sqlerrm,1,1000);
+                v_feil_kilde_navn := 'FAM_PP_PERIODE_UTBET_GRADER';
+                p_out_error := substr(v_error_melding||' '||v_feil_kilde_navn, 1, 1000);
+                rollback to do_insert; continue;
+                insert into dvh_fam_fp.fp_xml_utbrett_error(id, error_msg, opprettet_tid, kilde)
+                values(null, v_error_melding, sysdate, v_feil_kilde_navn);
+                commit;
+                exit;--Ut av utbet_grader
+            end;
+          end loop;--Utbet_grader
+
+          --Aarsak
+          for rec_aarsak in cur_periode_aarsak(rec_fagsak.kafka_offset) loop
+            begin
+              insert into dvh_fam_pp.fam_pp_periode_aarsak(aarsak, fk_pp_perioder, lastet_dato)
+              values(rec_aarsak.aarsak, v_pk_pp_perioder, sysdate);
+            exception
+              when others then
+                v_error_melding := substr(sqlcode||sqlerrm,1,1000);
+                v_feil_kilde_navn := 'FAM_PP_PERIODE_AARSAK';
+                p_out_error := substr(v_error_melding||' '||v_feil_kilde_navn, 1, 1000);
+                rollback to do_insert; continue;
+                insert into dvh_fam_fp.fp_xml_utbrett_error(id, error_msg, opprettet_tid, kilde)
+                values(null, v_error_melding, sysdate, v_feil_kilde_navn);
+                commit;
+                exit;--Ut av årsak
+            end;
+          end loop; --Aarsak
+        exception
+          when others then
+            v_error_melding := substr(sqlcode||sqlerrm,1,1000);
+            v_feil_kilde_navn := 'FAM_PP_PERIODER';
+            p_out_error := substr(v_error_melding||' '||v_feil_kilde_navn, 1, 1000);
+            rollback to do_insert; continue;
+            insert into dvh_fam_fp.fp_xml_utbrett_error(id, error_msg, opprettet_tid, kilde)
+            values(null, v_error_melding, sysdate, v_feil_kilde_navn);
+            commit;
+            exit;--Ut av perioder
+        end;
+      end loop;--Perioder
+
+      v_commit := v_commit + 1;
+      if v_commit >= 10000 then
+        commit;
+        v_commit := 0;
+      end if;
+    exception
+      when others then
+        v_error_melding := substr(sqlcode||sqlerrm,1,1000);
+        v_feil_kilde_navn := 'FAM_PP_FAGSAK';
+        p_out_error := substr(v_error_melding||' '||v_feil_kilde_navn, 1, 1000);
+        rollback to do_insert; continue;
+        insert into dvh_fam_fp.fp_xml_utbrett_error(id, error_msg, opprettet_tid, kilde)
+        values(null, v_error_melding, sysdate, v_feil_kilde_navn);
+        commit;
+        --Gå til neste fagsak
+    end;
+  end loop;--Fagsak
+  commit;
+exception
+  when others then
+    v_error_melding := substr(sqlcode||sqlerrm,1,1000);
+    insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+    values(null, null, v_error_melding, sysdate, 'FAM_PP_UTPAKKING');
+    commit;
+    p_out_error := substr(p_out_error || v_error_melding, 1, 1000);
+end fam_pp_utpakking_offset;
+
+
+
+procedure fam_pp_utpakking_offset_2(p_in_offset in number, p_out_error out varchar2) as
+  cursor cur_fagsak(p_offset in number) is
+    with jdata as (
+      select fam_pp_meta_data.kafka_topic
+            ,fam_pp_meta_data.kafka_offset
+            ,fam_pp_meta_data.kafka_partition
+            ,fam_pp_meta_data.pk_pp_meta_data
+            ,fam_pp_meta_data.melding as doc
+      from dvh_fam_pp.fam_pp_meta_data
+      left join dvh_fam_pp.fam_pp_fagsak
+      on fam_pp_meta_data.kafka_offset = fam_pp_fagsak.kafka_offset
+      where fam_pp_meta_data.kafka_offset = p_offset
+      --and fam_pp_fagsak.kafka_offset is null--TEST!!!
+    )
+    select t.behandlings_id, t.pleietrengende, t.saksnummer
+          ,t.soker, t.utbetalingsreferanse, t.ytelse_type
+          ,cast(to_timestamp_tz(t.vedtaks_tidspunkt,'yyyy-mm-dd"T"hh24:mi:ss.ff+tzh:tzm')
+                at time zone 'europe/belgrade' as timestamp) as vedtaks_tidspunkt
+          ,t.forrige_behandlings_id
+          ,kafka_topic, kafka_offset, kafka_partition, pk_pp_meta_data
+    from jdata
+        ,json_table
+        (
+          doc, '$'
+          columns (
+          behandlings_id         varchar2 path '$.behandlingUuid'
+         ,pleietrengende         varchar2 path '$.pleietrengende'
+         ,saksnummer             varchar2 path '$.saksnummer'
+         ,soker                  varchar2 path '$.søker'
+         ,utbetalingsreferanse   varchar2 path '$.utbetalingsreferanse'
+         ,ytelse_type            varchar2 path '$.ytelseType'
+         ,vedtaks_tidspunkt      varchar2 path '$.vedtakstidspunkt'
+         ,forrige_behandlings_id varchar2 path '$.forrigeBehandlingUuid'
+         )
+        ) t;
+
+  cursor cur_diagnose(p_offset in number) is
+    with jdata as (
+      select melding as doc
+      from dvh_fam_pp.fam_pp_meta_data
+      where kafka_offset = p_offset
+    )
+    select t.kode, t.type
+    from jdata
+        ,json_table
+        (
+         doc, '$'
+         columns (
+         nested path '$.diagnosekoder[*]' columns (
+         kode varchar2 path '$.kode'
+        ,type varchar2 path '$.type'
+         )
+        )
+        ) t
+        where t.kode is not null;
+
+  cursor cur_perioder(p_offset in number) is
+    with jdata as (
+      select melding as doc
+      from dvh_fam_pp.fam_pp_meta_data
+      where kafka_offset = p_offset
+    )
+    select t.beredskap, to_number(t.brutto_beregningsgrunnlag,'999999999.99') as brutto_beregningsgrunnlag
+          ,to_date(t.dato_fom,'yyyy-mm-dd') as dato_fom, to_date(t.dato_tom,'yyyy-mm-dd') as dato_tom
+          ,t.gmt_andre_sokers_tilsyn, t.gmt_etablert_tilsyn, t.gmt_overse_etablert_tilsyn_aarsak
+          ,t.gmt_tilgjengelig_for_soker, t.nattevaak, t.oppgitt_tilsyn, t.pleiebehov, t.sokers_tapte_timer
+          ,t.utfall, t.uttaksgrad, t.sokers_tapte_arbeidstid
+    from jdata
+        ,json_table
+        (
+          doc, '$'
+          columns (
+          nested path '$.perioder[*]' columns (
+          beredskap                         varchar2 path '$.beredskap'
+         ,brutto_beregningsgrunnlag         varchar2 path '$.bruttoBeregningsgrunnlag'
+         ,dato_fom                          varchar2 path '$.fom'
+         ,dato_tom                          varchar2 path '$.tom'
+         ,gmt_andre_sokers_tilsyn           varchar2 path '$.graderingMotTilsyn.andreSøkeresTilsyn'
+         ,gmt_etablert_tilsyn               varchar2 path '$.graderingMotTilsyn.etablertTilsyn'
+         ,gmt_overse_etablert_tilsyn_aarsak varchar2 path '$.graderingMotTilsyn.overseEtablertTilsynÅrsak'
+         ,gmt_tilgjengelig_for_soker        varchar2 path '$.graderingMotTilsyn.tilgjengeligForSøker'
+         ,nattevaak                         varchar2 path '$.nattevåk'
+         ,oppgitt_tilsyn                    varchar2 path '$.oppgittTilsyn'
+         ,pleiebehov                        varchar2 path '$.pleiebehov'
+         ,sokers_tapte_timer                varchar2 path '$.søkersTapteTimer'
+         ,utfall                            varchar2 path '$.utfall'
+         ,uttaksgrad                        varchar2 path '$.uttaksgrad'
+         ,sokers_tapte_arbeidstid           varchar2 path '$.søkersTapteArbeidstid'
+           )
+        )
+        ) t;
+
+  cursor cur_periode_inngangsvilkaar(p_offset in number, p_fom date, p_tom date) is
+    with jdata as (
+      select melding as doc
+      from dvh_fam_pp.fam_pp_meta_data
+      where kafka_offset = p_offset
+    )
+    select t.*
+    from jdata
+        ,json_table (
+         doc, '$'
+         columns (
+		 nested path '$.perioder[*]' columns (
+           dato_fom         date path '$.fom'
+          ,dato_tom         date path '$.tom'
+        , nested path '$.inngangsvilkår[*]' columns (
+         utfall  varchar2 path '$.utfall'
+        ,vilkaar varchar2 path '$.vilkår'
+         )
+         )
+		)
+        ) t
+      --where dato_fom=to_date(p_fom, 'dd.mm.yyyy') and dato_tom=to_date(p_tom, 'dd.mm.yyyy');
+      where dato_fom = p_fom and dato_tom = p_tom
+      ;
+
+
+  cursor cur_periode_inngangsvilkaar_detaljertUtfall(p_offset in number, p_fom date, p_tom date, p_utfall string, p_vilkaar string) is
+    with jdata as (
+      select melding as doc
+      from dvh_fam_pp.fam_pp_meta_data
+      where kafka_offset = p_offset
+    )
+    select t.*
+    from jdata
+        ,json_table(
+        doc, '$'
+         columns (
+		 nested path '$.perioder[*]' columns (
+           dato_fom         date path '$.fom'
+          ,dato_tom         date path '$.tom'
+        , nested path '$.inngangsvilkår[*]' columns (
+         inn_utfall  varchar2 path '$.utfall'
+        ,inn_vilkaar varchar2 path '$.vilkår',
+        nested path '$.detaljertUtfall[*]' columns (
+        gjelderKravstiller         varchar2 path '$.gjelderKravstiller',
+        gjelderAktivitetType       varchar2 path '$.gjelderAktivitetType',
+        gjelderOrganisasjonsnummer varchar2 path '$.gjelderOrganisasjonsnummer',
+        gjelderAktorId             varchar2 path '$.gjelderAktørId',
+        gjelderArbeidsforholdId    varchar2 path '$.gjelderArbeidsforholdId',
+        utfall   varchar2 path '$.utfall'
+        )
+        )
+        )
+        )
+        )
+        t
+        --WHERE
+      WHERE DATO_FOM = p_fom AND DATO_TOM = p_tom AND INN_UTFALL=p_utfall AND INN_VILKAAR=p_vilkaar
+      AND  t.utfall IS NOT NULL
+        ;
+
+
+
+
+
+
+  cursor cur_periode_utbet_grader(p_offset in number) is
+    with jdata as (
+      select melding as doc
+      from dvh_fam_pp.fam_pp_meta_data
+      where kafka_offset = p_offset
+    )
+    select t.*
+          ,null as delytelse_id_direkte
+          ,null as delytelse_id_refusjon
+    from jdata
+        ,json_table (
+         doc, '$'
+         columns (
+         nested path '$.perioder.utbetalingsgrader[*]' columns (
+         arbeidsforhold_aktorid varchar2 path '$.arbeidsforhold.aktørId'
+        ,arbeidsforhold_id      varchar2 path '$.arbeidsforhold.arbeidsforholdId'
+        ,arbeidsforhold_orgnr   varchar2 path '$.arbeidsforhold.organisasjonsnummer'
+        ,arbeidsforhold_type    varchar2 path '$.arbeidsforhold.type'
+        ,dagsats                varchar2 path '$.dagsats'
+        ,faktisk_arbeidstid     varchar2 path '$.faktiskArbeidstid'
+        ,normal_arbeidstid      varchar2 path '$.normalArbeidstid'
+        ,utbetalingsgrad        varchar2 path '$.utbetalingsgrad'
+        ,bruker_er_mottaker     varchar2 path '$.brukerErMottaker'
+         )
+        )
+        ) t;
+
+  cursor cur_periode_aarsak(p_offset in number) is
+    with jdata as (
+      select melding as doc
+      from dvh_fam_pp.fam_pp_meta_data
+      where kafka_offset = p_offset
+    )
+    select t.*
+    from jdata
+        ,json_table (
+         doc, '$'
+         columns (
+         nested path '$.perioder.årsaker[*]' columns (
+         aarsak  varchar2 path '$[0]'
+         )
+        )
+        ) t;
+
+  v_pk_pp_fagsak number;
+  v_pk_pp_perioder number;
+  v_pk_pp_periode_inngangsvilkaar number;
+
+  v_fk_person1_soker number;
+  v_fk_person1_pleietrengende number;
+
+  v_error_melding varchar2(4000);
+  v_commit number := 0;
+  v_feil_kilde_navn varchar2(100) := null;
+begin
+  for rec_fagsak in cur_fagsak(p_in_offset) loop
+    begin
+      savepoint do_insert;
+      v_pk_pp_fagsak := -1;
+      v_fk_person1_soker := -1;
+      v_fk_person1_pleietrengende := -1;
+      select dvh_fampp_kafka.hibernate_sequence.nextval into v_pk_pp_fagsak from dual;
+      --Hent fk_person1
+      v_fk_person1_soker := fam_pp_fk_person1(rec_fagsak.vedtaks_tidspunkt, rec_fagsak.soker);
+      v_fk_person1_pleietrengende := fam_pp_fk_person1(rec_fagsak.vedtaks_tidspunkt, rec_fagsak.pleietrengende);
+        insert into dvh_fam_pp.fam_pp_fagsak
+      (
+        pk_pp_fagsak, behandlings_id, fk_person1_mottaker, fk_person1_pleietrengende
+       ,kafka_offset, kafka_partition, kafka_topic, lastet_dato
+       ,pleietrengende, saksnummer, soker, utbetalingsreferanse
+       ,ytelse_type, fk_pp_metadata, vedtaks_tidspunkt, forrige_behandlings_id
+      )
+      values
+      (
+        v_pk_pp_fagsak, rec_fagsak.behandlings_id, v_fk_person1_soker, v_fk_person1_pleietrengende
+       ,rec_fagsak.kafka_offset, rec_fagsak.kafka_partition, rec_fagsak.kafka_topic, sysdate
+       ,rec_fagsak.pleietrengende, rec_fagsak.saksnummer, rec_fagsak.soker, rec_fagsak.utbetalingsreferanse
+       ,rec_fagsak.ytelse_type, rec_fagsak.pk_pp_meta_data, rec_fagsak.vedtaks_tidspunkt
+       ,rec_fagsak.forrige_behandlings_id
+      );
+
+      --Diagnose
+      --if rec_fagsak.ytelse_type != 'OMP' then
+
+      for rec_diagnose in cur_diagnose(rec_fagsak.kafka_offset) loop
+        begin
+          insert into dvh_fam_pp.fam_pp_diagnose(kode, type, fk_pp_fagsak, lastet_dato)
+          values(rec_diagnose.kode, rec_diagnose.type, v_pk_pp_fagsak, sysdate);
+        exception
+          when others then
+            v_error_melding := substr(sqlcode||sqlerrm,1,1000);
+            v_feil_kilde_navn := 'FAM_PP_DIAGNOSE';
+            p_out_error := substr(v_error_melding||' '||v_feil_kilde_navn, 1, 1000);
+            rollback to do_insert; continue;
+            insert into dvh_fam_fp.fp_xml_utbrett_error(id, error_msg, opprettet_tid, kilde)
+            values(null, v_error_melding, sysdate, v_feil_kilde_navn);
+            commit;
+            exit;--Ut av diagnose
+        end;
+      end loop;--Diagnose
+     -- end if;
+
+      --Perioder
+      for rec_perioder in cur_perioder(rec_fagsak.kafka_offset) loop
+        begin
+          v_pk_pp_perioder := -1;
+          select dvh_fampp_kafka.hibernate_sequence.nextval into v_pk_pp_perioder from dual;
+          insert into dvh_fam_pp.fam_pp_perioder
+          (
+            pk_pp_perioder, beredskap, brutto_beregningsgrunnlag, dato_fom, dato_tom
+           ,gmt_andre_sokers_tilsyn, gmt_etablert_tilsyn, gmt_overse_etablert_tilsyn_aarsak
+           ,gmt_tilgjengelig_for_soker, nattevaak, oppgitt_tilsyn, pleiebehov
+           ,sokers_tapte_timer, utfall, uttaksgrad, fk_pp_fagsak, sokers_tapte_arbeidstid
+           ,lastet_dato
+          )
+          values
+          (
+            v_pk_pp_perioder, rec_perioder.beredskap, rec_perioder.brutto_beregningsgrunnlag
+           ,rec_perioder.dato_fom, rec_perioder.dato_tom
+           ,rec_perioder.gmt_andre_sokers_tilsyn, rec_perioder.gmt_etablert_tilsyn
+           ,rec_perioder.gmt_overse_etablert_tilsyn_aarsak, rec_perioder.gmt_tilgjengelig_for_soker
+           ,rec_perioder.nattevaak, rec_perioder.oppgitt_tilsyn, rec_perioder.pleiebehov
+          ,rec_perioder.sokers_tapte_timer, rec_perioder.utfall, rec_perioder.uttaksgrad
+          ,v_pk_pp_fagsak, rec_perioder.sokers_tapte_arbeidstid
+          ,sysdate
+          );
+
+          --Inngangsvilkaar
+          for rec_vilkaar in cur_periode_inngangsvilkaar(rec_fagsak.kafka_offset, rec_perioder.dato_fom, rec_perioder.dato_tom) loop
+            begin
+              v_pk_pp_periode_inngangsvilkaar:= -1;
+              select dvh_fampp_kafka.hibernate_sequence.nextval into v_pk_pp_periode_inngangsvilkaar from dual;
+              insert into dvh_fam_pp.fam_pp_periode_inngangsvilkaar
+              (
+              pk_pp_periode_inngangsvilkaar,utfall, vilkaar, fk_pp_perioder, lastet_dato--,fom,tom
+              )
+              values
+              (
+              v_pk_pp_periode_inngangsvilkaar,rec_vilkaar.utfall, rec_vilkaar.vilkaar, v_pk_pp_perioder, sysdate
+              --,rec_perioder.dato_fom, rec_perioder.dato_tom
+              );
+
+
+
+              if rec_fagsak.ytelse_type = 'OMP' then
+              for rec_detUtfall in cur_periode_inngangsvilkaar_detaljertUtfall(rec_fagsak.kafka_offset
+              ,rec_perioder.dato_fom, rec_perioder.dato_tom,rec_vilkaar.utfall, rec_vilkaar.vilkaar) loop
+                begin
+                 insert into dvh_fam_pp.fam_vilkaar_detaljer_utfall
+                 (
+                    gjelder_kravstiller,gjelder_aktivitet_type,gjelder_organisasjonsnummer,gjelder_aktor_id
+                    ,gjelder_arbeidsforhold_id,det_utfall,lastet_dato,fk_pp_periode_inngangsvilkaar
+                 )
+                 values
+                 (
+                    rec_detUtfall.gjelderKravstiller, rec_detUtfall.gjelderAktivitetType, rec_detUtfall.gjelderOrganisasjonsnummer, rec_detUtfall.gjelderAktorId
+                    ,rec_detUtfall.gjelderArbeidsforholdId, rec_detUtfall.utfall, sysdate, v_pk_pp_periode_inngangsvilkaar
+                 );
+            exception
+              when others then
+                v_error_melding := substr(sqlcode||sqlerrm,1,1000);
+                v_feil_kilde_navn := 'FAM_VILKAAR_DETALJER_UTFALL';
+                p_out_error := substr(v_error_melding||' '||v_feil_kilde_navn, 1, 1000);
+                rollback to do_insert; continue;
+                insert into dvh_fam_fp.fp_xml_utbrett_error(id, error_msg, opprettet_tid, kilde)
+                values(null, v_error_melding, sysdate, v_feil_kilde_navn);
+                commit;
+                exit;--DetaljertUtfall
+                end;
+              end loop;--DetaljertUtfall
+              end if;
+
+            exception
+              when others then
+                v_error_melding := substr(sqlcode||sqlerrm,1,1000);
+                v_feil_kilde_navn := 'FAM_PP_PERIODE_INNGANGSVILKAAR';
+                p_out_error := substr(v_error_melding||' '||v_feil_kilde_navn, 1, 1000);
+                rollback to do_insert; continue;
+                insert into dvh_fam_fp.fp_xml_utbrett_error(id, error_msg, opprettet_tid, kilde)
+                values(null, v_error_melding, sysdate, v_feil_kilde_navn);
+                commit;
+                exit;--Ut av inngangsvilkår
+            end;
+          end loop;--Inngangsvilkaar
+
+          --detaljertUtfall
+
+          --Utbet_grader
+          for rec_utbet in cur_periode_utbet_grader(rec_fagsak.kafka_offset) loop
+            begin
+              insert into dvh_fam_pp.fam_pp_periode_utbet_grader
+              (
+                arbeidsforhold_aktorid, arbeidsforhold_id, arbeidsforhold_orgnr
+               ,arbeidsforhold_type, dagsats, delytelse_id_direkte, delytelse_id_refusjon
+               ,faktisk_arbeidstid, normal_arbeidstid, utbetalingsgrad
+               ,bruker_er_mottaker, fk_pp_perioder, lastet_dato
+              )
+              values
+              (
+                rec_utbet.arbeidsforhold_aktorid, rec_utbet.arbeidsforhold_id, rec_utbet.arbeidsforhold_orgnr
+               ,rec_utbet.arbeidsforhold_type, rec_utbet.dagsats, rec_utbet.delytelse_id_direkte, rec_utbet.delytelse_id_refusjon
+               ,rec_utbet.faktisk_arbeidstid, rec_utbet.normal_arbeidstid, rec_utbet.utbetalingsgrad
+               ,rec_utbet.bruker_er_mottaker, v_pk_pp_perioder, sysdate
+              );
+            exception
+              when others then
+                v_error_melding := substr(sqlcode||sqlerrm,1,1000);
+                v_feil_kilde_navn := 'FAM_PP_PERIODE_UTBET_GRADER';
+                p_out_error := substr(v_error_melding||' '||v_feil_kilde_navn, 1, 1000);
+                rollback to do_insert; continue;
+                insert into dvh_fam_fp.fp_xml_utbrett_error(id, error_msg, opprettet_tid, kilde)
+                values(null, v_error_melding, sysdate, v_feil_kilde_navn);
+                commit;
+                exit;--Ut av utbet_grader
+            end;
+          end loop;--Utbet_grader
+
+          --Aarsak
+          for rec_aarsak in cur_periode_aarsak(rec_fagsak.kafka_offset) loop
+            begin
+              insert into dvh_fam_pp.fam_pp_periode_aarsak(aarsak, fk_pp_perioder, lastet_dato)
+              values(rec_aarsak.aarsak, v_pk_pp_perioder, sysdate);
+            exception
+              when others then
+                v_error_melding := substr(sqlcode||sqlerrm,1,1000);
+                v_feil_kilde_navn := 'FAM_PP_PERIODE_AARSAK';
+                p_out_error := substr(v_error_melding||' '||v_feil_kilde_navn, 1, 1000);
+                rollback to do_insert; continue;
+                insert into dvh_fam_fp.fp_xml_utbrett_error(id, error_msg, opprettet_tid, kilde)
+                values(null, v_error_melding, sysdate, v_feil_kilde_navn);
+                commit;
+                exit;--Ut av årsak
+            end;
+          end loop; --Aarsak
+
+
+        exception
+          when others then
+            v_error_melding := substr(sqlcode||sqlerrm,1,1000);
+            v_feil_kilde_navn := 'FAM_PP_PERIODER';
+            p_out_error := substr(v_error_melding||' '||v_feil_kilde_navn, 1, 1000);
+            rollback to do_insert; continue;
+            insert into dvh_fam_fp.fp_xml_utbrett_error(id, error_msg, opprettet_tid, kilde)
+            values(null, v_error_melding, sysdate, v_feil_kilde_navn);
+            commit;
+            exit;--Ut av perioder
+        end;
+      end loop;--Perioder
+
+      v_commit := v_commit + 1;
+      if v_commit >= 10000 then
+        commit;
+        v_commit := 0;
+      end if;
+    exception
+      when others then
+        v_error_melding := substr(sqlcode||sqlerrm,1,1000);
+        v_feil_kilde_navn := 'FAM_PP_FAGSAK';
+        p_out_error := substr(v_error_melding||' '||v_feil_kilde_navn, 1, 1000);
+        rollback to do_insert; continue;
+        insert into dvh_fam_fp.fp_xml_utbrett_error(id, error_msg, opprettet_tid, kilde)
+        values(null, v_error_melding, sysdate, v_feil_kilde_navn);
+        commit;
+        --Gå til neste fagsak
+    end;
+  end loop;--Fagsak
+  commit;
+exception
+  when others then
+    v_error_melding := substr(sqlcode||sqlerrm,1,1000);
+    insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+    values(null, null, v_error_melding, sysdate, 'FAM_PP_UTPAKKING');
+    commit;
+    p_out_error := substr(p_out_error || v_error_melding, 1, 1000);
+end fam_pp_utpakking_offset_2;
+
+procedure fam_pp_utpakking_offset_test(p_in_offset in number, p_out_error out varchar2) as
+  cursor cur_fagsak(p_offset in number) is
+    with jdata as (
+      select fam_pp_meta_data.kafka_topic
+            ,fam_pp_meta_data.kafka_offset
+            ,fam_pp_meta_data.kafka_partition
+            ,fam_pp_meta_data.pk_pp_meta_data
+            ,fam_pp_meta_data.melding as doc
+      from dvh_fam_pp.fam_pp_meta_data
+      left join dvh_fam_pp.fam_pp_fagsak
+      on fam_pp_meta_data.kafka_offset = fam_pp_fagsak.kafka_offset
+      where fam_pp_meta_data.kafka_offset = p_offset
+      and fam_pp_fagsak.kafka_offset is null--TEST!!!
+    )
+    select t.behandlings_id, t.pleietrengende, t.saksnummer
+          ,t.soker, t.utbetalingsreferanse, t.ytelse_type
+          ,cast(to_timestamp_tz(t.vedtaks_tidspunkt,'yyyy-mm-dd"T"hh24:mi:ss.ff+tzh:tzm')
+                at time zone 'europe/belgrade' as timestamp) as vedtaks_tidspunkt
+          ,t.forrige_behandlings_id
+          ,kafka_topic, kafka_offset, kafka_partition, pk_pp_meta_data
+    from jdata
+        ,json_table
+        (
+          doc, '$'
+          columns (
+          behandlings_id         varchar2 path '$.behandlingUuid'
+         ,pleietrengende         varchar2 path '$.pleietrengende'
+         ,saksnummer             varchar2 path '$.saksnummer'
+         ,soker                  varchar2 path '$.søker'
+         ,utbetalingsreferanse   varchar2 path '$.utbetalingsreferanse'
+         ,ytelse_type            varchar2 path '$.ytelseType'
+         ,vedtaks_tidspunkt      varchar2 path '$.vedtakstidspunkt'
+         ,forrige_behandlings_id varchar2 path '$.forrigeBehandlingUuid'
+         )
+        ) t;
+
+  cursor cur_diagnose(p_offset in number) is
+    with jdata as (
+      select melding as doc
+      from dvh_fam_pp.fam_pp_meta_data
+      where kafka_offset = p_offset
+    )
+    select t.kode, t.type
+    from jdata
+        ,json_table
+        (
+         doc, '$'
+         columns (
+         nested path '$.diagnosekoder[*]' columns (
+         kode varchar2 path '$.kode'
+        ,type varchar2 path '$.type'
+         )
+        )
+        ) t;
+
+  cursor cur_perioder(p_offset in number) is
+    with jdata as (
+      select melding as doc
+      from dvh_fam_pp.fam_pp_meta_data
+      where kafka_offset = p_offset
+    )
+    select t.beredskap, to_number(t.brutto_beregningsgrunnlag) as brutto_beregningsgrunnlag
+          ,to_date(t.dato_fom,'yyyy-mm-dd') as dato_fom, to_date(t.dato_tom,'yyyy-mm-dd') as dato_tom
+          ,t.gmt_andre_sokers_tilsyn, t.gmt_etablert_tilsyn, t.gmt_overse_etablert_tilsyn_aarsak
+          ,t.gmt_tilgjengelig_for_soker, t.nattevaak, t.oppgitt_tilsyn, t.pleiebehov, t.sokers_tapte_timer
+          ,t.utfall, t.uttaksgrad, t.sokers_tapte_arbeidstid
+    from jdata
+        ,json_table
+        (
+          doc, '$'
+          columns (
+          nested path '$.perioder[*]' columns (
+          beredskap                         varchar2 path '$.beredskap'
+         ,brutto_beregningsgrunnlag         varchar2 path '$.bruttoBeregningsgrunnlag'
+         ,dato_fom                          varchar2 path '$.fom'
+         ,dato_tom                          varchar2 path '$.tom'
+         ,gmt_andre_sokers_tilsyn           varchar2 path '$.graderingMotTilsyn.andreSøkeresTilsyn'
+         ,gmt_etablert_tilsyn               varchar2 path '$.graderingMotTilsyn.etablertTilsyn'
+         ,gmt_overse_etablert_tilsyn_aarsak varchar2 path '$.graderingMotTilsyn.overseEtablertTilsynårsak'
+         ,gmt_tilgjengelig_for_soker        varchar2 path '$.graderingMotTilsyn.tilgjengeligForSøker'
+         ,nattevaak                         varchar2 path '$.nattevåk'
+         ,oppgitt_tilsyn                    varchar2 path '$.oppgittTilsyn'
+         ,pleiebehov                        varchar2 path '$.pleiebehov'
+         ,sokers_tapte_timer                varchar2 path '$.søkersTapteTimer'
+         ,utfall                            varchar2 path '$.utfall'
+         ,uttaksgrad                        varchar2 path '$.uttaksgrad'
+         ,sokers_tapte_arbeidstid           varchar2 path '$.søkersTapteArbeidstid'
+           )
+        )
+        ) t;
+
+  cursor cur_periode_inngangsvilkaar(p_offset in number) is
+    with jdata as (
+      select melding as doc
+      from dvh_fam_pp.fam_pp_meta_data
+      where kafka_offset = p_offset
+    )
+    select t.*
+    from jdata
+        ,json_table (
+         doc, '$'
+         columns (
+         nested path '$.perioder.inngangsvilkår[*]' columns (
+         utfall  varchar2 path '$.utfall'
+        ,vilkaar varchar2 path '$.vilkår'
+         )
+        )
+        ) t;
+
+  cursor cur_periode_utbet_grader(p_offset in number) is
+    with jdata as (
+      select melding as doc
+      from dvh_fam_pp.fam_pp_meta_data
+      where kafka_offset = p_offset
+    )
+    select t.*
+          ,null as delytelse_id_direkte
+          ,null as delytelse_id_refusjon
+    from jdata
+        ,json_table (
+         doc, '$'
+         columns (
+         nested path '$.perioder.utbetalingsgrader[*]' columns (
+         arbeidsforhold_aktorid varchar2 path '$.arbeidsforhold.aktørId'
+        ,arbeidsforhold_id      varchar2 path '$.arbeidsforhold.arbeidsforholdId'
+        ,arbeidsforhold_orgnr   varchar2 path '$.arbeidsforhold.organisasjonsnummer'
+        ,arbeidsforhold_type    varchar2 path '$.arbeidsforhold.type'
+        ,dagsats                varchar2 path '$.dagsats'
+        ,faktisk_arbeidstid     varchar2 path '$.faktiskArbeidstid'
+        ,normal_arbeidstid      varchar2 path '$.normalArbeidstid'
+        ,utbetalingsgrad        varchar2 path '$.utbetalingsgrad'
+        ,bruker_er_mottaker     varchar2 path '$.brukerErMottaker'
+         )
+        )
+        ) t;
+
+  cursor cur_periode_aarsak(p_offset in number) is
+    with jdata as (
+      select melding as doc
+      from dvh_fam_pp.fam_pp_meta_data
+      where kafka_offset = p_offset
+    )
+    select t.*
+    from jdata
+        ,json_table (
+         doc, '$'
+         columns (
+         nested path '$.perioder.årsaker[*]' columns (
          aarsak  varchar2 path '$[0]'
          )
         )
@@ -424,7 +1220,7 @@ begin
                 insert into fk_sensitiv.fp_xml_utbrett_error(id, error_msg, opprettet_tid, kilde)
                 values(null, v_error_melding, sysdate, v_feil_kilde_navn);
                 commit;
-                exit;--Ut av inngangsvilk�r
+                exit;--Ut av inngangsvilk¿r
             end;
           end loop;--Inngangsvilkaar
 
@@ -472,7 +1268,7 @@ begin
                 insert into fk_sensitiv.fp_xml_utbrett_error(id, error_msg, opprettet_tid, kilde)
                 values(null, v_error_melding, sysdate, v_feil_kilde_navn);
                 commit;
-                exit;--Ut av �rsak
+                exit;--Ut av ¿rsak
             end;
           end loop; --Aarsak
         exception
@@ -502,7 +1298,7 @@ begin
         insert into fk_sensitiv.fp_xml_utbrett_error(id, error_msg, opprettet_tid, kilde)
         values(null, v_error_melding, sysdate, v_feil_kilde_navn);
         commit;
-        --G� til neste fagsak
+        --G¿ til neste fagsak
     end;
   end loop;--Fagsak
   commit;
@@ -513,7 +1309,7 @@ exception
     values(null, null, v_error_melding, sysdate, 'FAM_PP_UTPAKKING');
     commit;
     p_out_error := substr(p_out_error || v_error_melding, 1, 1000);
-end fam_pp_utpakking_offset;
+end fam_pp_utpakking_offset_test;
 
 procedure fam_pp_stonad_vedtak_insert(p_in_vedtak_periode_yyyymm in number
                                      ,p_in_max_vedtaksperiode_yyyymm in number
@@ -560,6 +1356,7 @@ procedure fam_pp_stonad_vedtak_insert(p_in_vedtak_periode_yyyymm in number
             ,perioder.oppgitt_tilsyn, perioder.pleiebehov, perioder.sokers_tapte_timer
             ,perioder.sokers_tapte_arbeidstid, perioder.utfall, perioder.uttaksgrad
             ,perioder.antall_dager
+            , perioder.pk_pp_perioder fk_pp_perioder
             ,utbet.dagsats
             ,utbet.dagsats * perioder.antall_dager as belop
             ,sum(dagsats) over (partition by fagsak.saksnummer, perioder.dato_fom, perioder.dato_tom) as dagsats_total
@@ -674,7 +1471,7 @@ begin
   exception
     when others then
       l_error_melding := substr(sqlcode || ' ' || sqlerrm, 1, 1000);
-      insert into fk_sensitiv.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+      insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
       values(null, null, l_error_melding, sysdate, 'FAM_PP_STONAD_VEDTAK_INSERT1');
       commit;
       p_out_error := l_error_melding;
@@ -696,7 +1493,7 @@ begin
       ,fk_dim_person, fk_dim_geografi, bosted_kommune_nr, bydel_kommune_nr
       ,fk_pp_diagnose, antall_diagnose, relasjon, fk_pp_relasjoner
       ,fodsel_aar_mottaker, fodsel_mnd_mottaker
-      ,fodsel_aar_pleietrengende, fodsel_mnd_pleietrengende
+      ,fodsel_aar_pleietrengende, fodsel_mnd_pleietrengende, fk_pp_perioder
       )
       values
       (rec_pp.pk_pp_fagsak, rec_pp.behandlings_id, rec_pp.forrige_behandlings_id, rec_pp.fk_person1_mottaker
@@ -713,14 +1510,14 @@ begin
       ,rec_pp.pk_dim_person, rec_pp.pk_dim_geografi, rec_pp.bosted_kommune_nr, rec_pp.bydel_kommune_nr
       ,rec_pp.pk_pp_diagnose, rec_pp.antall_diagnose, rec_pp.relasjon, rec_pp.pk_pp_relasjoner
       ,rec_pp.fodsel_aar_mottaker, rec_pp.fodsel_mnd_mottaker
-      ,rec_pp.fodsel_aar_pleietrengende, rec_pp.fodsel_mnd_pleietrengende);
+      ,rec_pp.fodsel_aar_pleietrengende, rec_pp.fodsel_mnd_pleietrengende, rec_pp.fk_pp_perioder);
       l_commit := l_commit + 1;
     exception
       when others then
         l_error_melding := substr(sqlcode || ' ' || sqlerrm, 1, 1000);
-        insert into fk_sensitiv.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+        insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
         values(null, rec_pp.pk_pp_fagsak, l_error_melding, sysdate, 'FAM_PP_STONAD_VEDTAK_INSERT2');
-        l_commit := l_commit + 1;--G� videre til neste rekord
+        l_commit := l_commit + 1;--Gå videre til neste rekord
         p_out_error := substr(p_out_error || l_error_melding, 1, 1000);
         l_error_melding := null;
     end;
@@ -731,7 +1528,7 @@ begin
   end loop;
   commit;
   if l_error_melding is not null then
-    insert into fk_sensitiv.fp_xml_utbrett_error(id, error_msg, opprettet_tid, kilde)
+    insert into dvh_fam_fp.fp_xml_utbrett_error(id, error_msg, opprettet_tid, kilde)
     values(null, l_error_melding, sysdate, 'FAM_PP_STONAD_VEDTAK_INSERT3');
     commit;
     p_out_error := substr(p_out_error || l_error_melding, 1, 1000);
@@ -739,7 +1536,7 @@ begin
 exception
   when others then
     l_error_melding := substr(sqlcode || ' ' || sqlerrm, 1, 1000);
-    insert into fk_sensitiv.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+    insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
     values(null, null, l_error_melding, sysdate, 'FAM_PP_STONAD_VEDTAK_INSERT4');
     commit;
     p_out_error := substr(p_out_error || l_error_melding, 1, 1000);
@@ -874,7 +1671,7 @@ begin
   exception
     when others then
       l_error_melding := substr(sqlcode || ' ' || sqlerrm, 1, 1000);
-      insert into fk_sensitiv.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+      insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
       values(null, null, l_error_melding, sysdate, 'FAM_PP_STONAD_VEDTAK_INSERT1');
       commit;
       p_out_error := l_error_melding;
@@ -914,9 +1711,9 @@ begin
     exception
       when others then
         l_error_melding := substr(sqlcode || ' ' || sqlerrm, 1, 1000);
-        insert into fk_sensitiv.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+        insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
         values(null, rec_pp.pk_pp_fagsak, l_error_melding, sysdate, 'FAM_PP_STONAD_VEDTAK_INSERT2');
-        l_commit := l_commit + 1;--G� videre til neste rekord
+        l_commit := l_commit + 1;--Gå videre til neste rekord
         p_out_error := substr(p_out_error || l_error_melding, 1, 1000);
         l_error_melding := null;
     end;
@@ -927,7 +1724,7 @@ begin
   end loop;
   commit;
   if l_error_melding is not null then
-    insert into fk_sensitiv.fp_xml_utbrett_error(id, error_msg, opprettet_tid, kilde)
+    insert into dvh_fam_fp.fp_xml_utbrett_error(id, error_msg, opprettet_tid, kilde)
     values(null, l_error_melding, sysdate, 'FAM_PP_STONAD_VEDTAK_INSERT3');
     commit;
     p_out_error := substr(p_out_error || l_error_melding, 1, 1000);
@@ -935,7 +1732,7 @@ begin
 exception
   when others then
     l_error_melding := substr(sqlcode || ' ' || sqlerrm, 1, 1000);
-    insert into fk_sensitiv.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+    insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
     values(null, null, l_error_melding, sysdate, 'FAM_PP_STONAD_VEDTAK_INSERT4');
     commit;
     p_out_error := substr(p_out_error || l_error_melding, 1, 1000);
@@ -1024,10 +1821,12 @@ procedure fam_pp_stonad_vedtak_ur_insert(p_in_vedtak_periode_yyyymm in number
 
       join dt_kodeverk.dim_tid
       on dim_tid.dato between ur.dato_utbet_fom and ur.dato_utbet_tom
+      and dim_tid.dag_i_uke<6
 
       left join dvh_fam_pp.fam_pp_perioder perioder
       on perioder.fk_pp_fagsak = fagsak.pk_pp_fagsak
       and dim_tid.dato between perioder.dato_fom and perioder.dato_tom
+      and dim_tid.dag_i_uke<6
 
       left join dvh_fam_pp.fam_pp_relasjoner relasjoner
       on relasjoner.fk_pp_fagsak = fagsak.pk_pp_fagsak
@@ -1194,7 +1993,7 @@ begin
   exception
     when others then
       l_error_melding := substr(sqlcode || ' ' || sqlerrm, 1, 1000);
-      insert into fk_sensitiv.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+      insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
       values(null, null, l_error_melding, sysdate, 'FAM_PP_STONAD_VEDTAK_UR_INSERT1');
       commit;
       p_out_error := l_error_melding;
@@ -1242,9 +2041,9 @@ begin
     exception
       when others then
         l_error_melding := substr(sqlcode || ' ' || sqlerrm, 1, 1000);
-        insert into fk_sensitiv.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+        insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
         values(null, rec_pp.pk_pp_fagsak, l_error_melding, sysdate, 'FAM_PP_STONAD_VEDTAK_UR_INSERT2');
-        l_commit := l_commit + 1;--G� videre til neste rekord
+        l_commit := l_commit + 1;--Gå videre til neste rekord
         p_out_error := substr(p_out_error || l_error_melding, 1, 1000);
         l_error_melding := null;
     end;
@@ -1255,7 +2054,7 @@ begin
   end loop;
   commit;
   if l_error_melding is not null then
-    insert into fk_sensitiv.fp_xml_utbrett_error(id, error_msg, opprettet_tid, kilde)
+    insert into dvh_fam_fp.fp_xml_utbrett_error(id, error_msg, opprettet_tid, kilde)
     values(null, l_error_melding, sysdate, 'FAM_PP_STONAD_VEDTAK_UR_INSERT3');
     commit;
     p_out_error := substr(p_out_error || l_error_melding, 1, 1000);
@@ -1263,7 +2062,7 @@ begin
 exception
   when others then
     l_error_melding := substr(sqlcode || ' ' || sqlerrm, 1, 1000);
-    insert into fk_sensitiv.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+    insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
     values(null, null, l_error_melding, sysdate, 'FAM_PP_STONAD_VEDTAK_UR_INSERT4');
     commit;
     p_out_error := substr(p_out_error || l_error_melding, 1, 1000);
@@ -1302,9 +2101,120 @@ exception
   when others then
     v_error_melding := substr(sqlcode || ' ' || sqlerrm, 1, 1000);
     p_out_error := v_error_melding;
-    insert into fk_sensitiv.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+    insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
     values(null, null, v_error_melding, sysdate, 'FAM_PP_DIAGNOSE_DIM_OPPDATER');
     commit;
 end fam_pp_diagnose_dim_oppdater;
+
+procedure fam_pp_stonad_siste_diagnose_patching(p_in_vedtak_periode_yyyymm in number
+                                     ,p_in_kildesystem in varchar2
+                                     ,p_in_gyldig_flagg in number default 0
+                                     ,p_out_error out varchar2) as
+  l_error_melding varchar2(1000);
+Begin
+    merge into FAM_PP_STONAD stonad
+    using (
+      SELECT
+  saksnummer,
+  behandlings_id,
+  vedtaks_tidspunkt,
+  max(fk_dim_diagnose) SISTE_FK_DIM_DIAGNOSE,
+  kode siste_diagnose_kode,
+  type siste_diagnose_type
+FROM
+  (
+    SELECT
+      saksnummer,
+      behandlings_id,
+      vedtaks_tidspunkt,
+      LAST_VALUE(fk_dim_diagnose IGNORE NULLS) OVER ( ORDER BY saksnummer, vedtaks_tidspunkt) fk_dim_diagnose,
+      type,
+      LAST_VALUE(kode IGNORE NULLS) OVER ( ORDER BY saksnummer, vedtaks_tidspunkt) kode
+    FROM
+      (
+        SELECT
+          *
+        FROM
+          (
+            SELECT
+              saksnummer,
+              vedtaks_tidspunkt,
+              NULL kode,
+              behandlings_id,
+              NULL fk_dim_diagnose,
+              type,
+              ROW_NUMBER() OVER ( PARTITION BY saksnummer, vedtaks_tidspunkt ORDER BY vedtaks_tidspunkt DESC) sorted_id
+            FROM
+              (
+                SELECT
+                  s.*
+                FROM
+                  slett_1 s
+                WHERE
+                  s.kode IN (
+                    SELECT
+                      b.kode
+                    FROM
+                      slett_1 b
+                    WHERE
+                      s.saksnummer = b.saksnummer AND s.vedtaks_tidspunkt > b.vedtaks_tidspunkt
+                  )
+              ) A
+          ) WHERE sorted_id = 1
+        UNION
+        SELECT
+          *
+        FROM
+          (
+            SELECT
+              saksnummer,
+              vedtaks_tidspunkt,
+              kode,
+              behandlings_id,
+              fk_dim_diagnose,
+              type,
+              ROW_NUMBER() OVER ( PARTITION BY saksnummer, vedtaks_tidspunkt ORDER BY vedtaks_tidspunkt DESC) sorted_id
+            FROM
+              (
+                SELECT
+                  s.*
+                FROM
+                  slett_1 s
+                WHERE
+                  s.kode NOT IN (
+                    SELECT
+                      b.kode
+                    FROM
+                      slett_1 b
+                    WHERE
+                      s.saksnummer = b.saksnummer AND s.vedtaks_tidspunkt > b.vedtaks_tidspunkt
+                  )
+              ) A
+          ) WHERE sorted_id = 1
+      )
+  )
+GROUP BY saksnummer, behandlings_id, vedtaks_tidspunkt, kode, fk_dim_diagnose, type
+    ) siste
+    on (stonad.behandlings_id = siste.behandlings_id)
+    when matched then
+        update set stonad.siste_diagnose_kode = siste.siste_diagnose_kode,
+                   stonad.siste_diagnose_type = siste.siste_diagnose_type,
+                   stonad.siste_fk_dim_diagnose = siste.siste_fk_dim_diagnose
+                WHERE
+                stonad.siste_diagnose_kode != siste.siste_diagnose_kode
+                OR stonad.siste_diagnose_type != siste.siste_diagnose_type AND
+                stonad.gyldig_flagg = p_in_gyldig_flagg
+                AND stonad.kildesystem = p_in_kildesystem
+                AND stonad.periode = p_in_vedtak_periode_yyyymm;
+    COMMIT;
+    EXCEPTION
+    WHEN OTHERS THEN
+      l_error_melding := substr(sqlcode || ' ' || sqlerrm, 1, 1000);
+      insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+      values(null, null, l_error_melding, sysdate, 'FAM_PP_STONAD_siste_diagnose');
+      commit;
+      p_out_error := l_error_melding;
+      l_error_melding := null;
+    END;
 
 END FAM_PP;

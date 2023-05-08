@@ -14,7 +14,7 @@ create or replace PACKAGE BODY                                                  
       fk_person1:= -1;
   end fam_ef_fk_person1;
 
-   procedure fam_ef_utpakking_offset(p_in_offset in number, p_error_melding out varchar2) as
+  procedure fam_ef_utpakking_offset(p_in_offset in number, p_error_melding out varchar2) as
   v_pk_ef_fagsak number;
   v_pk_ef_utbetalinger number;
   v_pk_ef_vedtaksperioder number;
@@ -48,7 +48,6 @@ create or replace PACKAGE BODY                                                  
       --and fam_ef_fagsak.kafka_offset is null
     )
     select t.fagsak_id, t.behandlings_id, t.person_ident, t.relatert_behandlings_id
-          ,t.krav_mottatt, t.årsak_revurderings_kilde, t.revurderings_årsak
           ,t.adressebeskyttelse, t.vedtaksbegrunnelse_skole
           ,cast(to_timestamp_tz(t.vedtaks_tidspunkt,'yyyy-mm-dd"T"hh24:mi:ss.ff+tzh:tzm')
                 at time zone 'europe/belgrade' as timestamp) as vedtaks_tidspunkt
@@ -76,12 +75,8 @@ create or replace PACKAGE BODY                                                  
          ,stonadstype                     varchar2 path '$.stønadstype'
          ,funksjonell_Id                  varchar2 path '$.funksjonellId'
          ,vedtaksbegrunnelse_skole        varchar2 path '$.vedtaksbegrunnelse'
-         ,krav_mottatt                    varchar2 path '$.kravMottatt'
-         ,nested path '$.årsakRevurdering' columns (
-         årsak_revurderings_kilde         varchar2 path '$.opplysningskilde'
-         ,revurderings_årsak              varchar2 path '$.årsak'
+
          )
-        )
         ) t;
 
   cursor cur_ef_utbetalinger(p_offset in number) is
@@ -342,7 +337,6 @@ create or replace PACKAGE BODY                                                  
           insert into dvh_fam_ef.fam_ef_fagsak
           (
             pk_ef_fagsak, fk_ef_meta_data, fagsak_id, behandlings_id, relatert_behandlings_id
-            ,krav_mottatt, årsak_revurderings_kilde, revurderings_årsak
            ,adressebeskyttelse
            ,fk_person1, behandling_type, behandlings_aarsak, vedtaks_status
            ,stonadstype, aktivitetsplikt_inntreffer_dato, har_sagt_opp_arbeidsforhold
@@ -357,8 +351,7 @@ create or replace PACKAGE BODY                                                  
           values
           (
             v_pk_ef_fagsak, rec_fagsak.pk_ef_meta_data, rec_fagsak.fagsak_id, rec_fagsak.behandlings_id
-           ,rec_fagsak.relatert_behandlings_id, rec_fagsak.krav_mottatt, rec_fagsak.årsak_revurderings_kilde, rec_fagsak.revurderings_årsak
-           ,rec_fagsak.adressebeskyttelse
+           ,rec_fagsak.relatert_behandlings_id, rec_fagsak.adressebeskyttelse
            ,v_fk_person1_mottaker, rec_fagsak.behandling_type, rec_fagsak.behandling_aarsak
            ,rec_fagsak.vedtak_resultat, rec_fagsak.stonadstype, rec_fagsak.aktivitetsplikt_inntreffer_dato
            ,rec_fagsak.har_sagt_opp_arbeidsforhold, rec_fagsak.funksjonell_id, rec_fagsak.vedtaks_tidspunkt
@@ -904,22 +897,29 @@ create or replace PACKAGE BODY                                                  
       (
         select fagsak.periode, fagsak.fk_person1, fagsak.pk_ef_fagsak, fagsak.pk_ef_fagsak_barntil, fagsak.pk_ef_fagsak_ovgst
               ,count(distinct person.fk_person1) antbarn
-              ,min(nvl(case when floor(months_between(fagsak.max_posteringsdato, dim_person.fodt_dato)/12) < 0 then 0
-                            else floor(months_between(fagsak.max_posteringsdato, dim_person.fodt_dato)/12)
-                       end, 0)) ybarn
-              ,count(distinct case when floor(months_between(fagsak.max_posteringsdato, dim_person.fodt_dato)/12) < 1
+              ,min(nvl(case when floor(months_between(fagsak.max_posteringsdato, nvl(dim_person.fodt_dato,termindato))/12) < 0 then 0
+                            else floor(months_between(fagsak.max_posteringsdato, nvl(dim_person.fodt_dato,termindato))/12)
+                       end, 0)) ybarn,
+                       min(case when fagsak.stonadstype= 'OVERGANGSSTØNAD' AND floor(months_between(fagsak.max_posteringsdato, nvl(dim_person.fodt_dato,termindato))/12) < 0 then 0
+                                 when fagsak.stonadstype= 'OVERGANGSSTØNAD' AND floor(months_between(fagsak.max_posteringsdato, nvl(dim_person.fodt_dato,termindato))/12) >= 0 then floor(months_between(fagsak.max_posteringsdato, nvl(dim_person.fodt_dato,termindato))/12)
+                       end) ybarn_ovgst,
+                       min(case when fagsak.stonadstype= 'BARNETILSYN' AND floor(months_between(fagsak.max_posteringsdato, nvl(dim_person.fodt_dato,termindato))/12) < 0 then 0
+                                 when fagsak.stonadstype= 'BARNETILSYN' AND floor(months_between(fagsak.max_posteringsdato, nvl(dim_person.fodt_dato,termindato))/12) >= 0 then floor(months_between(fagsak.max_posteringsdato, nvl(dim_person.fodt_dato,termindato))/12)
+                       end) ybarn_btil
+
+              ,count(distinct case when floor(months_between(fagsak.max_posteringsdato, nvl(dim_person.fodt_dato,termindato))/12) < 1
                                         then dim_person.fk_person1
                                    else null
                               end) antbu1
-              ,count(distinct case when floor(months_between(fagsak.max_posteringsdato, dim_person.fodt_dato)/12) < 3
+              ,count(distinct case when floor(months_between(fagsak.max_posteringsdato, nvl(dim_person.fodt_dato,termindato))/12) < 3
                                         then dim_person.fk_person1
                                    else null
                               end) antbu3
-              ,count(distinct case when floor(months_between(fagsak.max_posteringsdato, dim_person.fodt_dato)/12) < 8
+              ,count(distinct case when floor(months_between(fagsak.max_posteringsdato, nvl(dim_person.fodt_dato,termindato))/12) < 8
                                         then dim_person.fk_person1
                                    else null
                               end) antbu8
-              ,count(distinct case when floor(months_between(fagsak.max_posteringsdato, dim_person.fodt_dato)/12) < 10
+              ,count(distinct case when floor(months_between(fagsak.max_posteringsdato, nvl(dim_person.fodt_dato,termindato))/12) < 10
                                         then dim_person.fk_person1
                                    else null
                               end) antbu10
@@ -960,6 +960,8 @@ create or replace PACKAGE BODY                                                  
                 ,fagsak.pk_ef_fagsak, fagsak.pk_ef_fagsak_barntil, fagsak.pk_ef_fagsak_ovgst, pk_ef_fagsak_skolepen
                 ,fagsak.belop_tillegg
                 ,fagsak.belop_kontantstøtte
+                ,barn.ybarn_ovgst
+                ,barn.ybarn_btil
                 --,sysdate lastet_dato
           from fagsak
           left join barn
@@ -968,7 +970,9 @@ create or replace PACKAGE BODY                                                  
           and barn.pk_ef_fagsak = fagsak.pk_ef_fagsak),
 
         resultat as (
-          select fk_person1, max(kjonn) as kjonn, max(alder) alder, max(overgkode) overgkode, max(overgst) overgst
+          select fk_person1, max(kjonn) as kjonn, max(alder) alder,
+
+                max(overgkode) overgkode, max(overgst) overgst
                ,max(barntil) barntil, max(skolepen) skolepen,max(antbtg) antbtg
                 ,max(virk) virk, max(innt) innt
                 ,max(nvl(overgst,0))+max(nvl(barntil,0))+max(nvl(skolepen,0))+max(nvl(inntfradrag,0)) bruttobelop
@@ -992,6 +996,8 @@ create or replace PACKAGE BODY                                                  
                 ,max(belop_tillegg) belop_tillegg
                 ,max(aktivitetskrav) aktivitetskrav
                 ,max(belop_kontantstøtte) belop_kontantstøtte
+                ,max(ybarn_ovgst) ybarn_ovgst
+                ,max(ybarn_btil) ybarn_btil
                 from fagsak_barn
 				--where fk_person1 = 1019431763 --1292606586 --1800681045--
 				--where fagsak.fk_person1 = '1109359276'--'1347119395' '1109359276' '1786191366'
@@ -1038,7 +1044,7 @@ create or replace PACKAGE BODY                                                  
         ,kildesystem, lastet_dato
         ,nivaa_01, nivaa_02, nivaa_03
         ,samordnings_belop, belop_totalt, fk_dim_geografi, fk_ef_fagsak_ovgst, fk_ef_fagsak_barntil, fk_ef_fagsak_skolepen, belop_tillegg, belop_kontantstøtte,gyldig_flagg
-        ,ovgst_totalt, barntil_totalt, utd, aktivitetskrav
+        ,ovgst_totalt, barntil_totalt, utd, aktivitetskrav,ybarn_ovgst,ybarn_btil
         )
         values
         (rec_ef.fk_person1, rec_ef.pk_dim_person, rec_ef.kjonn, rec_ef.alder, rec_ef.overgkode, rec_ef.overgst
@@ -1052,7 +1058,7 @@ create or replace PACKAGE BODY                                                  
         ,rec_ef.nivaa_01, rec_ef.nivaa_02, rec_ef.nivaa_03
         ,rec_ef.samordningsfradrag, rec_ef.belop_totalt, rec_ef.fk_dim_geografi_bosted
         ,rec_ef.pk_ef_fagsak_ovgst, rec_ef.pk_ef_fagsak_barntil, rec_ef.pk_ef_fagsak_skolepen, rec_ef.belop_tillegg, rec_ef.belop_kontantstøtte,p_in_gyldig_flagg
-        ,rec_ef.ovgst_totalt, rec_ef.barntil_totalt, rec_ef.skolepen_totalt ,rec_ef.aktivitetskrav);
+        ,rec_ef.ovgst_totalt, rec_ef.barntil_totalt, rec_ef.skolepen_totalt ,rec_ef.aktivitetskrav,rec_ef.ybarn_ovgst,rec_ef.ybarn_btil);
         l_commit := l_commit + 1;
       exception
         when others then
@@ -1104,6 +1110,7 @@ create or replace PACKAGE BODY                                                  
         where trunc(vedtaks_tidspunkt) <=
                     last_day(to_date(p_in_max_vedtaksperiode_yyyymm,'yyyymm')) + p_in_forskyvninger_dag_dd
         and vedtaks_tidspunkt <= sysdate
+        and vedtaks_status!='AVSLÅTT'
         group by fagsak_id
       ),
 
@@ -1207,22 +1214,30 @@ create or replace PACKAGE BODY                                                  
         select fagsak.periode, fagsak.fk_person1, fagsak.pk_ef_fagsak, fagsak.pk_ef_fagsak_barntil
               ,fagsak.pk_ef_fagsak_ovgst, fagsak.pk_ef_fagsak_skolepen
               ,count(distinct person.fk_person1) antbarn
-              ,min(nvl(case when floor(months_between(p_dato_tom, dim_person.fodt_dato)/12) < 0 then 0
-                            else floor(months_between(p_dato_tom, dim_person.fodt_dato)/12)
-                       end, 0)) ybarn
-              ,count(distinct case when floor(months_between(p_dato_tom, dim_person.fodt_dato)/12) < 1
+              ,min(nvl(case when floor(months_between(p_dato_tom, nvl(dim_person.fodt_dato,termindato))/12) < 0 then 0
+                            else floor(months_between(p_dato_tom, nvl(dim_person.fodt_dato,termindato))/12)
+                       end, 0)) ybarn,
+
+                       min(case when fagsak.stonadstype= 'OVERGANGSSTØNAD' AND floor(months_between(p_dato_tom, nvl(dim_person.fodt_dato,termindato))/12) < 0 then 0
+                                 when fagsak.stonadstype= 'OVERGANGSSTØNAD' AND floor(months_between(p_dato_tom, nvl(dim_person.fodt_dato,termindato))/12) >= 0 then floor(months_between(p_dato_tom, nvl(dim_person.fodt_dato,termindato))/12)
+                       end) ybarn_ovgst,
+                       min(case when fagsak.stonadstype= 'BARNETILSYN' AND floor(months_between(p_dato_tom, nvl(dim_person.fodt_dato,termindato))/12) < 0 then 0
+                                 when fagsak.stonadstype= 'BARNETILSYN' AND floor(months_between(p_dato_tom, nvl(dim_person.fodt_dato,termindato))/12) >= 0 then floor(months_between(p_dato_tom, nvl(dim_person.fodt_dato,termindato))/12)
+                       end) ybarn_btil
+
+              ,count(distinct case when floor(months_between(p_dato_tom, nvl(dim_person.fodt_dato,termindato))/12) < 1
                                         then dim_person.fk_person1
                                    else null
                               end) antbu1
-              ,count(distinct case when floor(months_between(p_dato_tom, dim_person.fodt_dato)/12) < 3
+              ,count(distinct case when floor(months_between(p_dato_tom, nvl(dim_person.fodt_dato,termindato))/12) < 3
                                         then dim_person.fk_person1
                                    else null
                               end) antbu3
-              ,count(distinct case when floor(months_between(p_dato_tom, dim_person.fodt_dato)/12) < 8
+              ,count(distinct case when floor(months_between(p_dato_tom, nvl(dim_person.fodt_dato,termindato))/12) < 8
                                         then dim_person.fk_person1
                                    else null
                               end) antbu8
-              ,count(distinct case when floor(months_between(p_dato_tom, dim_person.fodt_dato)/12) < 10
+              ,count(distinct case when floor(months_between(p_dato_tom, nvl(dim_person.fodt_dato,termindato))/12) < 10
                                         then dim_person.fk_person1
                                    else null
                               end) antbu10
@@ -1255,7 +1270,7 @@ create or replace PACKAGE BODY                                                  
                 ,fagsak.bydel_kommune_nr, fagsak.aktivitet, fagsak.btdok, fagsak.antbtg, fagsak.statsb
                 ,fagsak.pk_dim_person, fagsak.fodeland, fagsak.fk_dim_geografi_bosted
                 ,fagsak.periode_type, fagsak.aktkode,fagsak.max_vedtaksdato,fagsak.vedtaks_tidspunkt
-                ,antbarn, ybarn, antbu1, antbu3, antbu8, antbu10, 'EF_VEDTAK' kildesystem
+                ,antbarn, ybarn, ybarn_ovgst,ybarn_btil,antbu1, antbu3, antbu8, antbu10, 'EF_VEDTAK' kildesystem
                 ,fagsak.pk_ef_fagsak, fagsak.pk_ef_fagsak_barntil, fagsak.pk_ef_fagsak_ovgst, fagsak.pk_ef_fagsak_skolepen
 
                 ,fagsak.belop_tillegg
@@ -1282,7 +1297,11 @@ create or replace PACKAGE BODY                                                  
                 ,max(bydel_kommune_nr) bydel_kommune_nr, max(aktivitet) aktivitet, max(statsb) statsb
                 ,max(pk_dim_person) pk_dim_person, max(fodeland) fodeland, max(fk_dim_geografi_bosted) fk_dim_geografi_bosted
                 ,max(periode_type) periode_type, max(aktkode) aktkode
-                ,max(antbarn) antbarn, max(ybarn) ybarn, max(antbu1) antbu1, max(antbu3) antbu3, max(antbu8) antbu8, max(antbu10) antbu10, max(kildesystem) kildesystem
+                ,max(antbarn) antbarn, max(ybarn) ybarn
+
+                ,max(ybarn_ovgst) ybarn_ovgst
+                ,max(ybarn_btil) ybarn_btil
+                ,max(antbu1) antbu1, max(antbu3) antbu3, max(antbu8) antbu8, max(antbu10) antbu10, max(kildesystem) kildesystem
                 ,max(pk_ef_fagsak) pk_ef_fagsak
                 ,max(pk_ef_fagsak_ovgst) pk_ef_fagsak_ovgst
                 ,max(pk_ef_fagsak_barntil) pk_ef_fagsak_barntil
@@ -1336,7 +1355,8 @@ create or replace PACKAGE BODY                                                  
         ,kildesystem, lastet_dato, vedtaks_dato, max_vedtaksdato
         ,gyldig_flagg, fk_ef_fagsak
 		,fk_ef_fagsak_ovgst, fk_ef_fagsak_barntil, fk_ef_fagsak_skolepen, belop_tillegg, belop_kontantstøtte
-        ,aktivitetskrav, belop_totalt, barntil_totalt, ovgst_totalt, utd
+        ,aktivitetskrav, belop_totalt, barntil_totalt, ovgst_totalt, utd,
+         ybarn_ovgst, ybarn_btil
         )
         values
         (rec_ef.fk_person1, rec_ef.pk_dim_person, rec_ef.kjonn, rec_ef.alder, rec_ef.overgkode, rec_ef.overgst
@@ -1353,7 +1373,8 @@ create or replace PACKAGE BODY                                                  
         ,p_in_gyldig_flagg, rec_ef.pk_ef_fagsak
 		,rec_ef.pk_ef_fagsak_ovgst, rec_ef.pk_ef_fagsak_barntil, rec_ef.pk_ef_fagsak_skolepen
         ,rec_ef.belop_tillegg, rec_ef.belop_kontantstøtte
-        ,rec_ef.aktivitetskrav, rec_ef.nettobelop, rec_ef.barntil, rec_ef.overgst, rec_ef.skolepen);
+        ,rec_ef.aktivitetskrav, rec_ef.nettobelop, rec_ef.barntil, rec_ef.overgst, rec_ef.skolepen,
+        rec_ef.ybarn_ovgst, rec_ef.ybarn_btil);
         l_commit := l_commit + 1;
       exception
         when others then
@@ -1679,7 +1700,8 @@ create or replace PACKAGE BODY                                                  
            ,oppdatert_dato = sysdate
         where antbarn = 0
         --aktivitet = 'MIGRERING'
-        and kildesystem != 'INFOTRYGD'
+        and
+        kildesystem != 'INFOTRYGD'
         and gyldig_flagg = 1
         and periode = p_in_periode_yyyymm
         and fk_person1 = rec_stonad.fk_person1;
