@@ -28,16 +28,6 @@ select * from barnetrygd_meta_data,
          ,underkategori             VARCHAR2 PATH '$.underkategoriV2'
          ,funksjonell_id            VARCHAR2 PATH '$.funksjonellId'
          ,person_ident              VARCHAR2 PATH '$.personV2[*].personIdent'
-         ,rolle                     VARCHAR2 PATH '$.personV2[*].rolle'
-         ,statsborgerskap           VARCHAR2 PATH '$.personV2[*].statsborgerskap[*]'
-         ,annenpart_bostedsland     VARCHAR2 PATH '$.personV2[*].annenpartBostedsland'
-         ,annenpart_personident     VARCHAR2 PATH '$.personV2[*].annenpartPersonident'
-         ,annenpart_statsborgerskap VARCHAR2 PATH '$.personV2[*].annenpartStatsborgerskap'
-         ,bostedsland               VARCHAR2 PATH '$.personV2[*].bostedsland'
-         ,delingsprosent_omsorg     VARCHAR2 PATH '$.personV2[*].delingsprosentOmsorg'
-         ,delingsprosent_ytelse     VARCHAR2 PATH '$.personV2[*].delingsprosentYtelse'
-         ,primærland                VARCHAR2 PATH '$.personV2[*].primærland'
-         ,sekundærland              VARCHAR2 PATH '$.personV2[*].sekundærland'
          ,behandling_Årsak           VARCHAR2 PATH '$.behandlingÅrsakV2'
          )
         ) j
@@ -72,11 +62,10 @@ final as (
   from pre_final p
   join bt_person per
   on p.kafka_offset = per.kafka_offset
-  where per.rolle = 'SØKER'
+  where per.soker_flagg = 1
 )
 
 select
-  --ROWNUM  as PK_BT_fagsak
     dvh_fambt_kafka.hibernate_sequence.nextval as PK_BT_FAGSAK
     ,FK_BT_PERSON
     ,FK_BT_META_DATA
@@ -99,6 +88,6 @@ from final
 
 {% if is_incremental() %}
 
-  where kafka_mottatt_dato > (select max(kafka_mottatt_dato) from {{ this }}) 
+  where kafka_mottatt_dato > (select max(kafka_mottatt_dato) from {{ this }})
 
 {% endif %}

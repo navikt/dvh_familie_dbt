@@ -48,6 +48,7 @@ final_fagsak_person as (
     ,delingsprosent_ytelse
     ,kafka_offset
     ,KAFKA_MOTTATT_DATO
+    ,1 as soker_flagg
   from
     pre_final_fagsak_person
   left outer join dt_person.ident_off_id_til_fk_person1 b on
@@ -67,6 +68,7 @@ final_utbet_det_person as (
     ,delingsprosent_ytelse
     ,kafka_offset
     ,KAFKA_MOTTATT_DATO
+    ,0 as soker_flagg
   from
     pre_final_utbet_det_person
   left outer join dt_person.ident_off_id_til_fk_person1 b on
@@ -102,10 +104,11 @@ select
   ,localtimestamp AS lastet_dato
   ,localtimestamp AS OPPDATERT_DATO
   ,KAFKA_MOTTATT_DATO
+  ,soker_flagg
 from final
 
 {% if is_incremental() %}
 
-  where kafka_mottatt_dato > (select max(kafka_mottatt_dato) from {{ this }}) 
+  where kafka_mottatt_dato > (select max(kafka_mottatt_dato) from {{ this }})
 
 {% endif %}
