@@ -58,6 +58,7 @@ joining_pre_final as (
     and b.gyldig_fra_dato<=pre_final.kafka_mottatt_dato
     and b.gyldig_til_dato>=kafka_mottatt_dato
     and b.skjermet_kode=0
+  where person_ident is not null
 ),
 
 final as (
@@ -97,6 +98,6 @@ from final
 
 {% if is_incremental() %}
 
-  where kafka_mottatt_dato > (select max(kafka_mottatt_dato) from {{ this }}) 
+  where kafka_mottatt_dato > (select max(kafka_mottatt_dato) from {{ this }})
 
 {% endif %}
