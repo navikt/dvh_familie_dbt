@@ -76,6 +76,7 @@ final_utbet_det_person as (
     and b.gyldig_fra_dato<=pre_final_utbet_det_person.kafka_mottatt_dato
     and b.gyldig_til_dato>=kafka_mottatt_dato
     and b.skjermet_kode=0
+  where person_ident is not null
 ),
 
 final as (
