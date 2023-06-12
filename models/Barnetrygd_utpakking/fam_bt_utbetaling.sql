@@ -1,12 +1,18 @@
 {{
     config(
         materialized='incremental',
-        unique_key='PK_BT_UTBETALING'
+        incremental_strategy='append'
     )
 }}
 
 with barnetrygd_meta_data as (
   select pk_bt_meta_data, kafka_offset, kafka_mottatt_dato, melding from {{ source ('fam_bt', 'fam_bt_meta_data') }}
+
+  {% if is_incremental() %}
+
+  where kafka_mottatt_dato > (select max(kafka_mottatt_dato) from {{ this }})
+
+  {% endif %}
 
 ),
 
@@ -56,9 +62,3 @@ select
   ,localtimestamp AS lastet_dato
   ,KAFKA_MOTTATT_DATO
 from final
-
-{% if is_incremental() %}
-
-  where kafka_mottatt_dato > (select max(kafka_mottatt_dato) from {{ this }}) 
-
-{% endif %}

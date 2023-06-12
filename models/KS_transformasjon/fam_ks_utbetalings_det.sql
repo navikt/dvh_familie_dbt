@@ -1,12 +1,18 @@
 {{
     config(
-        materialized='incremental',
-        unique_key='pk_ks_utbet_det'
+        materialized='incremental'
     )
 }}
 
 with kafka_ny_losning as (
   select kafka_offset, kafka_mottatt_dato, melding from {{ source ('fam_ks', 'fam_ks_meta_data') }}
+
+{% if is_incremental() %}
+
+  where kafka_mottatt_dato > (select max(kafka_mottatt_dato) from {{ this }})
+
+{% endif %}
+
 ),
 
 pre_final as (
@@ -77,8 +83,3 @@ select
   fk_ks_fagsak
 from final
 
-{% if is_incremental() %}
-
-  where kafka_mottatt_dato > (select max(kafka_mottatt_dato) from {{ this }}) and utbetalt_per_mnd is not null
-
-{% endif %}
