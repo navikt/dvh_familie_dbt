@@ -1,7 +1,6 @@
 {{
     config(
-        materialized='incremental',
-        incremental_strategy='append'
+        materialized='incremental'
     )
 }}
 with barnetrygd_meta_data as (
