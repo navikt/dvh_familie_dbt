@@ -10,6 +10,10 @@ def set_secrets_as_envs():
   secrets = json.loads(secret_str)
   os.environ.update(secrets)
 
+
+
+
+
 # we pass a list of dictionary parameter, and write a json output to the file (xcom_file). This file doesn't exist but will be created when the dag runs
 def write_to_xcom_push_file(content: List[dict]):
     with open('/airflow/xcom/return.json', 'w') as xcom_file:
@@ -105,5 +109,3 @@ if __name__ == "__main__":
 
   filtered_logs = filter_logs(f"{project_path}/logs/dbt.log")
   write_to_xcom_push_file(filtered_logs)
-
-  """dbt run --select Barnetrygd_utpakking.* --vars '{"data_interval_start":', '2023-06-22', '11:17:06,', '"data_interval_start":', '2023-06-22', "12:17:06}'" --profiles-dir/workspace/airflow --project-dir workspace'"""
