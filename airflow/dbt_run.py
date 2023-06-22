@@ -88,12 +88,11 @@ if __name__ == "__main__":
   logger.info(f"Prosjekt path er: {project_path}") # print project_path to the airflow log after the dag is run
 
 
-  # we run the dbt command in the background
+  # we run the dbt command in the background   command +
   try:
       output = subprocess.run(
           (
-            ["dbt", "--log-format", "json"] +
-            command +
+            ["dbt", "--log-format", "json"] + ["run",  "--select", "Barnetrygd_utpakking.*", "--vars '{dag_interval_start: '2023-06-22 12:00:00', dag_interval_end: '2023-06-22 13:00:00'}'"]
             ["--profiles-dir", profiles_dir, "--project-dir", project_path]
           ),
           check=True, capture_output=True
