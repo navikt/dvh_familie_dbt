@@ -5,12 +5,13 @@
 }}
 with barnetrygd_meta_data as (
   select pk_bt_meta_data, kafka_offset, kafka_mottatt_dato, melding from {{ source ('fam_bt', 'fam_bt_meta_data') }}
+  where kafka_mottatt_dato between '{{ var ("dag_interval_start") }}' and '{{ var ("dag_interval_end") }}'
 
-  {% if is_incremental() %}
+  --{% if is_incremental() %}
 
-  where kafka_mottatt_dato > (select max(kafka_mottatt_dato) from {{ this }})
+  --where kafka_mottatt_dato > (select max(kafka_mottatt_dato) from {{ this }})
 
-  {% endif %}
+  --{% endif %}
 
 ),
 
