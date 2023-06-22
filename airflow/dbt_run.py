@@ -50,7 +50,7 @@ if __name__ == "__main__":
     time.tzset()
     profiles_dir = str(sys.path[0])
     command = []
-    for c in os.environ["DBT_COMMAND"].split():
+    for c in os.environ["DBT_COMMAND"].split(' ',3):
       if 'periode' in c:
         s = '{}'.format(c[1:-1])
         command.append(s)
