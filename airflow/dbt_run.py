@@ -55,7 +55,7 @@ def dbt_logg(my_path) -> str:
 if __name__ == "__main__":
 
     # the 3 below comes from the airflow dag (they are passed to the task the runs the dbt model/s)
-  command = os.environ["DBT_COMMAND"].split(' ',3)
+  command = os.environ["DBT_COMMAND"].split(' ',4)
   log_level = os.getenv("LOG_LEVEL")
   schema = os.getenv("DB_SCHEMA")
   os.environ["TZ"] = "Europe/Oslo"
@@ -88,11 +88,12 @@ if __name__ == "__main__":
   logger.info(f"Prosjekt path er: {project_path}") # print project_path to the airflow log after the dag is run
 
 
-  # we run the dbt command in the background   command +
+  # we run the dbt command in the background
   try:
       output = subprocess.run(
-          (["dbt", "--log-format", "json"]
-           + ["run",  "--select Barnetrygd_utpakking.* --vars '{dag_interval_start: '2023-06-22 12:00:00', dag_interval_end: '2023-06-22 13:00:00'}'"] +
+          (
+            ["dbt", "--log-format", "json"] +
+            command +
             ["--profiles-dir", profiles_dir, "--project-dir", project_path]
           ),
           check=True, capture_output=True
