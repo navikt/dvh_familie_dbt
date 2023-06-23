@@ -93,7 +93,7 @@ if __name__ == "__main__":
             (
               ["dbt", "--no-use-colors", "--log-format", "json"] +
               #command +
-              ['run', '--select', 'Barnetrygd_utpakking.*', '--vars', '"{dag_interval_start:2023-06-23T09:00:00}"']
+              ['run', '--select', 'Barnetrygd_utpakking.*', '--vars', '\"{dag_interval_start:2023-06-23T09:00:00}\"']
               ["--profiles-dir", profiles_dir, "--project-dir", project_path]
             ),
             check=True, capture_output=True
