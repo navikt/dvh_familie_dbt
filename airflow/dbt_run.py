@@ -49,13 +49,15 @@ if __name__ == "__main__":
     os.environ["TZ"] = "Europe/Oslo"
     time.tzset()
     profiles_dir = str(sys.path[0])
-    command = []
-    for c in os.environ["DBT_COMMAND"].split(' ',4):
-      if '{{' in c:
-        s = '{}'.format(c[1:-2])
-        command.append(s)
-      else:
-        command.append(c)
+    command = os.environ["DBT_COMMAND"].split(' ',4)
+
+    # command = []
+    # for c in os.environ["DBT_COMMAND"].split(' ',4):
+    #   if '{{' in c:
+    #     s = '{}'.format(c[1:-2])
+    #     command.append(s)
+    #   else:
+    #     command.append(c)
 
     #[c.replace('\\', '') for c in os.environ["DBT_COMMAND"].split()]
     log_level = os.getenv("LOG_LEVEL")
