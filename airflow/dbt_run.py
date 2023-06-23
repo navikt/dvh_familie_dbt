@@ -54,11 +54,15 @@ if __name__ == "__main__":
     command = []
     for c in os.environ["DBT_COMMAND"].split(' ',4):
       if '{{' in c:
-        s = f'{c}'.replace('\\', '')
-        command.append(s)
+        if ' ' in c:
+          fmt = '"%s"'
+        else:
+          fmt = '%s'
+        cmd = fmt % c
+        command.append(cmd[1:-1])
       else:
-        command.append(c)
-
+          command.append(c)
+          
     #[c.replace('\\', '') for c in os.environ["DBT_COMMAND"].split()]
     log_level = os.getenv("LOG_LEVEL")
     schema = os.getenv("DB_SCHEMA")
