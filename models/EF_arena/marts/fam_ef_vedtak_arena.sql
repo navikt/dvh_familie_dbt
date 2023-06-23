@@ -1,3 +1,9 @@
+{{
+    config(
+        materialized = 'incremental'
+    )
+}}
+
 with dim_maalgruppe_type_ AS (
     SELECT *
     FROM {{ ref ('stg_fam_ef_arena_dim_maalgruppe') }}
@@ -71,7 +77,7 @@ final as (
 		  VFAKTA_FDATO.VEDTAK_FAKTA_VERDI_DATO AS "GYLDIG_FRA_DATO",
 		  VFAKTA_TDATO.VEDTAK_FAKTA_VERDI_DATO AS "GYLDIG_TIL_DATO",
       'DBT_ARENA' kildesystem,
-      sysdate lastet_dato
+      localtimestamp lastet_dato
 
 	FROM  fak_vedtak_fakta VFAKTA_INNFV
 	JOIN fak_arena_sak_vedtak FASV
@@ -114,8 +120,34 @@ final as (
 )
 
 
-select *
-
-
+select
+DVH_FAM_EF.ISEQ$$_18277021.nextval AS PK_FAM_EF_VEDTAK_ARENA
+,PERIODE
+,LK_VEDTAK_ID
+,FK_PERSON1
+,KOMMUNE_NR
+,BYDEL_NR
+,VEDTAK_SAK_RESULTAT_KODE
+,STONAD_KODE
+,STONADBERETT_AKTIVITET_FLAGG
+,AAR
+,SAK_STATUS_KODE
+,STONAD_NAVN
+,MAALGRUPPE_KODE
+,MAALGRUPPE_NAVN
+,VEDTAK_DATO
+,VILKAAR_KODE
+,VILKAAR_STATUS_KODE
+,VILKAAR_NAVN
+,VEDTAK_SAK_TYPE_KODE
+,VEDTAK_BEHANDLING_STATUS
+,GYLDIG_FRA_DATO
+,GYLDIG_TIL_DATO
+,KILDESYSTEM
+,LASTET_DATO
 from final
-order by fk_person1
+
+{% if is_incremental() %}
+
+where lastet_dato > (select max(lastet_dato) from {{ this }} where kildesystem = 'DBT_ARENA')
+{% endif %}
