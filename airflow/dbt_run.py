@@ -51,18 +51,18 @@ if __name__ == "__main__":
     profiles_dir = str(sys.path[0])
     #command = os.environ["DBT_COMMAND"].split(' ',4)
 
-    command = []
-    for c in os.environ["DBT_COMMAND"].split(' ',4):
-      if '{{' in c:
-        if ' ' in c:
-          fmt = '"%s"'
-        else:
-          fmt = '%s'
-        cmd = fmt % c
-        command.append(cmd[1:-1])
-      else:
-          command.append(c)
-          
+    # command = []
+    # for c in os.environ["DBT_COMMAND"].split(' ',4):
+    #   if '{{' in c:
+    #     if ' ' in c:
+    #       fmt = '"%s"'
+    #     else:
+    #       fmt = '%s'
+    #     cmd = fmt % c
+    #     command.append(cmd[1:-1])
+    #   else:
+    #       command.append(c)
+
     #[c.replace('\\', '') for c in os.environ["DBT_COMMAND"].split()]
     log_level = os.getenv("LOG_LEVEL")
     schema = os.getenv("DB_SCHEMA")
@@ -92,7 +92,8 @@ if __name__ == "__main__":
         output = subprocess.run(
             (
               ["dbt", "--no-use-colors", "--log-format", "json"] +
-              command +
+              #command +
+              ['run', '--select', 'Barnetrygd_utpakking.*', '--vars', '"{dag_interval_start:2023-06-23T09:00:00}"']
               ["--profiles-dir", profiles_dir, "--project-dir", project_path]
             ),
             check=True, capture_output=True
