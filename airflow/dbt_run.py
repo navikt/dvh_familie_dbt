@@ -6,6 +6,7 @@ import sys
 import logging
 from typing import List
 from google.cloud import secretmanager
+import shlex
 
 def set_secrets_as_envs():
   secrets = secretmanager.SecretManagerServiceClient()
@@ -49,13 +50,7 @@ if __name__ == "__main__":
     os.environ["TZ"] = "Europe/Oslo"
     time.tzset()
     profiles_dir = str(sys.path[0])
-    command = []
-    for c in os.environ["DBT_COMMAND"].split():
-      if 'periode' in c:
-        s = '{}'.format(c[1:-1])
-        command.append(s)
-      else:
-        command.append(c)
+    command = shlex.split(os.environ["DBT_COMMAND"])
 
     #[c.replace('\\', '') for c in os.environ["DBT_COMMAND"].split()]
     log_level = os.getenv("LOG_LEVEL")
