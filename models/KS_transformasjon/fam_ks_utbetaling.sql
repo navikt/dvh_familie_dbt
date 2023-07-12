@@ -6,13 +6,8 @@
 
 with kafka_ny_losning as (
   select kafka_offset, kafka_mottatt_dato, melding from {{ source ('fam_ks', 'fam_ks_meta_data') }}
-
-{% if is_incremental() %}
-
-  where kafka_mottatt_dato > (select max(kafka_mottatt_dato) from {{ this }})
-
-{% endif %}
-
+  where kafka_mottatt_dato between to_timestamp('{{ var("dag_interval_start") }}', 'yyyy-mm-dd hh24:mi:ss')
+  and to_timestamp('{{ var("dag_interval_end") }}', 'yyyy-mm-dd hh24:mi:ss')
 ),
 
 pre_final as (
