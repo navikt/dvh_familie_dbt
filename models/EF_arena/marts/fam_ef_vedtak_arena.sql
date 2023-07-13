@@ -145,7 +145,7 @@ select
 	,GYLDIG_TIL_DATO
 	,KILDESYSTEM
 	,LASTET_DATO
-from ¨
+from
 	final
 
 {% if is_incremental() %}
