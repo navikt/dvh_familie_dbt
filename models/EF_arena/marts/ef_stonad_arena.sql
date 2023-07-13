@@ -105,7 +105,10 @@ FINAL AS (
         ) <= LAST_DAY(TO_DATE('{{ var ("periode") }}' || '01', 'yyyymmdd')))
 
 
-SELECT * FROM FINAL
+SELECT
+  *
+FROM
+  FINAL
 
 
 
