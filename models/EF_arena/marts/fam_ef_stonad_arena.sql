@@ -1,3 +1,9 @@
+{{
+    config(
+        materialized = 'incremental'
+    )
+}}
+
 WITH ef_stonad_arena_agg_per_pvt_ AS (
   SELECT * FROM {{ ref ('ef_stonad_arena_agg_per_pvt') }}
 ),
@@ -97,9 +103,9 @@ final AS (
     bdk.antbu10,
     bdk.antbu18,
     'DBT_ARENA' as kildesystem,
-    sysdate lastet_dato,
+    localtimestamp lastet_dato,
     0 as ALDER_GML,
-    sysdate oppdatert_dato
+    localtimestamp oppdatert_dato
 
   FROM
     legg_til_utdanningsstonad utdstnd
@@ -111,45 +117,56 @@ final AS (
 
 
 SELECT
-FK_PERSON1
-,FK_DIM_PERSON
-,PERIODE
-,ALDER
-,KOMMUNE_NR
-,BYDEL_NR
-,KJONN_KODE
-,MAALGRUPPE_KODE
-,MAALGRUPPE_NAVN
-,STATSBORGERSKAP
-,FODELAND
-,SIVILSTATUS_KODE
-,ANTBLAV
-,ANTBHOY
-,BARN_UNDER_18_ANTALL
-,INNTEKT_SISTE_BERAAR
-,INNTEKT_3_SISTE_BERAAR
-,UTDSTONAD
-,TSOTILBARN
-,TSOLMIDLER
-,TSOBOUTG
-,TSODAGREIS
-,TSOREISOBL
-,TSOFLYTT
-,TSOREISAKT
-,TSOREISARB
-,TSOTILFAM
-,YBARN
-,ANTBARN
-,ANTBU1
-,ANTBU3
-,ANTBU8
-,ANTBU10
-,ANTBU18
-,KILDESYSTEM
-,LASTET_DATO
-,OPPDATERT_DATO
-,FK_DIM_GEOGRAFI
-FROM final
+  DVH_FAM_EF.ISEQ$$_18277021.nextval AS PK_FAM_EF_STONAD_ARENA
+  ,cast(null as varchar2(4)) FODSEL_AAR
+  ,cast(null as varchar2(4)) FODSEL_MND
+  ,FK_PERSON1
+  ,FK_DIM_PERSON
+  ,PERIODE
+  ,ALDER
+  ,KOMMUNE_NR
+  ,BYDEL_NR
+  ,KJONN_KODE
+  ,MAALGRUPPE_KODE
+  ,MAALGRUPPE_NAVN
+  ,STATSBORGERSKAP
+  ,FODELAND
+  ,SIVILSTATUS_KODE
+  ,ANTBLAV
+  ,ANTBHOY
+  ,BARN_UNDER_18_ANTALL
+  ,INNTEKT_SISTE_BERAAR
+  ,INNTEKT_3_SISTE_BERAAR
+  ,UTDSTONAD
+  ,TSOTILBARN
+  ,TSOLMIDLER
+  ,TSOBOUTG
+  ,TSODAGREIS
+  ,TSOREISOBL
+  ,TSOFLYTT
+  ,TSOREISAKT
+  ,TSOREISARB
+  ,TSOTILFAM
+  ,YBARN
+  ,ANTBARN
+  ,ANTBU1
+  ,ANTBU3
+  ,ANTBU8
+  ,ANTBU10
+  ,ANTBU18
+  ,KILDESYSTEM
+  ,LASTET_DATO
+  ,cast(null as varchar2(30)) ALDER_GML
+  ,OPPDATERT_DATO
+  ,FK_DIM_GEOGRAFI
+FROM
+ final
+
+{% if is_incremental() %}
+
+where lastet_dato > (select max(lastet_dato) from {{ this }} where kildesystem = 'DBT_ARENA')
+
+{% endif %}
 
 
 

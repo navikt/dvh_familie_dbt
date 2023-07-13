@@ -55,7 +55,7 @@ def dbt_logg(my_path) -> str:
 if __name__ == "__main__":
 
     # the 3 below comes from the airflow dag (they are passed to the task the runs the dbt model/s)
-  command = os.environ["DBT_COMMAND"].split()
+  command = os.environ["DBT_COMMAND"].split(' ',3)
   log_level = os.getenv("LOG_LEVEL")
   schema = os.getenv("DB_SCHEMA")
   os.environ["TZ"] = "Europe/Oslo"
