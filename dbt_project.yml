@@ -51,7 +51,7 @@ quoting:
   #- "grant select, delete, update, insert, read on fam_ef_vedtak_arena to DVH_FAM_AIRFLOW"
 
 models:
-  post-hook: 'grant select, read on {{ this }} to DVH_FAM_AIRFLOW'
+  #post-hook: 'grant select, read on {{ this }} to DVH_FAM_AIRFLOW'
   dvh_familie:
     marts:
       +materialized: view
