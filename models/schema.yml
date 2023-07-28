@@ -63,6 +63,12 @@ sources:
       - name: fam_bt_meta_data
         description: 'inneholder meta_data for barnetrygd'
 
+  - name: fam_ef
+    schema: dvh_fam_ef
+    tables:
+      - name: fam_ef_meta_data
+        description: 'inneholder meta_data for ensligforsørger'
+
 
 
 
