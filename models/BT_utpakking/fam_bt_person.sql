@@ -5,9 +5,9 @@
 }}
 
 with barnetrygd_meta_data as (
-  select pk_bt_meta_data, kafka_offset, kafka_mottatt_dato, melding from {{ source ('fam_bt', 'fam_bt_meta_data') }}
-  where kafka_mottatt_dato between to_timestamp('{{ var("dag_interval_start") }}', 'yyyy-mm-dd hh24:mi:ss')
-  and to_timestamp('{{ var("dag_interval_end") }}', 'yyyy-mm-dd hh24:mi:ss')
+  select * from {{ref ('meldinger_til_aa_pakke_ut')}}
+  --select pk_bt_meta_data, kafka_offset, kafka_mottatt_dato, melding from {{ source ('fam_bt', 'fam_bt_meta_data') }}
+  --where kafka_mottatt_dato >= sysdate-30
 ),
 
 pre_final_fagsak_person as (
