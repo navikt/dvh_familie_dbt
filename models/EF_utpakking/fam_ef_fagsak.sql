@@ -3,10 +3,9 @@
         materialized='incremental'
     )
 }}
+
 with ef_meta_data as (
-  select pk_ef_meta_data, kafka_offset, kafka_mottatt_dato, melding from {{ source ('fam_ef', 'fam_ef_meta_data') }}
-  where kafka_mottatt_dato between to_timestamp('{{ var("dag_interval_start") }}', 'yyyy-mm-dd hh24:mi:ss')
-  and to_timestamp('{{ var("dag_interval_end") }}', 'yyyy-mm-dd hh24:mi:ss')
+  select * from {{ref ('meldinger_til_aa_pakke_ut')}}
 ),
 
 pre_final as (
@@ -18,7 +17,7 @@ select * from ef_meta_data,
          ,relatert_behandlings_id         VARCHAR2 PATH '$.relatertBehandlingId'
          ,adressebeskyttelse              VARCHAR2 PATH '$.adressebeskyttelse'
          ,behandling_type                 VARCHAR2 PATH '$.behandlingType'
-         ,behandling_aarsak               VARCHAR2 PATH '$.behandlingÅrsak'
+         ,behandlings_aarsak               VARCHAR2 PATH '$.behandlingÅrsak'
          ,vedtaks_status                  VARCHAR2 PATH '$.vedtaksStatus'
          ,stonadstype                     VARCHAR2 PATH '$.stønadstype'
          ,person_ident                    VARCHAR2 PATH '$.person.personIdent'
@@ -28,7 +27,7 @@ select * from ef_meta_data,
          ,vedtaks_tidspunkt               VARCHAR2 PATH '$.tidspunktVedtak'
          ,aktivitetsvilkaar_barnetilsyn   VARCHAR2 PATH '$.aktivitetskrav'
          ,vedtaksbegrunnelse_skole        VARCHAR2 PATH '$.vedtaksbegrunnelse'
-         ,krav_motatt                     VARCHAR2 PATH '$.kravMottatt'
+         ,krav_mottatt                     VARCHAR2 PATH '$.kravMottatt'
          ,årsak_revurderings_kilde        VARCHAR2 PATH '$.årsakRevurdering.opplysningskilde'
          ,revurderings_årsak              VARCHAR2 PATH '$.årsakRevurdering.årsak'
          )
@@ -42,26 +41,26 @@ final as (
     ,p.relatert_behandlings_id
     ,p.adressebeskyttelse
     ,p.behandling_type
-    ,p.behandling_aarsak
+    ,p.behandlings_aarsak
     ,p.vedtaks_status
     ,p.stonadstype
-    ,nvl(ident.fk_person1) as fk_person1
-    ,p.aktivitetsplikt_inntreffer_dato
-    ,p.har_sagt_opp_arbeidsforhold
-    ,p.funksjonell_id
-    ,p.vedtaks_tidspunkt
-    ,p.aktivitetsvilkaar_barnetilsyn
-    ,p.vedtaksbegrunnelse_skole
-    ,p.krav_motatt
+    ,to_date(p.krav_mottatt,'yyyy-mm-dd') krav_mottatt
     ,p.årsak_revurderings_kilde
     ,p.revurderings_årsak
-    /*
+    ,p.aktivitetsvilkaar_barnetilsyn
+    ,nvl(ident.fk_person1, -1) as fk_person1
+    ,to_date(p.aktivitetsplikt_inntreffer_dato,'yyyy-mm-dd') aktivitetsplikt_inntreffer_dato
+    ,p.har_sagt_opp_arbeidsforhold
+    ,p.funksjonell_id
+    ,p.vedtaksbegrunnelse_skole
     ,CASE
-      WHEN LENGTH(tidspunkt_vedtak) = 25 THEN CAST(to_timestamp_tz(tidspunkt_vedtak, 'yyyy-mm-dd"T"hh24:mi:ss TZH:TZM') AT TIME ZONE 'Europe/Belgrade' AS TIMESTAMP)
-      ELSE CAST(to_timestamp_tz(tidspunkt_vedtak, 'FXYYYY-MM-DD"T"HH24:MI:SS.FXFF3TZH:TZM') AT TIME ZONE 'Europe/Belgrade' AS TIMESTAMP)
-      END tidspunkt_vedtak
-    */
+      WHEN LENGTH(p.VEDTAKS_TIDSPUNKT) = 25 THEN CAST(to_timestamp_tz(p.VEDTAKS_TIDSPUNKT, 'yyyy-mm-dd"T"hh24:mi:ss TZH:TZM') AT TIME ZONE 'Europe/Belgrade' AS TIMESTAMP)
+      ELSE CAST(to_timestamp_tz(p.VEDTAKS_TIDSPUNKT, 'FXYYYY-MM-DD"T"HH24:MI:SS.FXFF3TZH:TZM') AT TIME ZONE 'Europe/Belgrade' AS TIMESTAMP)
+      END VEDTAKS_TIDSPUNKT
     ,p.pk_ef_meta_data as fk_ef_meta_data
+    ,p.kafka_offset
+    ,p.KAFKA_TOPIC
+    ,p.KAFKA_PARTITION
   from pre_final p
   left outer join dt_person.ident_off_id_til_fk_person1 ident
   on p.person_ident = ident.off_id
@@ -70,27 +69,35 @@ final as (
 )
 
 select dvh_famef_kafka.hibernate_sequence.nextval as PK_EF_FAGSAK
-      ,fk_ef_meta_data
-      ,fagsak_id
-      ,behandlings_id
-      ,relatert_behandlings_id
-      ,adressebeskyttelse
-      ,behandling_type
-      ,behandling_aarsak
-      ,vedtaks_status
-      ,stonadstype
-      ,fk_person1
-      ,aktivitetsplikt_inntreffer_dato
-      ,har_sagt_opp_arbeidsforhold
-      ,funksjonell_id
-      ,vedtaks_tidspunkt
-      ,aktivitetsvilkaar_barnetilsyn
-      ,vedtaksbegrunnelse_skole
-      ,krav_motatt
-      ,årsak_revurderings_kilde
-      ,revurderings_årsak
-      ,kafka_offset
-      ,kildesystem
-      ,lastet_dato
-      ,kafka_mottatt_dato
+  ,FK_EF_META_DATA
+  ,FAGSAK_ID
+  ,BEHANDLINGS_ID
+  ,RELATERT_BEHANDLINGS_ID
+  ,ADRESSEBESKYTTELSE
+  ,FK_PERSON1
+  ,BEHANDLING_TYPE
+  ,BEHANDLINGS_AARSAK
+  ,VEDTAKS_STATUS
+  ,STONADSTYPE
+  ,case when FK_PERSON1 = -1 then PERSON_IDENT
+      else null
+  end PERSON_IDENT
+  ,AKTIVITETSPLIKT_INNTREFFER_DATO
+  ,HAR_SAGT_OPP_ARBEIDSFORHOLD
+  ,FUNKSJONELL_ID
+  ,VEDTAKS_TIDSPUNKT
+  ,KAFKA_TOPIC
+  ,KAFKA_OFFSET
+  ,KAFKA_PARTITION
+  ,LASTET_DATO
+  ,FAGSAK_ID_GML
+  ,BEHANDLINGS_ID_GML
+  ,AKTIVITETSVILKAAR_BARNETILSYN
+  ,VEDTAKSBEGRUNNELSE_SKOLE
+  ,KRAV_MOTTATT
+  ,ÅRSAK_REVURDERINGS_KILDE
+  ,REVURDERINGS_ÅRSAK
 from final
+
+
+
