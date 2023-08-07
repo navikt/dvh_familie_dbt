@@ -5,13 +5,11 @@
 }}
 
 with barnetrygd_meta_data as (
-  select pk_bt_meta_data, kafka_offset, kafka_mottatt_dato, melding from {{ source ('fam_bt', 'fam_bt_meta_data') }}
-  where kafka_mottatt_dato between to_timestamp('{{ var("dag_interval_start") }}', 'yyyy-mm-dd hh24:mi:ss')
-  and to_timestamp('{{ var("dag_interval_end") }}', 'yyyy-mm-dd hh24:mi:ss')
+  select * from {{ref ('meldinger_til_aa_pakke_ut')}}
 ),
 
 bt_person AS (
-  SELECT * FROM {{ ref ('fam_bt_person') }}
+  SELECT * FROM {{ ref ('fam_bt_person') }} where (rolle = 'SØKER' and soker_flagg = 1) OR rolle = 'BARN'
 ),
 
 statsborgerskap_soker as (
@@ -19,7 +17,10 @@ select * from barnetrygd_meta_data,
   json_table(melding, '$'
     COLUMNS (
     person_ident             VARCHAR2 PATH '$.personV2[*].personIdent'
-    ,statsborgerskap_soker          VARCHAR2 PATH '$.personV2[*].statsborgerskap[*]'
+    ,NESTED                   PATH '$.personV2[*].statsborgerskap[*]'
+    COLUMNS (
+    statsborgerskap_soker                    VARCHAR2 PATH '$')
+   --,statsborgerskap_soker          VARCHAR2 PATH '$.personV2[*].statsborgerskap[1]'
     )
   ) j
 ),
@@ -33,7 +34,10 @@ select * from barnetrygd_meta_data,
     NESTED                   PATH '$.utbetalingsDetaljer[*]'
     COLUMNS (
     person_ident_barn             VARCHAR2 PATH '$.person.personIdent'
-    ,statsborgerskap_barn          VARCHAR2 PATH '$.person.statsborgerskap[*]'
+    ,rolle                         VARCHAR2 PATH '$.person.rolle'
+    ,NESTED                   PATH '$.person.statsborgerskap[*]'
+    COLUMNS (
+    statsborgerskap_barn                    VARCHAR2 PATH '$')
       )
     )
   )
