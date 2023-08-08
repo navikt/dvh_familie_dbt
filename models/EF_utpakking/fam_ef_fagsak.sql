@@ -12,24 +12,24 @@ pre_final as (
 select * from ef_meta_data,
   json_table(melding, '$'
     COLUMNS (
-          fagsak_id                       VARCHAR2 PATH '$.fagsakId'
-         ,behandlings_id                  VARCHAR2 PATH '$.behandlingsId'
-         ,relatert_behandlings_id         VARCHAR2 PATH '$.relatertBehandlingId'
-         ,adressebeskyttelse              VARCHAR2 PATH '$.adressebeskyttelse'
-         ,behandling_type                 VARCHAR2 PATH '$.behandlingType'
-         ,behandlings_aarsak               VARCHAR2 PATH '$.behandlingÅrsak'
-         ,vedtaks_status                  VARCHAR2 PATH '$.vedtaksStatus'
-         ,stonadstype                     VARCHAR2 PATH '$.stønadstype'
-         ,person_ident                    VARCHAR2 PATH '$.person.personIdent'
-         ,aktivitetsplikt_inntreffer_dato VARCHAR2 PATH '$.aktivitetskrav.aktivitetspliktInntrefferDato'
-         ,har_sagt_opp_arbeidsforhold     VARCHAR2 PATH '$.aktivitetskrav.harSagtOppArbeidsforhold'
-         ,funksjonell_id                  VARCHAR2 PATH '$.funksjonellId'
-         ,vedtaks_tidspunkt               VARCHAR2 PATH '$.tidspunktVedtak'
-         ,aktivitetsvilkaar_barnetilsyn   VARCHAR2 PATH '$.aktivitetskrav'
-         ,vedtaksbegrunnelse_skole        VARCHAR2 PATH '$.vedtaksbegrunnelse'
-         ,krav_mottatt                     VARCHAR2 PATH '$.kravMottatt'
-         ,årsak_revurderings_kilde        VARCHAR2 PATH '$.årsakRevurdering.opplysningskilde'
-         ,revurderings_årsak              VARCHAR2 PATH '$.årsakRevurdering.årsak'
+        fagsak_id                       VARCHAR2 PATH '$.fagsakId'
+        ,BEHANDLINGS_ID                  VARCHAR2 PATH '$.behandlingId'
+        ,relatert_behandlings_id         VARCHAR2 PATH '$.relatertBehandlingId'
+        ,adressebeskyttelse              VARCHAR2 PATH '$.adressebeskyttelse'
+        ,behandling_type                 VARCHAR2 PATH '$.behandlingType'
+        ,behandlings_aarsak               VARCHAR2 PATH '$.behandlingÅrsak'
+        ,vedtaks_status                  VARCHAR2 PATH '$.vedtaksStatus'
+        ,stonadstype                     VARCHAR2 PATH '$.stønadstype'
+        ,person_ident                    VARCHAR2 PATH '$.person.personIdent'
+        ,aktivitetsplikt_inntreffer_dato VARCHAR2 PATH '$.aktivitetskrav.aktivitetspliktInntrefferDato'
+        ,har_sagt_opp_arbeidsforhold     VARCHAR2 PATH '$.aktivitetskrav.harSagtOppArbeidsforhold'
+        ,funksjonell_id                  VARCHAR2 PATH '$.funksjonellId'
+        ,vedtaks_tidspunkt               VARCHAR2 PATH '$.tidspunktVedtak'
+        ,aktivitetsvilkaar_barnetilsyn   VARCHAR2 PATH '$.aktivitetskrav'
+        ,vedtaksbegrunnelse_skole        VARCHAR2 PATH '$.vedtaksbegrunnelse'
+        ,krav_mottatt                     VARCHAR2 PATH '$.kravMottatt'
+        ,årsak_revurderings_kilde        VARCHAR2 PATH '$.årsakRevurdering.opplysningskilde'
+        ,revurderings_årsak              VARCHAR2 PATH '$.årsakRevurdering.årsak'
          )
         ) j
 ),
@@ -89,8 +89,7 @@ select dvh_famef_kafka.hibernate_sequence.nextval as PK_EF_FAGSAK
   ,KAFKA_TOPIC
   ,KAFKA_OFFSET
   ,KAFKA_PARTITION
-  ,LASTET_DATO
-  ,FAGSAK_ID_GML
+  ,localtimestamp AS lastet_dato  ,FAGSAK_ID_GML
   ,BEHANDLINGS_ID_GML
   ,AKTIVITETSVILKAAR_BARNETILSYN
   ,VEDTAKSBEGRUNNELSE_SKOLE
