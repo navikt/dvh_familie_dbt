@@ -57,4 +57,3 @@ select
   STUDIEBELASTNING,
   kafka_offset
 from final
-
