@@ -14,7 +14,7 @@ ef_fagsak AS (
 
 kolonner as (
 select * from ef_meta_data,
-  json_table(melding, '$'
+  json_table(melding, '$?(@.stønadstype != "SKOLEPENGER")'
     COLUMNS (
       BEHANDLINGS_ID  VARCHAR2 PATH '$.behandlingId'
       nested path '$.vedtaksperioder[*]' columns (
