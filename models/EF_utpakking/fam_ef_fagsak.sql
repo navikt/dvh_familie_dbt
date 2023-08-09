@@ -89,15 +89,16 @@ select dvh_famef_kafka.hibernate_sequence.nextval as PK_EF_FAGSAK
   ,KAFKA_TOPIC
   ,KAFKA_OFFSET
   ,KAFKA_PARTITION
-  ,localtimestamp AS lastet_dato  
-  ,FAGSAK_ID_GML
-  ,BEHANDLINGS_ID_GML
+  ,localtimestamp AS lastet_dato
+  ,null FAGSAK_ID_GML
+  ,null BEHANDLINGS_ID_GML
   ,AKTIVITETSVILKAAR_BARNETILSYN
   ,VEDTAKSBEGRUNNELSE_SKOLE
   ,KRAV_MOTTATT
   ,ÅRSAK_REVURDERINGS_KILDE
   ,REVURDERINGS_ÅRSAK
 from final
+
 
 
 
