@@ -81,7 +81,7 @@ select dvh_famef_kafka.hibernate_sequence.nextval as PK_EF_FAGSAK
   ,VEDTAKS_STATUS
   ,STONADSTYPE
   ,case when FK_PERSON1 = -1 then PERSON_IDENT
-      else null
+      else cast(null as varchar2(11))
   end PERSON_IDENT
   ,AKTIVITETSPLIKT_INNTREFFER_DATO
   ,HAR_SAGT_OPP_ARBEIDSFORHOLD
@@ -91,8 +91,8 @@ select dvh_famef_kafka.hibernate_sequence.nextval as PK_EF_FAGSAK
   ,KAFKA_OFFSET
   ,KAFKA_PARTITION
   ,localtimestamp AS lastet_dato
-  ,null FAGSAK_ID_GML
-  ,null BEHANDLINGS_ID_GML
+  ,cast(null as varchar2(20)) FAGSAK_ID_GML
+  ,cast(null as varchar2(20)) BEHANDLINGS_ID_GML
   ,AKTIVITETSVILKAAR_BARNETILSYN
   ,VEDTAKSBEGRUNNELSE_SKOLE
   ,KRAV_MOTTATT
