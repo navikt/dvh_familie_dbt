@@ -62,5 +62,3 @@ select
   ANTALLBARN,
   UTGIFTER
 from final
-
-
