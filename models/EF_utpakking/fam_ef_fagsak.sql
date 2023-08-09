@@ -44,6 +44,7 @@ final as (
     ,p.behandlings_aarsak
     ,p.vedtaks_status
     ,p.stonadstype
+    ,p.person_ident
     ,to_date(p.krav_mottatt,'yyyy-mm-dd') krav_mottatt
     ,p.årsak_revurderings_kilde
     ,p.revurderings_årsak
