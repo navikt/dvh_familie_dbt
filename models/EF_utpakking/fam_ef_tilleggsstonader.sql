@@ -70,6 +70,7 @@ final as (
     p.FRA_OG_MED,
     p.TIL_OG_MED,
     p.belop,
+    p.kafka_offset,
     pk_EF_FAGSAK as FK_EF_FAGSAK
   from pre_final p
   join ef_fagsak b
@@ -83,5 +84,6 @@ select
   fra_og_med,
   til_og_med,
   belop,
-  localtimestamp AS lastet_dato
+  localtimestamp AS lastet_dato,
+  kafka_offset
 from final
