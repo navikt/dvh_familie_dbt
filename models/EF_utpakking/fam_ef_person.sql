@@ -16,7 +16,7 @@ pre_final_fagsak_person as (
 select * from ef_meta_data
   ,json_table(melding, '$'
       columns (
-        ,behandlings_id varchar2 path '$.behandlingId'
+        behandlings_id varchar2 path '$.behandlingId'
         ,person_ident   varchar2 path '$.person.personIdent'
       )
     ) j
@@ -27,7 +27,7 @@ pre_final_barn_person as (
     ,json_table(melding, '$'
       columns (
         behandlings_id    varchar2 path '$.behandlingId'
-        nested            path '$.barn[*]'
+        ,nested            path '$.barn[*]'
         columns (
         person_ident varchar2 path '$.personIdent'
         ,termindato        varchar2 path '$.termindato'
@@ -37,10 +37,10 @@ pre_final_barn_person as (
 ),
 
 union_person as (
-  select behandlings_id, person_ident, kafka_offset, kafka_topic, kafka_partition, null as termindato from pre_final_fagsak_person
+  select behandlings_id, person_ident, kafka_offset, kafka_topic, kafka_partition, kafka_mottatt_dato, null as termindato from pre_final_fagsak_person
   union
-  select behandlings_id, person_ident, kafka_offset, kafka_topic, kafka_partition, termindato from pre_final_barn_person
-)
+  select behandlings_id, person_ident, kafka_offset, kafka_topic, kafka_partition, kafka_mottatt_dato, termindato from pre_final_barn_person
+),
 
 pre_final as (
   select
@@ -56,30 +56,31 @@ pre_final as (
   on p.person_ident = ident.off_id
   and p.kafka_mottatt_dato between ident.gyldig_fra_dato and ident.gyldig_til_dato
   and ident.skjermet_kode = 0
-)
+),
 
 final as (
-  p.behandlings_id,
-  ,case when p.fk_person1 = -1 then p.person_ident
-        else null
-   end person_ident
-  p.fk_person1,
-  p.kafka_offset,
-  p.kafka_topic,
-  p.kafka_partition,
-  p.termindato,
-  b.pk_EF_FAGSAK as FK_EF_FAGSAK
+  select
+    p.behandlings_id,
+    case when p.fk_person1 = -1 then p.person_ident
+          else null
+    end person_ident,
+    p.fk_person1,
+    p.kafka_offset,
+    p.kafka_topic,
+    p.kafka_partition,
+    p.termindato,
+    b.pk_EF_FAGSAK as FK_EF_FAGSAK
   from pre_final p
   join ef_fagsak b
   on p.kafka_offset = b.kafka_offset
 )
 
 select
-  dvh_famef_kafka.hibernate_sequence.nextval as PK_EF_PERSON
+  dvh_famef_kafka.hibernate_sequence.nextval as PK_EF_PERSON,
   FK_EF_FAGSAK,
   PERSON_IDENT,
   TERMINDATO,
-  RELASJON,
+  'BARN' RELASJON,
   FK_PERSON1,
   BEHANDLINGS_ID,
   KAFKA_TOPIC,

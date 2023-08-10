@@ -17,13 +17,13 @@ select * from ef_meta_data,
   json_table(melding, '$'
     COLUMNS (
       BEHANDLINGS_ID  VARCHAR2 PATH '$.behandlingId'
-      nested path  '$.vilkårsvurderinger[*]' columns (
+      ,nested path  '$.vilkårsvurderinger[*]' columns (
       vilkaar      varchar2 path '$.vilkår'
       ,resultat     varchar2 path '$.resultat'
         )
       )
     ) j
-)
+),
 
 final as (
   select

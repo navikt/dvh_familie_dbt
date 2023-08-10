@@ -17,7 +17,7 @@ select * from ef_meta_data,
   json_table(melding, '$'
     COLUMNS (
       BEHANDLINGS_ID                  VARCHAR2 PATH '$.behandlingId'
-      nested                path '$.utbetalinger[*]' columns (
+      ,nested                path '$.utbetalinger[*]' columns (
          belop              varchar2 path '$.beløp'
         ,samordningsfradrag varchar2 path '$.samordningsfradrag'
         ,inntekt            varchar2 path '$.inntekt'
@@ -43,8 +43,8 @@ pre_final as (
     inntektsreduksjon,
     fra_og_med,
     til_og_med,
-    klassekode
-    delytelse_id
+    klassekode,
+    delytelse_id,
     kafka_offset,
     kafka_topic,
     kafka_partition
@@ -55,7 +55,7 @@ pre_final as (
     and b.gyldig_fra_dato<=kolonner.kafka_mottatt_dato
     and b.gyldig_til_dato>=kolonner.kafka_mottatt_dato
     and b.skjermet_kode=0
-)
+),
 
 final as (
   select
@@ -68,8 +68,8 @@ final as (
     p.inntektsreduksjon,
     p.fra_og_med,
     p.til_og_med,
-    p.klassekode
-    p.delytelse_id
+    p.klassekode,
+    p.delytelse_id,
     p.kafka_offset,
     p.kafka_topic,
     p.kafka_partition,

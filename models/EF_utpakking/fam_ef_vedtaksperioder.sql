@@ -17,7 +17,7 @@ select * from ef_meta_data,
   json_table(melding, '$?(@.stønadstype != "SKOLEPENGER")'
     COLUMNS (
       BEHANDLINGS_ID  VARCHAR2 PATH '$.behandlingId'
-      nested path '$.vedtaksperioder[*]' columns (
+      ,nested path '$.vedtaksperioder[*]' columns (
       fra_og_med      varchar2 path '$.fraOgMed'
       ,til_og_med     varchar2 path '$.tilOgMed'
       ,aktivitet      varchar2 path '$.aktivitet'

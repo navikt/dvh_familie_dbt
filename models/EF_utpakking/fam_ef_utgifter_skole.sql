@@ -24,7 +24,7 @@ kolonner as (
         )
       )
       )
-    ) t;
+    ) j
 ),
 
 pre_final as (
@@ -32,13 +32,13 @@ pre_final as (
     p.UTGIFTSDATO,
     p.UTGIFTSBELOP,
     p.UTBETALTBELOP,
-    p.kafka_offset
+    p.kafka_offset,
     PK_EF_VEDTAKSPERIODER_SKOLE as FK_EF_VEDTAKSPERIODER_SKOLE
   from kolonner p
   join vedtaksperioder_skole b
   on p.kafka_offset = b.kafka_offset
   and p.UTGIFTSDATO between b.dato_fra and b.dato_til
-)
+),
 
 final as (
   select

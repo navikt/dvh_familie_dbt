@@ -69,6 +69,7 @@ final as (
     p.TYPE_TILLEGGS_STONAD,
     p.FRA_OG_MED,
     p.TIL_OG_MED,
+    p.belop,
     pk_EF_FAGSAK as FK_EF_FAGSAK
   from pre_final p
   join ef_fagsak b
