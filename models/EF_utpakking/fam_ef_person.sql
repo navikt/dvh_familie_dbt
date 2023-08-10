@@ -79,7 +79,7 @@ select
   dvh_famef_kafka.hibernate_sequence.nextval as PK_EF_PERSON,
   FK_EF_FAGSAK,
   PERSON_IDENT,
-  TERMINDATO,
+  to_date(TERMINDATO,'yyyy-mm-dd') TERMINDATO,
   'BARN' RELASJON,
   FK_PERSON1,
   BEHANDLINGS_ID,
@@ -88,3 +88,4 @@ select
   KAFKA_PARTITION,
   localtimestamp AS LASTET_DATO
 from final
+
