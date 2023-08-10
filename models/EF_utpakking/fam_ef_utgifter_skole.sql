@@ -37,7 +37,7 @@ pre_final as (
   from kolonner p
   join vedtaksperioder_skole b
   on p.kafka_offset = b.kafka_offset
-  and p.UTGIFTSDATO between b.dato_fra and b.dato_til
+  and to_date(p.UTGIFTSDATO, 'yyyy-mm-dd') between b.dato_fra and b.dato_til
 ),
 
 final as (
