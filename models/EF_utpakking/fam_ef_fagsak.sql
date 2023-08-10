@@ -56,7 +56,7 @@ final as (
     ,p.vedtaksbegrunnelse_skole
     ,CASE
       WHEN LENGTH(p.VEDTAKS_TIDSPUNKT) = 25 THEN CAST(to_timestamp_tz(p.VEDTAKS_TIDSPUNKT, 'yyyy-mm-dd"T"hh24:mi:ss TZH:TZM') AT TIME ZONE 'Europe/Belgrade' AS TIMESTAMP)
-      ELSE CAST(to_timestamp_tz(p.VEDTAKS_TIDSPUNKT, 'FXYYYY-MM-DD"T"HH24:MI:SS.FXFF3TZH:TZM') AT TIME ZONE 'Europe/Belgrade' AS TIMESTAMP)
+      ELSE CAST(to_timestamp_tz(p.VEDTAKS_TIDSPUNKT, 'FXYYYY-MM-DD"T"HH24:MI:SS.FXFFTZH:TZM') AT TIME ZONE 'Europe/Belgrade' AS TIMESTAMP)
       END VEDTAKS_TIDSPUNKT
     ,p.pk_ef_meta_data as fk_ef_meta_data
     ,p.kafka_offset
