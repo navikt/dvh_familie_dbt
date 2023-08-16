@@ -25,6 +25,7 @@ select * from barnetrygd_meta_data,
          tom                            VARCHAR2 PATH '$.tom'
         ,fom                            VARCHAR2 PATH '$.fom'
         ,kompetanse_Resultat            VARCHAR2 PATH '$.resultat'
+        ,barnets_bostedsland            Varchar2 path '$.barnetsBostedsland'
         ,nested path '$.barnsIdenter[*]'
          columns (
          personidentbarn   varchar2 path '$[*]'
@@ -42,7 +43,8 @@ joining_pre_final as (
     fom,
     kompetanse_Resultat,
     kafka_offset,
-    kafka_mottatt_dato
+    kafka_mottatt_dato,
+    barnets_bostedsland
   from
     pre_final
   left outer join dt_person.ident_off_id_til_fk_person1 b on
@@ -59,21 +61,18 @@ final as (
     j.tom,
     j.kafka_offset,
     j.kompetanse_Resultat,
+    j.barnets_bostedsland,
     j.kafka_mottatt_dato,
-    k.pK_BT_KOMPETANSE_PERIODER as fK_BT_KOMPETANSE_PERIODER--,
+    k.pK_BT_KOMPETANSE_PERIODER as fK_BT_KOMPETANSE_PERIODER
   from joining_pre_final j
   join bt_komp_barn k
-  on j.fom = k.fom and j.kompetanse_Resultat = k.kompetanse_Resultat
+  on j.fom = k.fom and j.kompetanse_Resultat = k.kompetanse_Resultat and j.barnets_bostedsland = k.barnets_bostedsland
   and j.kafka_offset = k.kafka_offset
 )
 
 select
-  --ROWNUM as PK_BT_KOMPETANSE_BARN,
   dvh_fambt_kafka.hibernate_sequence.nextval as PK_BT_KOMPETANSE_BARN,
   FK_BT_KOMPETANSE_PERIODER,
   FK_PERSON1,
   kafka_mottatt_dato
 from final
-
-
-
