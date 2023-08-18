@@ -5,7 +5,7 @@
 }}
 
 with ef_meta_data as (
-  select * from {{ref ('meldinger_til_aa_pakke_ut')}}
+  select * from {{ref ('ef_meldinger_til_aa_pakke_ut')}}
 ),
 
 vedtaksperioder_skole AS (

@@ -4,7 +4,7 @@
     )
 }}
 with barnetrygd_meta_data as (
-  select * from {{ref ('meldinger_til_aa_pakke_ut')}}
+  select * from {{ref ('bt_meldinger_til_aa_pakke_ut')}}
 ),
 
 bt_person AS (
