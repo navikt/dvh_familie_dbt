@@ -4,14 +4,12 @@
     )
 }}
 
-with kafka_ny_losning as (
-  select kafka_offset, kafka_mottatt_dato, melding from {{ source ('fam_ks', 'fam_ks_meta_data') }}
-  where kafka_mottatt_dato between to_timestamp('{{ var("dag_interval_start") }}', 'yyyy-mm-dd hh24:mi:ss')
-  and to_timestamp('{{ var("dag_interval_end") }}', 'yyyy-mm-dd hh24:mi:ss')
+with ks_meta_data as (
+  select * from {{ref ('ks_meldinger_til_aa_pakke_ut')}}
 ),
 
 pre_final as (
-select *  from kafka_ny_losning,
+select *  from ks_meta_data,
   json_table(melding, '$'
     columns(
         behandlings_id  path  '$.behandlingsId',
