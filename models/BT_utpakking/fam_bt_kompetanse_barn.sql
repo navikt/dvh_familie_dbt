@@ -8,7 +8,7 @@ with barnetrygd_meta_data as (
   select * from {{ref ('bt_meldinger_til_aa_pakke_ut')}}
 ),
 
-bt_komp_barn AS (
+bt_komp_per AS (
   SELECT * FROM {{ ref ('fam_bt_kompetanse_perioder') }}
 ),
 
@@ -73,7 +73,7 @@ final as (
     j.barnets_bostedsland,
     k.pK_BT_KOMPETANSE_PERIODER as fK_BT_KOMPETANSE_PERIODER
   from joining_pre_final j
-  join bt_komp_barn k
+  join bt_komp_per k
   on COALESCE(j.fom,'-1') = COALESCE(k.fom,'-1') and COALESCE(j.tom,'-1') = COALESCE(k.tom,'-1')
   and COALESCE(j.kompetanse_Resultat,'-1') = COALESCE(k.kompetanse_Resultat,'-1')
   and COALESCE(j.barnets_bostedsland,'-1') = COALESCE(k.barnets_bostedsland,'-1')

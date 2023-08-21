@@ -50,6 +50,7 @@ select
   FK_BT_FAGSAK,
   localtimestamp as LASTET_DATO,
   BARNETS_BOSTEDSLAND,
-  SOKERS_AKTIVITETSLAND
+  SOKERS_AKTIVITETSLAND,
+  kafka_offset
 from final
 
