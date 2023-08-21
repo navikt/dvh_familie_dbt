@@ -5,21 +5,10 @@
 }}
 
 with ef_meta_data as (
-  select * from {{ref ('meldinger_til_aa_pakke_ut')}}
+  select * from {{ref ('ef_meldinger_til_aa_pakke_ut')}}
 ),
-
 ef_fagsak AS (
   SELECT * FROM {{ ref ('fam_ef_fagsak') }}
-),
-
-pre_final_fagsak_person as (
-select * from ef_meta_data
-  ,json_table(melding, '$'
-      columns (
-        behandlings_id varchar2 path '$.behandlingId'
-        ,person_ident   varchar2 path '$.person.personIdent'
-      )
-    ) j
 ),
 
 pre_final_barn_person as (
@@ -36,12 +25,6 @@ pre_final_barn_person as (
     ) j
 ),
 
-union_person as (
-  select behandlings_id, person_ident, kafka_offset, kafka_topic, kafka_partition, kafka_mottatt_dato, null as termindato from pre_final_fagsak_person
-  union
-  select behandlings_id, person_ident, kafka_offset, kafka_topic, kafka_partition, kafka_mottatt_dato, termindato from pre_final_barn_person
-),
-
 pre_final as (
   select
     behandlings_id,
@@ -51,7 +34,7 @@ pre_final as (
     kafka_topic,
     kafka_partition,
     termindato
-  from union_person p
+  from pre_final_barn_person  p
   left outer join dt_person.ident_off_id_til_fk_person1 ident
   on p.person_ident = ident.off_id
   and p.kafka_mottatt_dato between ident.gyldig_fra_dato and ident.gyldig_til_dato
@@ -78,14 +61,20 @@ final as (
 select
   dvh_famef_kafka.hibernate_sequence.nextval as PK_EF_PERSON,
   FK_EF_FAGSAK,
-  PERSON_IDENT,
   to_date(TERMINDATO,'yyyy-mm-dd') TERMINDATO,
   'BARN' RELASJON,
   FK_PERSON1,
-  BEHANDLINGS_ID,
   KAFKA_TOPIC,
   KAFKA_OFFSET,
   KAFKA_PARTITION,
-  localtimestamp AS LASTET_DATO
+  localtimestamp AS LASTET_DATO,
+  PERSON_IDENT,
+  BEHANDLINGS_ID
 from final
+
+
+
+
+
+
 

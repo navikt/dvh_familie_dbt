@@ -4,14 +4,12 @@
     )
 }}
 
-with kafka_ny_losning as (
-  select kafka_offset, kafka_mottatt_dato, melding from {{ source ('fam_ks', 'fam_ks_meta_data') }}
-  where kafka_mottatt_dato between to_timestamp('{{ var("dag_interval_start") }}', 'yyyy-mm-dd hh24:mi:ss')
-  and to_timestamp('{{ var("dag_interval_end") }}', 'yyyy-mm-dd hh24:mi:ss')
+with ks_meta_data as (
+  select * from {{ref ('ks_meldinger_til_aa_pakke_ut')}}
 ),
 
 pre_final as (
-select *  from kafka_ny_losning,
+select *  from ks_meta_data,
   json_table(melding, '$'
     columns(
       behandlings_id  path  '$.behandlingsId',
@@ -66,15 +64,17 @@ left outer join dt_person.ident_off_id_til_fk_person1 b on
 )
 
 select
-  pk_ks_utbet_det,
   kafka_offset,
-  hjemmel,
-  utbetalt_per_mnd,
   kafka_mottatt_dato,
   lastet_dato,
-  delytelse_id,
   fk_person1_barn,
-  fk_ks_utbetaling,
-  fk_ks_fagsak
+  utbetalt_per_mnd,
+  fk_ks_fagsak,
+  pk_ks_utbet_det,
+  hjemmel,
+  delytelse_id,
+  fk_ks_utbetaling
 from final
+
+
 

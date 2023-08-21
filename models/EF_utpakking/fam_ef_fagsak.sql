@@ -5,7 +5,7 @@
 }}
 
 with ef_meta_data as (
-  select * from {{ref ('meldinger_til_aa_pakke_ut')}}
+  select * from {{ref ('ef_meldinger_til_aa_pakke_ut')}}
 ),
 
 pre_final as (
@@ -18,7 +18,7 @@ select * from ef_meta_data,
         ,adressebeskyttelse              VARCHAR2 PATH '$.adressebeskyttelse'
         ,behandling_type                 VARCHAR2 PATH '$.behandlingType'
         ,behandlings_aarsak               VARCHAR2 PATH '$.behandlingÅrsak'
-        ,vedtaks_status                  VARCHAR2 PATH '$.vedtaksStatus'
+        ,vedtaks_status                  VARCHAR2 PATH '$.vedtak'
         ,stonadstype                     VARCHAR2 PATH '$.stønadstype'
         ,person_ident                    VARCHAR2 PATH '$.person.personIdent'
         ,aktivitetsplikt_inntreffer_dato VARCHAR2 PATH '$.aktivitetskrav.aktivitetspliktInntrefferDato'
@@ -26,7 +26,6 @@ select * from ef_meta_data,
         ,funksjonell_id                  VARCHAR2 PATH '$.funksjonellId'
         ,vedtaks_tidspunkt               VARCHAR2 PATH '$.tidspunktVedtak'
         ,aktivitetsvilkaar_barnetilsyn   VARCHAR2 PATH '$.aktivitetskrav'
-        ,vedtaksbegrunnelse_skole        VARCHAR2 PATH '$.vedtaksbegrunnelse'
         ,krav_mottatt                     VARCHAR2 PATH '$.kravMottatt'
         ,årsak_revurderings_kilde        VARCHAR2 PATH '$.årsakRevurdering.opplysningskilde'
         ,revurderings_årsak              VARCHAR2 PATH '$.årsakRevurdering.årsak'
@@ -53,7 +52,6 @@ final as (
     ,to_date(p.aktivitetsplikt_inntreffer_dato,'yyyy-mm-dd') aktivitetsplikt_inntreffer_dato
     ,p.har_sagt_opp_arbeidsforhold
     ,p.funksjonell_id
-    ,p.vedtaksbegrunnelse_skole
     ,CASE
       WHEN LENGTH(p.VEDTAKS_TIDSPUNKT) = 25 THEN CAST(to_timestamp_tz(p.VEDTAKS_TIDSPUNKT, 'yyyy-mm-dd"T"hh24:mi:ss TZH:TZM') AT TIME ZONE 'Europe/Belgrade' AS TIMESTAMP)
       ELSE CAST(to_timestamp_tz(p.VEDTAKS_TIDSPUNKT, 'FXYYYY-MM-DD"T"HH24:MI:SS.FXFFTZH:TZM') AT TIME ZONE 'Europe/Belgrade' AS TIMESTAMP)
@@ -71,21 +69,8 @@ final as (
 
 select dvh_famef_kafka.hibernate_sequence.nextval as PK_EF_FAGSAK
   ,FK_EF_META_DATA
-  ,FAGSAK_ID
-  ,BEHANDLINGS_ID
-  ,RELATERT_BEHANDLINGS_ID
-  ,ADRESSEBESKYTTELSE
   ,FK_PERSON1
-  ,BEHANDLING_TYPE
-  ,BEHANDLINGS_AARSAK
-  ,VEDTAKS_STATUS
-  ,STONADSTYPE
-  ,case when FK_PERSON1 = -1 then PERSON_IDENT
-      else cast(null as varchar2(11))
-  end PERSON_IDENT
   ,AKTIVITETSPLIKT_INNTREFFER_DATO
-  ,HAR_SAGT_OPP_ARBEIDSFORHOLD
-  ,FUNKSJONELL_ID
   ,VEDTAKS_TIDSPUNKT
   ,KAFKA_TOPIC
   ,KAFKA_OFFSET
@@ -93,12 +78,27 @@ select dvh_famef_kafka.hibernate_sequence.nextval as PK_EF_FAGSAK
   ,localtimestamp AS lastet_dato
   ,cast(null as varchar2(20)) FAGSAK_ID_GML
   ,cast(null as varchar2(20)) BEHANDLINGS_ID_GML
-  ,AKTIVITETSVILKAAR_BARNETILSYN
-  ,VEDTAKSBEGRUNNELSE_SKOLE
   ,KRAV_MOTTATT
+  ,FAGSAK_ID
+  ,BEHANDLINGS_ID
+  ,RELATERT_BEHANDLINGS_ID
+  ,ADRESSEBESKYTTELSE
+  ,BEHANDLING_TYPE
+  ,BEHANDLINGS_AARSAK
+  ,VEDTAKS_STATUS
+  ,STONADSTYPE
+  ,case when FK_PERSON1 = -1 then PERSON_IDENT
+      else cast(null as varchar2(11))
+  end PERSON_IDENT
+  ,HAR_SAGT_OPP_ARBEIDSFORHOLD
+  ,FUNKSJONELL_ID
+  ,AKTIVITETSVILKAAR_BARNETILSYN
+  ,cast(null as varchar2(20)) VEDTAKSBEGRUNNELSE_SKOLE
   ,ÅRSAK_REVURDERINGS_KILDE
   ,REVURDERINGS_ÅRSAK
 from final
+
+
 
 
 

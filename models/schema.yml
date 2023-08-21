@@ -43,12 +43,18 @@ sources:
     tables:
       - name: fam_bt_barn
         description: 'inneholder informasjon om brukere og barn, fodsel_aar, kjonn, fodsel_aar_barn, kjonn_barn'
+      - name: fam_bt_meta_data
+        description: 'inneholder meta_data for barnetrygd'
+      - name: fam_bt_fagsak
+        description: 'inneholder vedtaks informasjon'
 
   - name: fam_ks
     schema: dvh_fam_ks
     tables:
       - name: fam_ks_meta_data
         description: 'inneholder meta_data for kontantstøtte'
+      - name: fam_ks_fagsak
+        description: 'inneholder vedtaks data for kontantstøtte'
       - name: ks_meta_data_test
         description: 'tabellen inneholder en del av data som ligger i fam_ks_meta_data bare for å teste incremental tabell og snapshots'
 
@@ -57,12 +63,6 @@ sources:
     tables:
      - name: dim_alder
 
-  - name: fam_bt
-    schema: dvh_fam_bt
-    tables:
-      - name: fam_bt_meta_data
-        description: 'inneholder meta_data for barnetrygd'
-
   - name: fam_ef
     schema: dvh_fam_ef
     tables:
@@ -70,9 +70,4 @@ sources:
         description: 'inneholder meta_data for ensligforsørger'
       - name: fam_ef_fagsak
         description: 'inneholder vedtaks informasjon'
-
-
-
-
-
 

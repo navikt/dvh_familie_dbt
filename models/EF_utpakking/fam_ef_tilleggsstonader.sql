@@ -5,7 +5,7 @@
 }}
 
 with ef_meta_data as (
-  select * from {{ref ('meldinger_til_aa_pakke_ut')}}
+  select * from {{ref ('ef_meldinger_til_aa_pakke_ut')}}
 ),
 
 ef_fagsak AS (
@@ -14,7 +14,7 @@ ef_fagsak AS (
 
 kolonner_perioder_kontantstotte as (
   select * from ef_meta_data,
-  json_table(melding, '$'
+  json_table(melding, '$?(@.stønadstype == "BARNETILSYN")'
     COLUMNS (
       nested            path '$.perioderKontantstøtte[*]' columns (
         fra_og_med      varchar2 path '$.fraOgMed',
@@ -27,7 +27,7 @@ kolonner_perioder_kontantstotte as (
 
 kolonner_perioder_tilleggsstonad as (
   select * from ef_meta_data,
-  json_table(melding, '$'
+  json_table(melding, '$?(@.stønadstype == "BARNETILSYN")'
     COLUMNS (
       nested            path '$.perioderTilleggsstønad[*]' columns (
         fra_og_med      varchar2 path '$.fraOgMed',
@@ -70,11 +70,11 @@ final as (
     p.FRA_OG_MED,
     p.TIL_OG_MED,
     p.belop,
-    p.kafka_offset,
     pk_EF_FAGSAK as FK_EF_FAGSAK
   from pre_final p
   join ef_fagsak b
   on p.kafka_offset = b.kafka_offset
+  where p.fra_og_med is not null
 )
 
 select
@@ -85,5 +85,7 @@ select
   til_og_med,
   belop,
   localtimestamp AS lastet_dato,
-  kafka_offset
+  KAFKA_OFFSET
 from final
+
+

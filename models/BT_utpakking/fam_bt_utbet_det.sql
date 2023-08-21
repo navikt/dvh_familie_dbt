@@ -5,9 +5,7 @@
 }}
 
 with barnetrygd_meta_data as (
-  select pk_bt_meta_data, kafka_offset, kafka_mottatt_dato, melding from {{ source ('fam_bt', 'fam_bt_meta_data') }}
-  where kafka_mottatt_dato between to_timestamp('{{ var("dag_interval_start") }}', 'yyyy-mm-dd hh24:mi:ss')
-  and to_timestamp('{{ var("dag_interval_end") }}', 'yyyy-mm-dd hh24:mi:ss')
+  select * from {{ref ('bt_meldinger_til_aa_pakke_ut')}}
 ),
 
 bt_utbetaling AS (
@@ -82,7 +80,6 @@ final as (
 )
 
 select
---ROWNUM as PK_BT_UTBET_DET
   dvh_fambt_kafka.hibernate_sequence.nextval as PK_BT_UTBET_DET
   ,KLASSEKODE
   ,DELYTELSE_ID
@@ -93,5 +90,5 @@ select
   ,BEHANDLINGS_ID
   ,localtimestamp AS lastet_dato
   ,YTELSE_TYPE
-  ,kafka_mottatt_dato
 from final
+

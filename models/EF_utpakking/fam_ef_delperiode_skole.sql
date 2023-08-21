@@ -18,10 +18,11 @@ kolonner as (
     COLUMNS (
       nested path '$.vedtaksperioder[*]' columns (
       SKOLEAAR     varchar2 path '$.skoleår'
-      ,nested path '$.utgifter[*]' columns (
-      utgiftsdato        varchar2 path '$.utgiftsdato'
-      ,utgiftsbelop       varchar2 path '$.utgiftsbeløp'
-      ,utbetaltbelop      varchar2 path '$.utbetaltBeløp'
+      ,nested path '$.perioder[*]' columns (
+      STUDIE_TYPE        varchar2 path '$.studietype'
+      ,FRA_OG_MED          varchar2 path '$.datoFra'
+      ,TIL_OG_MED          varchar2 path '$.datoTil'
+      ,studiebelastning varchar2 path '$.studiebelastning'
         )
       )
       )
@@ -30,24 +31,25 @@ kolonner as (
 
 final as (
   select
-    p.UTGIFTSDATO,
-    p.UTGIFTSBELOP,
-    p.UTBETALTBELOP,
+    p.STUDIE_TYPE,
+    p.FRA_OG_MED,
+    p.TIL_OG_MED,
+    p.studiebelastning,
     p.kafka_offset,
     PK_EF_VEDTAKSPERIODER_SKOLE as FK_EF_VEDTAKSPERIODER_SKOLE
   from kolonner p
   join vedtaksperioder_skole v
   on p.kafka_offset = v.kafka_offset
   and p.skoleaar = v.skoleaar
-  where p.UTGIFTSDATO is not null
 )
 
 select
-  dvh_famef_kafka.hibernate_sequence.nextval as PK_EF_UTGIFTER_SKOLE,
-  to_date(UTGIFTSDATO, 'yyyy-mm-dd') UTGIFTSDATO,
-  UTGIFTSBELOP,
-  UTBETALTBELOP,
-  localtimestamp AS LASTET_DATO,
+  dvh_famef_kafka.hibernate_sequence.nextval as PK_EF_DELPERIODE_SKOLE,
+  STUDIE_TYPE,
+  to_date(FRA_OG_MED, 'yyyy-mm-dd') FRA_OG_MED,
+  to_date(TIL_OG_MED, 'yyyy-mm-dd') TIL_OG_MED,
+  STUDIEBELASTNING,
+  localtimestamp as LASTET_DATO,
   FK_EF_VEDTAKSPERIODER_SKOLE,
   kafka_offset
 from final

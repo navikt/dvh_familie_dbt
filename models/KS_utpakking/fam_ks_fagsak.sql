@@ -4,14 +4,12 @@
     )
 }}
 
-with kafka_ny_losning as (
-  select pk_ks_meta_data, kafka_offset, kafka_mottatt_dato, melding from {{ source ('fam_ks', 'fam_ks_meta_data') }}
-  where kafka_mottatt_dato between to_timestamp('{{ var("dag_interval_start") }}', 'yyyy-mm-dd hh24:mi:ss')
-  and to_timestamp('{{ var("dag_interval_end") }}', 'yyyy-mm-dd hh24:mi:ss')
+with ks_meta_data as (
+  select * from {{ref ('ks_meldinger_til_aa_pakke_ut')}}
 ),
 
 pre_final as (
-select * from kafka_ny_losning,
+select * from ks_meta_data,
   json_table(melding, '$'
     columns(
       fagsak_id  path  '$.fagsakId',
@@ -61,25 +59,26 @@ final as (
 )
 
 select
-  pk_ks_fagsak,
   kafka_offset,
+  fk_person1_mottaker,
+  lastet_dato,
+  kafka_mottatt_dato,
+  fk_ks_meta_data,
+  pk_ks_fagsak,
   fagsak_id,
   behandlings_id,
   CASE
     WHEN LENGTH(tidspunkt_vedtak) = 25 THEN CAST(to_timestamp_tz(tidspunkt_vedtak, 'yyyy-mm-dd"T"hh24:mi:ss TZH:TZM') AT TIME ZONE 'Europe/Belgrade' AS TIMESTAMP)
     ELSE CAST(to_timestamp_tz(tidspunkt_vedtak, 'FXYYYY-MM-DD"T"HH24:MI:SS.FXFF3TZH:TZM') AT TIME ZONE 'Europe/Belgrade' AS TIMESTAMP)
     END tidspunkt_vedtak,
+  delingsprosent_ytelse,
   kategori,
   behandling_type,
   funksjonell_id,
   behandling_aarsak,
-  fk_person1_mottaker,
   rolle,
-  bosteds_land,
-  delingsprosent_ytelse,
-  lastet_dato,
-  kafka_mottatt_dato,
-  fk_ks_meta_data
+  bosteds_land
 from final
+
 
 

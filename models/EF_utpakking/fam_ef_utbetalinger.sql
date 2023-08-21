@@ -5,7 +5,7 @@
 }}
 
 with ef_meta_data as (
-  select * from {{ref ('meldinger_til_aa_pakke_ut')}}
+  select * from {{ref ('ef_meldinger_til_aa_pakke_ut')}}
 ),
 
 ef_fagsak AS (
@@ -89,15 +89,17 @@ select
   INNTEKTSREDUKSJON,
   TO_DATE(FRA_OG_MED, 'YYYY-MM-DD') FRA_OG_MED,
   TO_DATE(TIL_OG_MED, 'YYYY-MM-DD') TIL_OG_MED,
+  FK_PERSON1,
+  KAFKA_TOPIC,
+  KAFKA_OFFSET,
+  KAFKA_PARTITION,
+  localtimestamp AS LASTET_DATO,
   case when fk_person1 = -1 then person_ident
     else null
   end PERSON_IDENT,
   KLASSEKODE,
   DELYTELSE_ID,
-  FK_PERSON1,
-  BEHANDLINGS_ID,
-  KAFKA_TOPIC,
-  KAFKA_OFFSET,
-  KAFKA_PARTITION,
-  localtimestamp AS LASTET_DATO
+  BEHANDLINGS_ID
 From final
+
+

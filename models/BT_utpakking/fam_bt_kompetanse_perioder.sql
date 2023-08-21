@@ -5,9 +5,7 @@
 }}
 
 with barnetrygd_meta_data as (
-  select pk_bt_meta_data, kafka_offset, kafka_mottatt_dato, melding from {{ source ('fam_bt', 'fam_bt_meta_data') }}
-  where kafka_mottatt_dato between to_timestamp('{{ var("dag_interval_start") }}', 'yyyy-mm-dd hh24:mi:ss')
-  and to_timestamp('{{ var("dag_interval_end") }}', 'yyyy-mm-dd hh24:mi:ss')
+  select * from {{ref ('bt_meldinger_til_aa_pakke_ut')}}
 ),
 
 bt_fagsak AS (
@@ -42,7 +40,6 @@ final as (
 )
 
 select
-  --ROWNUM as PK_BT_KOMPETANSE_PERIODER,
   dvh_fambt_kafka.hibernate_sequence.nextval as PK_BT_KOMPETANSE_PERIODER,
   FOM,
   TOM,
@@ -50,10 +47,9 @@ select
   ANNENFORELDER_AKTIVITET,
   ANNENFORELDER_AKTIVITETSLAND,
   KOMPETANSE_RESULTAT,
-  BARNETS_BOSTEDSLAND,
-  localtimestamp as LASTET_DATO,
   FK_BT_FAGSAK,
-  SOKERS_AKTIVITETSLAND,
-  KAFKA_MOTTATT_DATO,
-  KAFKA_OFFSET
+  localtimestamp as LASTET_DATO,
+  BARNETS_BOSTEDSLAND,
+  SOKERS_AKTIVITETSLAND
 from final
+

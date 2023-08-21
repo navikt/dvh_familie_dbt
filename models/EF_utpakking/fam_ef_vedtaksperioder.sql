@@ -5,7 +5,7 @@
 }}
 
 with ef_meta_data as (
-  select * from {{ref ('meldinger_til_aa_pakke_ut')}}
+  select * from {{ref ('ef_meldinger_til_aa_pakke_ut')}}
 ),
 
 ef_fagsak AS (
@@ -45,6 +45,7 @@ final as (
   from kolonner p
   join ef_fagsak b
   on p.kafka_offset = b.kafka_offset
+  where p.fra_og_med is not null
 )
 
 select
@@ -52,13 +53,15 @@ select
   FK_EF_FAGSAK,
   TO_DATE(FRA_OG_MED, 'YYYY-MM-DD') FRA_OG_MED,
   TO_DATE(TIL_OG_MED, 'YYYY-MM-DD') TIL_OG_MED,
-  AKTIVITET,
-  PERIODE_TYPE,
-  BEHANDLINGS_ID,
   KAFKA_TOPIC,
   KAFKA_OFFSET,
   KAFKA_PARTITION,
   localtimestamp AS LASTET_DATO,
   ANTALLBARN,
-  UTGIFTER
+  UTGIFTER,
+  AKTIVITET,
+  PERIODE_TYPE,
+  BEHANDLINGS_ID
 from final
+
+

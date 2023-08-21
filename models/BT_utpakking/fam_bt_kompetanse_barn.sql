@@ -5,9 +5,7 @@
 }}
 
 with barnetrygd_meta_data as (
-  select pk_bt_meta_data, kafka_offset, kafka_mottatt_dato, melding from {{ source ('fam_bt', 'fam_bt_meta_data') }}
-  where kafka_mottatt_dato between to_timestamp('{{ var("dag_interval_start") }}', 'yyyy-mm-dd hh24:mi:ss')
-  and to_timestamp('{{ var("dag_interval_end") }}', 'yyyy-mm-dd hh24:mi:ss')
+  select * from {{ref ('bt_meldinger_til_aa_pakke_ut')}}
 ),
 
 bt_komp_barn AS (
@@ -27,6 +25,11 @@ select * from barnetrygd_meta_data,
          tom                            VARCHAR2 PATH '$.tom'
         ,fom                            VARCHAR2 PATH '$.fom'
         ,kompetanse_Resultat            VARCHAR2 PATH '$.resultat'
+        ,barnets_bostedsland            Varchar2 path '$.barnetsBostedsland'
+        ,sokersaktivitet                Varchar2 path '$.sokersaktivitet'
+        ,sokersAktivitetsland           Varchar2 path '$.sokersAktivitetsland'
+        ,annenForeldersAktivitet        Varchar2 path '$.annenForeldersAktivitet'
+        ,annenForeldersAktivitetsland   Varchar2 path '$.annenForeldersAktivitetsland'
         ,nested path '$.barnsIdenter[*]'
          columns (
          personidentbarn   varchar2 path '$[*]'
@@ -43,8 +46,13 @@ joining_pre_final as (
     tom,
     fom,
     kompetanse_Resultat,
+    sokersaktivitet,
+    sokersAktivitetsland,
+    annenForeldersAktivitet,
+    annenForeldersAktivitetsland,
     kafka_offset,
-    kafka_mottatt_dato
+    kafka_mottatt_dato,
+    barnets_bostedsland
   from
     pre_final
   left outer join dt_person.ident_off_id_til_fk_person1 b on
@@ -62,20 +70,23 @@ final as (
     j.kafka_offset,
     j.kompetanse_Resultat,
     j.kafka_mottatt_dato,
-    k.pK_BT_KOMPETANSE_PERIODER as fK_BT_KOMPETANSE_PERIODER--,
+    j.barnets_bostedsland,
+    k.pK_BT_KOMPETANSE_PERIODER as fK_BT_KOMPETANSE_PERIODER
   from joining_pre_final j
   join bt_komp_barn k
-  on j.fom = k.fom and j.kompetanse_Resultat = k.kompetanse_Resultat
+  on COALESCE(j.fom,'-1') = COALESCE(k.fom,'-1') and COALESCE(j.tom,'-1') = COALESCE(k.tom,'-1')
+  and COALESCE(j.kompetanse_Resultat,'-1') = COALESCE(k.kompetanse_Resultat,'-1')
+  and COALESCE(j.barnets_bostedsland,'-1') = COALESCE(k.barnets_bostedsland,'-1')
+  and COALESCE(j.sokersaktivitet,'-1') = COALESCE(k.SOKERSAKTIVITET,'-1')
+  and COALESCE(j.sokersAktivitetsland,'-1') = COALESCE(k.SOKERS_AKTIVITETSLAND,'-1')
+  and COALESCE(j.annenForeldersAktivitet,'-1') = COALESCE(k.ANNENFORELDER_AKTIVITET,'-1')
+  and COALESCE(j.annenForeldersAktivitetsland,'-1') = COALESCE(k.ANNENFORELDER_AKTIVITETSLAND,'-1')
   and j.kafka_offset = k.kafka_offset
 )
 
 select
-  --ROWNUM as PK_BT_KOMPETANSE_BARN,
   dvh_fambt_kafka.hibernate_sequence.nextval as PK_BT_KOMPETANSE_BARN,
   FK_BT_KOMPETANSE_PERIODER,
-  FK_PERSON1,
-  kafka_mottatt_dato
+  FK_PERSON1
 from final
-
-
 

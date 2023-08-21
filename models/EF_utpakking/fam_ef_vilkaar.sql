@@ -5,7 +5,7 @@
 }}
 
 with ef_meta_data as (
-  select * from {{ref ('meldinger_til_aa_pakke_ut')}}
+  select * from {{ref ('ef_meldinger_til_aa_pakke_ut')}}
 ),
 
 ef_fagsak AS (
@@ -42,11 +42,13 @@ final as (
 select
   dvh_famef_kafka.hibernate_sequence.nextval as PK_EF_VILKÅR,
   FK_EF_FAGSAK,
-  VILKAAR,
-  RESULTAT,
-  BEHANDLINGS_ID,
   KAFKA_TOPIC,
   KAFKA_OFFSET,
   KAFKA_PARTITION,
-  localtimestamp AS LASTET_DATO
+  localtimestamp AS LASTET_DATO,
+  VILKAAR,
+  RESULTAT,
+  BEHANDLINGS_ID
 from final
+
+
