@@ -50,7 +50,10 @@ final as (
     ,p.aktivitetsvilkaar_barnetilsyn
     ,nvl(ident.fk_person1, -1) as fk_person1
     ,to_date(p.aktivitetsplikt_inntreffer_dato,'yyyy-mm-dd') aktivitetsplikt_inntreffer_dato
-    ,p.har_sagt_opp_arbeidsforhold
+    ,CASE
+      WHEN p.har_sagt_opp_arbeidsforhold = 'false' THEN 0
+      WHEN p.har_sagt_opp_arbeidsforhold = 'true' THEN 1
+      END har_sagt_opp_arbeidsforhold
     ,p.funksjonell_id
     ,CASE
       WHEN LENGTH(p.VEDTAKS_TIDSPUNKT) = 25 THEN CAST(to_timestamp_tz(p.VEDTAKS_TIDSPUNKT, 'yyyy-mm-dd"T"hh24:mi:ss TZH:TZM') AT TIME ZONE 'Europe/Belgrade' AS TIMESTAMP)

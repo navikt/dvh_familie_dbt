@@ -27,6 +27,8 @@ kolonner as (
       )
       )
     ) j
+    where json_value (melding, '$.vedtaksperioder.perioder.size()' )> 0
+
 ),
 
 final as (
