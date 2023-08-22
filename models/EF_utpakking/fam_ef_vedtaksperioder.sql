@@ -27,6 +27,7 @@ select * from ef_meta_data,
         )
       )
     ) j
+    where json_value (melding, '$.vedtaksperioder.size()' )> 0
 ),
 
 final as (
