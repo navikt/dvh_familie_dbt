@@ -102,7 +102,7 @@ final AS (
     bdk.antbu8,
     bdk.antbu10,
     bdk.antbu18,
-    'DBT_ARENA' as kildesystem,
+    'ARENA' as kildesystem,
     localtimestamp lastet_dato,
     0 as ALDER_GML,
     localtimestamp oppdatert_dato
@@ -164,7 +164,7 @@ FROM
 
 {% if is_incremental() %}
 
-where lastet_dato > (select max(lastet_dato) from {{ this }} where kildesystem = 'DBT_ARENA')
+where lastet_dato > (select max(lastet_dato) from {{ this }} where kildesystem = 'ARENA')
 
 {% endif %}
 

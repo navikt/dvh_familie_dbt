@@ -53,6 +53,8 @@ sources:
     tables:
       - name: fam_ks_meta_data
         description: 'inneholder meta_data for kontantstøtte'
+      - name: fam_ks_fagsak
+        description: 'inneholder vedtaks data for kontantstøtte'
       - name: ks_meta_data_test
         description: 'tabellen inneholder en del av data som ligger i fam_ks_meta_data bare for å teste incremental tabell og snapshots'
 
@@ -61,9 +63,19 @@ sources:
     tables:
      - name: dim_alder
 
+<<<<<<< HEAD
 
 
 
 
 
+=======
+  - name: fam_ef
+    schema: dvh_fam_ef
+    tables:
+      - name: fam_ef_meta_data
+        description: 'inneholder meta_data for ensligforsørger'
+      - name: fam_ef_fagsak
+        description: 'inneholder vedtaks informasjon'
+>>>>>>> main
 
