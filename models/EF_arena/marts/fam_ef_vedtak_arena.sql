@@ -76,7 +76,7 @@ final as (
 		  FASV.VEDTAK_BEHANDLING_STATUS,
 		  VFAKTA_FDATO.VEDTAK_FAKTA_VERDI_DATO AS "GYLDIG_FRA_DATO",
 		  VFAKTA_TDATO.VEDTAK_FAKTA_VERDI_DATO AS "GYLDIG_TIL_DATO",
-      'DBT_ARENA' kildesystem,
+      'ARENA' kildesystem,
       localtimestamp lastet_dato
 
 	FROM  fak_vedtak_fakta VFAKTA_INNFV
@@ -150,5 +150,5 @@ from
 
 {% if is_incremental() %}
 
-where lastet_dato > (select max(lastet_dato) from {{ this }} where kildesystem = 'DBT_ARENA')
+where lastet_dato > (select max(lastet_dato) from {{ this }} where kildesystem = 'ARENA')
 {% endif %}
