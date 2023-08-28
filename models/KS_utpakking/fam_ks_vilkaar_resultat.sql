@@ -1,3 +1,9 @@
+{{
+    config(
+        materialized='incremental'
+    )
+}}
+
 with ks_meta_data as (
   select * from {{ref ('ks_meldinger_til_aa_pakke_ut')}}
 ),
@@ -6,8 +12,8 @@ pre_final as (
 select *  from ks_meta_data,
   json_table(melding, '$'
     columns(
-            behandlings_id  path  '$.behandlingsId',
-      nested path '$.vilkårResultater[*]'
+      behandlings_id  path  '$.behandlingsId',
+      nested          path '$.vilkårResultater[*]'
       columns(
         resultat              path '$.resultat',
         antall_timer          path '$.antallTimer',
