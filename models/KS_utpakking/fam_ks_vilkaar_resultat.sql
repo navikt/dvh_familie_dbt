@@ -24,6 +24,7 @@ select *  from ks_meta_data,
         )
       )
     ) j
+    where json_value (melding, '$.vilkårResultater.size()' )> 0
 ),
 
 final as (
