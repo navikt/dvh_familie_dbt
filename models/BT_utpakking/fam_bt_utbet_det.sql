@@ -32,6 +32,7 @@ SELECT * FROM barnetrygd_meta_data,
       ,ytelse_type              VARCHAR2 PATH '$.ytelseType'
       ,utbetalt_pr_mnd          VARCHAR2 PATH '$..utbetaltPrMnd'
       ,person_ident             VARCHAR2 PATH '$.person.personIdent'
+      ,delingsprosentYtelse     VARCHAR2 PATH '$.person.delingsprosentYtelse'
       )))
       ) j
   ),
@@ -39,6 +40,7 @@ SELECT * FROM barnetrygd_meta_data,
 joining_pre_final as (
   select
     person_ident,
+    delingsprosentYtelse,
     nvl(b.fk_person1, -1) fk_person1,
     KLASSEKODE,
     DELYTELSE_ID,
@@ -75,6 +77,7 @@ final as (
   from joining_pre_final p
   join bt_person per
   on p.fk_person1 = per.fk_person1 and p.kafka_offset = per.kafka_offset
+  and p.delingsprosentYtelse = per.delingsprosent_ytelse
   join bt_utbetaling u
   on p.stønadfom = u.stønad_fom and p.stønadtom = u.stønad_tom and p.kafka_offset = u.kafka_offset
 )
