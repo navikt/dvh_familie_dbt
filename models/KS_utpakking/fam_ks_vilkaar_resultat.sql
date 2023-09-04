@@ -35,7 +35,7 @@ final as (
   antall_timer,
   to_date(periode_fom, 'yyyy-mm-dd') periode_fom,
   to_date(periode_tom, 'yyyy-mm-dd') periode_tom,
-  nvl(b.fk_person1, -1) fk_person1_barn,
+  nvl(b.fk_person1, -1) fk_person1,
   vilkaar_type
 from
   pre_final
@@ -52,10 +52,10 @@ SELECT
   ANTALL_TIMER,
   PERIODE_FOM,
   PERIODE_TOM,
-  case when FK_PERSON1_barn = -1 then IDENT
+  case when FK_PERSON1 = -1 then IDENT
       else cast(null as varchar2(11))
   end IDENT,
-  FK_PERSON1_BARN,
+  FK_PERSON1,
   VILKAAR_TYPE,
   localtimestamp AS LASTET_DATO,
   fk_ks_fagsak
