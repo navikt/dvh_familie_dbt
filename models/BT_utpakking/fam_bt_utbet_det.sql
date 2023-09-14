@@ -95,5 +95,4 @@ select
   ,BEHANDLINGS_ID
   ,localtimestamp AS lastet_dato
   ,YTELSE_TYPE
-  ,kafka_mottatt_dato
 from final

@@ -53,6 +53,5 @@ select
   localtimestamp as LASTET_DATO,
   FK_BT_FAGSAK,
   SOKERS_AKTIVITETSLAND,
-  KAFKA_MOTTATT_DATO,
   KAFKA_OFFSET
 from final

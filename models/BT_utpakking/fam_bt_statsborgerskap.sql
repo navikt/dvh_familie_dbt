@@ -101,7 +101,6 @@ select
   ,statsborgerskap
   ,localtimestamp AS lastet_dato
   ,FK_BT_PERSON
-  ,kafka_mottatt_dato
 from final
 
 

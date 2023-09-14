@@ -104,7 +104,6 @@ select
   ,BEHANDLINGS_ID
   ,localtimestamp AS lastet_dato
   ,localtimestamp AS OPPDATERT_DATO
-  ,KAFKA_MOTTATT_DATO
   ,soker_flagg
 from final
 

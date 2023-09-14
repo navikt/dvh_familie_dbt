@@ -54,5 +54,4 @@ select
   ,KAFKA_OFFSET
   ,BEHANDLINGS_ID
   ,localtimestamp AS lastet_dato
-  ,KAFKA_MOTTATT_DATO
 from final
