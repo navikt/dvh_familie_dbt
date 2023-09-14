@@ -19,8 +19,8 @@ select * from barnetrygd_meta_data,
     person_ident             VARCHAR2 PATH '$.personV2[*].personIdent'
     ,NESTED                   PATH '$.personV2[*].statsborgerskap[*]'
     COLUMNS (
-    statsborgerskap_soker                    VARCHAR2 PATH '$')
-   --,statsborgerskap_soker          VARCHAR2 PATH '$.personV2[*].statsborgerskap[1]'
+    statsborgerskap_soker                    VARCHAR2 PATH '$'
+    )
     )
   ) j
 ),
@@ -42,6 +42,7 @@ select * from barnetrygd_meta_data,
     )
   )
   )j
+  where json_value (melding, '$.utbetalingsperioderV2.utbetalingsDetaljer.size()' )> 0
 ),
 
 pre_final_soker as (

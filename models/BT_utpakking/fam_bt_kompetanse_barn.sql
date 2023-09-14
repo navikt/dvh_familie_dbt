@@ -37,6 +37,7 @@ select * from barnetrygd_meta_data,
          )
         )
     ) j
+    where json_value (melding, '$.kompetanseperioder.size()' )> 0
 ),
 
 joining_pre_final as (
