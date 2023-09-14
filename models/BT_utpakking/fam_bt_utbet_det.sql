@@ -35,6 +35,7 @@ SELECT * FROM barnetrygd_meta_data,
       ,delingsprosentYtelse     VARCHAR2 PATH '$.person.delingsprosentYtelse'
       )))
       ) j
+      where json_value (melding, '$.utbetalingsperioderV2.utbetalingsDetaljer.size()' )> 0
   ),
 
 joining_pre_final as (

@@ -23,8 +23,10 @@ select * from barnetrygd_meta_data,
         ,stønad_fom         VARCHAR2 PATH '$.stønadFom'
         ,stønad_tom         VARCHAR2 PATH '$.stønadTom'
         ,hjemmel            VARCHAR2 PATH '$.hjemmel'
-        ))
-        ) j
+        )
+      )
+    ) j
+      where json_value (melding, '$.utbetalingsperioderV2.size()' )> 0
 ),
 
 final as (
