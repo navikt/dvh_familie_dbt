@@ -42,7 +42,7 @@ select * from barnetrygd_meta_data,
     )
   )
   )j
-  where json_value (melding, '$.utbetalingsperioderV2.utbetalingsDetaljer.size()' )> 0
+  --where json_value (melding, '$.utbetalingsperioderV2.utbetalingsDetaljer.size()' )> 0
 ),
 
 pre_final_soker as (
