@@ -30,7 +30,7 @@ select * from ef_meta_data,
         )
       )
     )j
-    where json_value (melding, '$.utbetalinger.size()' )> 0
+    --where json_value (melding, '$.utbetalinger.size()' )> 0
 ),
 
 pre_final as (
