@@ -23,7 +23,7 @@ kolonner_perioder_kontantstotte as (
         )
       )
     )j
-    where json_value (melding, '$.perioderKontantstøtte.size()' )> 0
+    --where json_value (melding, '$.perioderKontantstøtte.size()' )> 0
 ),
 
 kolonner_perioder_tilleggsstonad as (
@@ -37,7 +37,7 @@ kolonner_perioder_tilleggsstonad as (
         )
       )
     )j
-    where json_value (melding, '$.perioderTilleggsstønad.size()' )> 0
+    --where json_value (melding, '$.perioderTilleggsstønad.size()' )> 0
 ),
 
 perioder_kontantstotte as (

@@ -23,7 +23,7 @@ pre_final_barn_person as (
         )
       )
     ) j
-    where json_value (melding, '$.barn.size()' )> 0
+    --where json_value (melding, '$.barn.size()' )> 0
 ),
 
 pre_final as (
