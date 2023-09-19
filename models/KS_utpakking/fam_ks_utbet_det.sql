@@ -8,10 +8,6 @@ with ks_meta_data as (
   select * from {{ref ('ks_meldinger_til_aa_pakke_ut')}}
 ),
 
-ks_fagsak as (
-  select * from {{ref('fam_ks_fagsak')}}
-),
-
 ks_utbetaling as (
   select * from {{ref('fam_ks_utbetaling')}}
 ),
@@ -60,8 +56,7 @@ bosteds_land,
 delingsprosent_ytelse,
 kafka_mottatt_dato,
 sysdate lastet_dato,
-to_number(behandlings_id) as fk_ks_fagsak,
-to_number(replace(behandlings_id || stonad_fom || stonad_tom, '-', '')) as fk_ks_utbetaling
+ks_utbetaling.pk_ks_utbetaling as fk_ks_utbetaling
 from
   pre_final
 left outer join dt_person.ident_off_id_til_fk_person1 b on
@@ -69,6 +64,8 @@ left outer join dt_person.ident_off_id_til_fk_person1 b on
   and b.gyldig_fra_dato<=pre_final.kafka_mottatt_dato
   and b.gyldig_til_dato>=kafka_mottatt_dato
   and b.skjermet_kode=0
+join ks_utbetaling
+on to_number(replace(behandlings_id || stonad_fom || stonad_tom, '-', '')) = ks_utbetaling.pk_ks_utbetaling
 )
 
 select

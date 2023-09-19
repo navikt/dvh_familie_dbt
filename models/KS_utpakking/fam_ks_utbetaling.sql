@@ -38,8 +38,10 @@ select
   to_date(stonad_tom,'yyyy-mm-dd') stonad_tom,
   --kafka_mottatt_dato,
   sysdate lastet_dato,
-  to_number(behandlings_id) as fk_ks_fagsak
+  ks_fagsak.pk_ks_fagsak as fk_ks_fagsak
 from pre_final
+join ks_fagsak
+on to_number(pre_final.behandlings_id) = ks_fagsak.pk_ks_fagsak
 )
 
 select * from final

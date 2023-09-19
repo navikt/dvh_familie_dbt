@@ -34,7 +34,7 @@ select *  from ks_meta_data,
 
 final as (
   Select
-  behandlings_id as fk_ks_fagsak,
+  ks_fagsak.pk_ks_fagsak as fk_ks_fagsak,
   resultat,
   ident,
   antall_timer,
@@ -49,6 +49,8 @@ left outer join dt_person.ident_off_id_til_fk_person1 b on
   and b.gyldig_fra_dato<=pre_final.kafka_mottatt_dato
   and b.gyldig_til_dato>=kafka_mottatt_dato
   and b.skjermet_kode=0
+join ks_fagsak
+on to_number(pre_final.behandlings_id) = ks_fagsak.pk_ks_fagsak
 )
 
 SELECT
