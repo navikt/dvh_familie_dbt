@@ -34,6 +34,8 @@ select * from barnetrygd_meta_data,
       ,delingsprosent_ytelse      VARCHAR2 PATH '$.person.delingsprosentYtelse'
         )
       )) j
+      --where json_value (melding, '$.utbetalingsperioderV2.utbetalingsDetaljer.size()' )> 0
+
 ),
 
 final_fagsak_person as (
@@ -102,7 +104,6 @@ select
   ,BEHANDLINGS_ID
   ,localtimestamp AS lastet_dato
   ,localtimestamp AS OPPDATERT_DATO
-  ,KAFKA_MOTTATT_DATO
   ,soker_flagg
 from final
 

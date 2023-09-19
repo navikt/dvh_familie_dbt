@@ -37,7 +37,7 @@ select *  from ks_meta_data,
 
 final as (
 select
-behandlings_id || stonad_fom || stonad_tom || delytelse_ID as pk_ks_utbet_det,
+to_number(replace(behandlings_id || stonad_fom || stonad_tom || delytelse_ID, '-', '')) as pk_ks_utbet_det,
 kafka_offset,
 klassekode,
 utbetalt_per_mnd,
@@ -52,8 +52,8 @@ bosteds_land,
 delingsprosent_ytelse,
 kafka_mottatt_dato,
 sysdate lastet_dato,
-behandlings_id as fk_ks_fagsak,
-behandlings_id || stonad_fom || stonad_tom as fk_ks_utbetaling
+to_number(behandlings_id) as fk_ks_fagsak,
+to_number(replace(behandlings_id || stonad_fom || stonad_tom, '-', '')) as fk_ks_utbetaling
 from
   pre_final
 left outer join dt_person.ident_off_id_til_fk_person1 b on
@@ -68,7 +68,7 @@ select
   kafka_offset,
   hjemmel,
   utbetalt_per_mnd,
-  kafka_mottatt_dato,
+  --kafka_mottatt_dato,
   lastet_dato,
   delytelse_id,
   fk_person1_barn,

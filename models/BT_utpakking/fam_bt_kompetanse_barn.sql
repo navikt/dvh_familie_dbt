@@ -37,6 +37,7 @@ select * from barnetrygd_meta_data,
          )
         )
     ) j
+    --where json_value (melding, '$.kompetanseperioder.size()' )> 0
 ),
 
 joining_pre_final as (
@@ -87,6 +88,5 @@ final as (
 select
   dvh_fambt_kafka.hibernate_sequence.nextval as PK_BT_KOMPETANSE_BARN,
   FK_BT_KOMPETANSE_PERIODER,
-  FK_PERSON1,
-  kafka_mottatt_dato
+  FK_PERSON1
 from final

@@ -27,7 +27,7 @@ kolonner as (
       )
       )
     ) j
-    where json_value (melding, '$.vedtaksperioder.perioder.size()' )> 0
+    --where json_value (melding, '$.vedtaksperioder.perioder.size()' )> 0
 
 ),
 

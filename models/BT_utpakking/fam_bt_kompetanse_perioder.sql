@@ -28,6 +28,7 @@ select * from barnetrygd_meta_data,
       ,kompetanse_Resultat            VARCHAR2 PATH '$.resultat'
     ))
     )j
+    --where json_value (melding, '$.kompetanseperioder.size()' )> 0
   ),
 
 final as (
@@ -52,6 +53,5 @@ select
   localtimestamp as LASTET_DATO,
   FK_BT_FAGSAK,
   SOKERS_AKTIVITETSLAND,
-  KAFKA_MOTTATT_DATO,
   KAFKA_OFFSET
 from final
