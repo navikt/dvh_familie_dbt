@@ -68,7 +68,7 @@ select
   kafka_offset,
   hjemmel,
   utbetalt_per_mnd,
-  kafka_mottatt_dato,
+  --kafka_mottatt_dato,
   lastet_dato,
   delytelse_id,
   fk_person1_barn,
