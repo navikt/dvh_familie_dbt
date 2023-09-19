@@ -24,7 +24,8 @@ select *  from ks_meta_data,
         )
       )
     ) j
-    where json_value (melding, '$.vilkårResultater.size()' )> 0
+    --where json_value (melding, '$.vilkårResultater.size()' )> 0
+    where json_exists(melding, '$.vilkårResultater.vilkårType')
 ),
 
 final as (

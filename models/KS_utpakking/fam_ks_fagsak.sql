@@ -32,7 +32,7 @@ select * from ks_meta_data,
 
 final as (
   select
-    behandlings_id as pk_ks_fagsak,
+    to_number(behandlings_id) as pk_ks_fagsak,
     kafka_offset,
     fagsak_id,
     behandlings_id,

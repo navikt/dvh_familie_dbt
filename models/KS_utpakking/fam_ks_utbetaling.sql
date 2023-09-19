@@ -26,7 +26,7 @@ select *  from ks_meta_data,
 
 final as (
 select
-  behandlings_id || stonad_fom || stonad_tom as pk_ks_utbetaling,
+  to_number(replace(behandlings_id || stonad_fom || stonad_tom, '-', '')) as pk_ks_utbetaling,
   kafka_offset,
   hjemmel,
   utbetalt_per_mnd,
@@ -34,7 +34,7 @@ select
   to_date(stonad_tom,'yyyy-mm-dd') stonad_tom,
   --kafka_mottatt_dato,
   sysdate lastet_dato,
-  behandlings_id as fk_ks_fagsak
+  to_number(behandlings_id) as fk_ks_fagsak
 from pre_final
 )
 
