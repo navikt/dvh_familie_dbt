@@ -56,7 +56,7 @@ bosteds_land,
 delingsprosent_ytelse,
 kafka_mottatt_dato,
 sysdate lastet_dato,
-ks_utbetaling.pk_ks_utbetaling as fk_ks_utbetaling
+to_number(replace(behandlings_id || stonad_fom || stonad_tom, '-', '')) as fk_ks_utbetaling
 from
   pre_final
 left outer join dt_person.ident_off_id_til_fk_person1 b on
@@ -64,8 +64,6 @@ left outer join dt_person.ident_off_id_til_fk_person1 b on
   and b.gyldig_fra_dato<=pre_final.kafka_mottatt_dato
   and b.gyldig_til_dato>=kafka_mottatt_dato
   and b.skjermet_kode=0
-join ks_utbetaling
-on to_number(replace(behandlings_id || stonad_fom || stonad_tom, '-', '')) = ks_utbetaling.pk_ks_utbetaling
 )
 
 select
@@ -77,7 +75,5 @@ select
   lastet_dato,
   delytelse_id,
   fk_person1_barn,
-  fk_ks_utbetaling,
-  fk_ks_fagsak
+  fk_ks_utbetaling
 from final
-
