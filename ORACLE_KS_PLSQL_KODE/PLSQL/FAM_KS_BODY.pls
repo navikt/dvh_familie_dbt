@@ -158,127 +158,124 @@ create or replace PACKAGE BODY fam_ks AS
 
 
 
-  PROCEDURE fam_ks_barn_insert(p_in_period IN VARCHAR2
+  procedure fam_ks_barn_insert(p_in_period in varchar2
                                   ,p_in_gyldig_flagg in number default 0
-                                  ,p_error_melding OUT VARCHAR2) AS
-    v_aar_start VARCHAR2(6):= substr(p_in_period,1,4) || '01';
-    v_kilde VARCHAR2(10) := 'KS';
+                                  ,p_error_melding out varchar2) as
+    v_aar_start varchar2(6):= substr(p_in_period,1,4) || '01';
+    v_kilde varchar2(10) := 'KS';
     --v_storedate DATE := sysdate;
-    l_error_melding VARCHAR2(1000);
-    v_in_period_fra NUMBER :=p_in_period||'00';
-    v_in_period_til NUMBER :=p_in_period||'32';
+    l_error_melding varchar2(1000);
+    v_in_period_fra number :=p_in_period||'00';
+    v_in_period_til number :=p_in_period||'32';
 
 
-    l_commit NUMBER := 0;
+    l_commit number := 0;
 
-    CURSOR cur_barn IS
-
-WITH
-   UR AS
+    cursor cur_barn is
+      with ur as
       (
-SELECT ur.fk_person1,
-HENVISNING,delytelse_id,
-fam_ks_periode.aar_maaned stat_aarmnd,
-fam_ks_periode.pk_dim_tid fk_dim_tid_mnd,
-fam_ks_periode.siste_dato_i_perioden,
-belop,
-fagsak.fagsak_id,
-fagsak.pk_ks_fagsak fk_ks_fagsak
-    FROM dvh_fam_ks.fam_ks_ur_utbetaling ur
-     JOIN dt_kodeverk.dim_tid fam_ks_periode
-        ON to_char(ur.posteringsdato,'YYYYMM') = fam_ks_periode.aar_maaned
-        AND fam_ks_periode.dim_nivaa = 3
-        AND fam_ks_periode.gyldig_flagg = 1
+        select ur.fk_person1,
+               henvisning,delytelse_id,
+               fam_ks_periode.aar_maaned stat_aarmnd,
+               fam_ks_periode.pk_dim_tid fk_dim_tid_mnd,
+               fam_ks_periode.siste_dato_i_perioden,
+               belop,
+               fagsak.fagsak_id,
+               fagsak.pk_ks_fagsak fk_ks_fagsak
+        from dvh_fam_ks.fam_ks_ur_utbetaling ur
+        join dt_kodeverk.dim_tid fam_ks_periode
+        on to_char(ur.posteringsdato,'YYYYMM') = fam_ks_periode.aar_maaned
+        and fam_ks_periode.dim_nivaa = 3
+        and fam_ks_periode.gyldig_flagg = 1
 
-      JOIN dvh_fam_ks.fam_ks_fagsak FAGSAK ON
-      ur.henvisning=FAGSAK.behandlings_id
-   WHERE FK_DIM_TID_DATO_POSTERT_UR between v_in_period_fra and v_in_period_til
-    )
+        join dvh_fam_ks.fam_ks_fagsak fagsak
+        on ur.henvisning = fagsak.behandlings_id
+        where fk_dim_tid_dato_postert_ur between v_in_period_fra and v_in_period_til
+      )
 
-SELECT ur.fk_person1 fk_person1_mottaker
-,dim_person_mottaker.pk_dim_person,
-dim_kjonn_mottaker.kjonn_kode kjonn,
-dim_kjonn_mottaker.pk_dim_kjonn fk_dim_kjonn,
-utbet_det.fk_person1_barn fk_person1_barn,
-dim_person_barn.pk_dim_person fk_dim_person_barn,
-ur.fagsak_id,
-ur.fk_ks_fagsak,
-dim_kjonn_barn.kjonn_kode kjonn_barn,
-dim_kjonn_barn.pk_dim_kjonn fk_dim_kjonn_barn,
+      select ur.fk_person1 fk_person1_mottaker
+            ,dim_person_mottaker.pk_dim_person,
+             dim_kjonn_mottaker.kjonn_kode kjonn,
+             dim_kjonn_mottaker.pk_dim_kjonn fk_dim_kjonn,
+             utbet_det.fk_person1_barn fk_person1_barn,
+             dim_person_barn.pk_dim_person fk_dim_person_barn,
+             ur.fagsak_id,
+             ur.fk_ks_fagsak,
+             dim_kjonn_barn.kjonn_kode kjonn_barn,
+             dim_kjonn_barn.pk_dim_kjonn fk_dim_kjonn_barn,
 
---,ur.delytelse_id,
-sum(ur.belop) belop, stat_aarmnd
-,EXTRACT( YEAR FROM dim_person_mottaker.fodt_dato) fodsel_aar
-,EXTRACT (MONTH FROM dim_person_mottaker.fodt_dato) fodsel_mnd
-,EXTRACT( YEAR FROM dim_person_barn.fodt_dato) fodsel_aar_barn
-,EXTRACT (MONTH FROM dim_person_barn.fodt_dato) fodsel_mnd_barn
-,fk_dim_tid_mnd
+             --,ur.delytelse_id,
+             sum(ur.belop) belop, stat_aarmnd
+            ,extract( year from dim_person_mottaker.fodt_dato) fodsel_aar
+            ,extract (month from dim_person_mottaker.fodt_dato) fodsel_mnd
+            ,extract( year from dim_person_barn.fodt_dato) fodsel_aar_barn
+            ,extract (month from dim_person_barn.fodt_dato) fodsel_mnd_barn
+            ,fk_dim_tid_mnd
+      from ur
 
+      join fam_ks_utbet_det utbet_det
+      on trim(ur.delytelse_id)=utbet_det.delytelse_id
+      join fam_ks_utbetaling utbetaling
+      on utbet_det.fk_ks_utbetaling = utbetaling.pk_ks_utbetaling
+      and ur.fk_ks_fagsak = utbetaling.fk_ks_fagsak
 
-FROM UR
+      join dt_person.dim_person dim_person_mottaker
+      on dim_person_mottaker.fk_person1 = ur.fk_person1
+      and dim_person_mottaker.gyldig_fra_dato <= ur.siste_dato_i_perioden
+      and dim_person_mottaker.gyldig_til_dato >= ur.siste_dato_i_perioden
 
+      left outer join dt_kodeverk.dim_kjonn dim_kjonn_mottaker
+      on dim_person_mottaker.fk_dim_kjonn = dim_kjonn_mottaker.pk_dim_kjonn
 
-  join FAM_KS_UTBETALINGS_DET utbet_det ON
-    ur.delytelse_id=utbet_det.delytelse_id and
-    ur.fk_ks_fagsak=utbet_det.fk_ks_fagsak
+      left outer join dt_person.dim_person dim_person_barn
+      on dim_person_barn.fk_person1 = utbet_det.fk_person1_barn
+      and dim_person_barn.gyldig_fra_dato <= ur.siste_dato_i_perioden
+      and dim_person_barn.gyldig_til_dato >= ur.siste_dato_i_perioden
 
-      JOIN dt_person.dim_person dim_person_mottaker
-        ON dim_person_mottaker.fk_person1 = ur.fk_person1
-        AND dim_person_mottaker.gyldig_fra_dato <= ur.siste_dato_i_perioden
-        AND dim_person_mottaker.gyldig_til_dato >= ur.siste_dato_i_perioden
+      left outer join dt_kodeverk.dim_kjonn dim_kjonn_barn
+      on dim_person_barn.fk_dim_kjonn = dim_kjonn_barn.pk_dim_kjonn
+      --where dim_person_mottaker.fk_person1=1021056929
 
-        left outer join dt_kodeverk.dim_kjonn dim_kjonn_mottaker
-        on dim_person_mottaker.fk_dim_kjonn = dim_kjonn_mottaker.pk_dim_kjonn
+      group by ur.fk_person1,
+               dim_person_mottaker.pk_dim_person,
+               dim_kjonn_mottaker.kjonn_kode,dim_kjonn_mottaker.pk_dim_kjonn,
+               utbet_det.fk_person1_barn,
+               dim_person_barn.pk_dim_person,
+               stat_aarmnd,
+               ur.fagsak_id,
+               ur.fk_ks_fagsak,
+               dim_kjonn_barn.kjonn_kode,stat_aarmnd
+               ,extract( year from dim_person_mottaker.fodt_dato),extract(month from dim_person_mottaker.fodt_dato)
+               ,extract( year from dim_person_mottaker.fodt_dato)
+               ,extract (month from dim_person_mottaker.fodt_dato)
+               ,extract( year from dim_person_barn.fodt_dato)
+               ,extract (month from dim_person_barn.fodt_dato),dim_kjonn_barn.pk_dim_kjonn
+               ,fk_dim_tid_mnd,dim_kjonn_barn.pk_dim_kjonn
+      having sum(ur.belop)>0;
 
-     LEFT OUTER JOIN dt_person.dim_person dim_person_barn
-        ON dim_person_barn.fk_person1 = utbet_det.fk_person1_barn
-        AND dim_person_barn.gyldig_fra_dato <= ur.siste_dato_i_perioden
-        AND dim_person_barn.gyldig_til_dato >= ur.siste_dato_i_perioden
-
-    left outer join dt_kodeverk.dim_kjonn dim_kjonn_barn
-        on dim_person_barn.fk_dim_kjonn = dim_kjonn_barn.pk_dim_kjonn
---where dim_person_mottaker.fk_person1=1021056929
-
-group by ur.fk_person1,
-dim_person_mottaker.pk_dim_person,
-dim_kjonn_mottaker.kjonn_kode,dim_kjonn_mottaker.pk_dim_kjonn,
-utbet_det.fk_person1_barn,
-dim_person_barn.pk_dim_person,
-stat_aarmnd,
-ur.fagsak_id,
-ur.fk_ks_fagsak,
-dim_kjonn_barn.kjonn_kode,stat_aarmnd
-,EXTRACT( YEAR FROM dim_person_mottaker.fodt_dato),EXTRACT(MONTH FROM dim_person_mottaker.fodt_dato)
-,EXTRACT( YEAR FROM dim_person_mottaker.fodt_dato)
-,EXTRACT (MONTH FROM dim_person_mottaker.fodt_dato)
-,EXTRACT( YEAR FROM dim_person_barn.fodt_dato)
-,EXTRACT (MONTH FROM dim_person_barn.fodt_dato),dim_kjonn_barn.pk_dim_kjonn
-,fk_dim_tid_mnd,dim_kjonn_barn.pk_dim_kjonn
-having sum(ur.belop)>0;
-
-  BEGIN
+  begin
 
     -- Slett mottakere dvh_fam_fp.fam_bt_mottaker_hist for aktuell periode
-    BEGIN
-      DELETE FROM dvh_fam_ks.FAK_FAM_KS_MOTTAKER
-      WHERE kilde = v_kilde
-      AND stat_aarmnd= p_in_period
+    begin
+      delete from dvh_fam_ks.fak_fam_ks_mottaker
+      where kilde = v_kilde
+      and stat_aarmnd= p_in_period
       and gyldig_flagg = p_in_gyldig_flagg;
-      COMMIT;
-    EXCEPTION
-      WHEN OTHERS THEN
-        l_error_melding := substr(SQLCODE || ' ' || sqlerrm, 1, 1000);
+      commit;
+    exception
+      when others then
+        l_error_melding := substr(sqlcode || ' ' || sqlerrm, 1, 1000);
         /*INSERT INTO dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, ID, error_msg, opprettet_tid, kilde)
         VALUES(NULL, NULL, l_error_melding, sysdate, 'FAM_KS_MOTTAKER_INSERT_WITH1');*/
-        COMMIT;
+        commit;
         p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
-        l_error_melding := NULL;
-    END;
+        l_error_melding := null;
+    end;
 
-    FOR rec_barn IN cur_barn LOOP
+    for rec_barn in cur_barn loop
       --INSERT INTO dvh_fam_fp.fam_bt_mottaker
-      BEGIN
-       INSERT INTO dvh_fam_ks.fam_ks_barn
+      begin
+       insert into dvh_fam_ks.fam_ks_barn
         (
           stat_aarmnd,
           fk_dim_tid_mnd,
@@ -299,7 +296,7 @@ having sum(ur.belop)>0;
           lastet_dato
           ,gyldig_flagg
         )
-        VALUES
+        values
         (
           p_in_period,
           rec_barn.fk_dim_tid_mnd,
@@ -323,36 +320,36 @@ having sum(ur.belop)>0;
           ,p_in_gyldig_flagg
         );
         l_commit := l_commit + 1;
-      EXCEPTION
-        WHEN OTHERS THEN
-          l_error_melding := substr(SQLCODE || ' ' || sqlerrm, 1, 1000);
+      exception
+        when others then
+          l_error_melding := substr(sqlcode || ' ' || sqlerrm, 1, 1000);
         /*INSERT INTO dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, ID, error_msg, opprettet_tid, kilde)
           VALUES(NULL, rec_mottaker.fagsak_id, l_error_melding, sysdate, 'FAM_KS_MOTTAKER_INSERT_WITH2');
           l_commit := l_commit + 1;--Gå videre til neste rekord
           */
           p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
-          l_error_melding := NULL;
-      END;
-      IF l_commit >= 100000 THEN
-          COMMIT;
+          l_error_melding := null;
+      end;
+      if l_commit >= 100000 then
+          commit;
           l_commit := 0;
-      END IF;
-    END LOOP;
-    COMMIT;
-    IF l_error_melding IS NOT NULL THEN
-     INSERT INTO dvh_fam_fp.fp_xml_utbrett_error(ID, error_msg, opprettet_tid, kilde)
-      VALUES(NULL, l_error_melding, sysdate, 'FAM_KS_MOTTAKER_INSERT_WITH3');
-      COMMIT;
+      end if;
+    end loop;
+    commit;
+    if l_error_melding is not null then
+     insert into dvh_fam_fp.fp_xml_utbrett_error(id, error_msg, opprettet_tid, kilde)
+      values(null, l_error_melding, sysdate, 'FAM_KS_MOTTAKER_INSERT_WITH3');
+      commit;
       p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
-    END IF;
-  EXCEPTION
-    WHEN OTHERS THEN
-      l_error_melding := substr(SQLCODE || ' ' || sqlerrm, 1, 1000);
-     INSERT INTO dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, ID, error_msg, opprettet_tid, kilde)
-      VALUES(NULL, NULL, l_error_melding, sysdate, 'FAM_KS_MOTTAKER_INSERT_WITH4');
-      COMMIT;
+    end if;
+  exception
+    when others then
+      l_error_melding := substr(sqlcode || ' ' || sqlerrm, 1, 1000);
+     insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
+      values(null, null, l_error_melding, sysdate, 'FAM_KS_MOTTAKER_INSERT_WITH4');
+      commit;
       p_error_melding := substr(p_error_melding || l_error_melding, 1, 1000);
-  END fam_ks_barn_insert;
+  end fam_ks_barn_insert;
 
 
 
