@@ -62,7 +62,6 @@ sources:
     schema: dt_kodeverk
     tables:
      - name: dim_alder
-
   - name: fam_ef
     schema: dvh_fam_ef
     tables:
@@ -70,4 +69,3 @@ sources:
         description: 'inneholder meta_data for ensligforsørger'
       - name: fam_ef_fagsak
         description: 'inneholder vedtaks informasjon'
-

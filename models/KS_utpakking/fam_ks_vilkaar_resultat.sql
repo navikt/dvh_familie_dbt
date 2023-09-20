@@ -8,6 +8,10 @@ with ks_meta_data as (
   select * from {{ref ('ks_meldinger_til_aa_pakke_ut')}}
 ),
 
+ks_fagsak as (
+  select * from {{ref('fam_ks_fagsak')}}
+),
+
 pre_final as (
 select *  from ks_meta_data,
   json_table(melding, '$'
@@ -24,12 +28,13 @@ select *  from ks_meta_data,
         )
       )
     ) j
-    where json_value (melding, '$.vilkårResultater.size()' )> 0
+    --where json_value (melding, '$.vilkårResultater.size()' )> 0
+    where json_exists(melding, '$.vilkårResultater.vilkårType')
 ),
 
 final as (
   Select
-  behandlings_id as fk_ks_fagsak,
+  to_number(pre_final.behandlings_id) as fk_ks_fagsak,
   resultat,
   ident,
   antall_timer,
