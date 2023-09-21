@@ -13,23 +13,27 @@ ks_fagsak as (
 ),
 
 pre_final as (
-select *  from ks_meta_data,
-  json_table(melding, '$'
-    columns(
-      behandlings_id  path  '$.behandlingsId',
-      nested          path '$.vilkårResultater[*]'
-      columns(
-        resultat              path '$.resultat',
-        antall_timer          path '$.antallTimer',
-        periode_fom           path '$.periodeFom',
-        periode_tom           path '$.periodeTom',
-        ident                 path '$.ident',
-        vilkaar_type          path '$.vilkårType'
-        )
-      )
-    ) j
-    --where json_value (melding, '$.vilkårResultater.size()' )> 0
-    where json_exists(melding, '$.vilkårResultater.vilkårType')
+  select * from
+  (
+    select *  from ks_meta_data,
+      json_table(melding, '$'
+        columns(
+          behandlings_id  path  '$.behandlingsId',
+          nested          path '$.vilkårResultater[*]'
+          columns(
+            resultat              path '$.resultat',
+            antall_timer          path '$.antallTimer',
+            periode_fom           path '$.periodeFom',
+            periode_tom           path '$.periodeTom',
+            ident                 path '$.ident',
+            vilkaar_type          path '$.vilkårType'
+            )
+          )
+        ) j
+  )
+  where vilkaar_type is not null
+  --where json_value (melding, '$.vilkårResultater.size()' )> 0
+  --where json_exists(melding, '$.vilkårResultater.vilkårType')
 ),
 
 final as (

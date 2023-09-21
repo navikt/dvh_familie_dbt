@@ -13,19 +13,24 @@ ks_fagsak as (
 ),
 
 pre_final as (
-select *  from ks_meta_data,
-  json_table(melding, '$'
-    columns(
-        behandlings_id  path  '$.behandlingsId',
-          nested path '$.utbetalingsperioder[*]'
-          columns(
-            hjemmel path '$.hjemmel',
-            utbetalt_per_mnd path '$.utbetaltPerMnd',
-            stonad_fom     path '$.stønadFom',
-            stonad_tom     path '$.stønadTom'
+  select *
+  from
+  (select *  from ks_meta_data,
+    json_table(melding, '$'
+      columns(
+          behandlings_id  path  '$.behandlingsId',
+            nested path '$.utbetalingsperioder[*]'
+            columns(
+              hjemmel path '$.hjemmel',
+              utbetalt_per_mnd path '$.utbetaltPerMnd',
+              stonad_fom     path '$.stønadFom',
+              stonad_tom     path '$.stønadTom'
+          )
         )
-      )
-    ) j
+      ) j
+    )
+    where stonad_fom is not null
+    --where json_exists(melding, '$.utbetalingsperioder.stønadFom')
 ),
 
 final as (
