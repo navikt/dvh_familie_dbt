@@ -13,23 +13,27 @@ ks_fagsak as (
 ),
 
 pre_final as (
-select *  from ks_meta_data,
-  json_table(melding, '$'
-    columns(
-      behandlings_id  path  '$.behandlingsId',
-      nested          path '$.vilkårResultater[*]'
-      columns(
-        resultat              path '$.resultat',
-        antall_timer          path '$.antallTimer',
-        periode_fom           path '$.periodeFom',
-        periode_tom           path '$.periodeTom',
-        ident                 path '$.ident',
-        vilkaar_type          path '$.vilkårType'
-        )
-      )
-    ) j
-    --where json_value (melding, '$.vilkårResultater.size()' )> 0
-    where json_exists(melding, '$.vilkårResultater.vilkårType')
+  select * from
+  (
+    select *  from ks_meta_data,
+      json_table(melding, '$'
+        columns(
+          behandlings_id  path  '$.behandlingsId',
+          nested          path '$.vilkårResultater[*]'
+          columns(
+            resultat              path '$.resultat',
+            antall_timer          path '$.antallTimer',
+            periode_fom           path '$.periodeFom',
+            periode_tom           path '$.periodeTom',
+            ident                 path '$.ident',
+            vilkaar_type          path '$.vilkårType'
+            )
+          )
+        ) j
+  )
+  where vilkaar_type is not null
+  --where json_value (melding, '$.vilkårResultater.size()' )> 0
+  --where json_exists(melding, '$.vilkårResultater.vilkårType')
 ),
 
 final as (
@@ -37,7 +41,11 @@ final as (
   to_number(pre_final.behandlings_id) as fk_ks_fagsak,
   resultat,
   ident,
-  antall_timer,
+  replace(antall_timer, '.', ',') antall_timer,
+  --case when antall_timer is not null
+  --  then to_number(antall_timer)
+  --else antall_timer
+  --end antall_timer,
   to_date(periode_fom, 'yyyy-mm-dd') periode_fom,
   to_date(periode_tom, 'yyyy-mm-dd') periode_tom,
   nvl(b.fk_person1, -1) fk_person1,

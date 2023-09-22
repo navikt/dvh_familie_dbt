@@ -13,30 +13,35 @@ ks_utbetaling as (
 ),
 
 pre_final as (
-select *  from ks_meta_data,
-  json_table(melding, '$'
-    columns(
-      behandlings_id  path  '$.behandlingsId',
-        nested path '$.utbetalingsperioder[*]'
+  select * from
+  (
+    select *  from ks_meta_data,
+      json_table(melding, '$'
         columns(
-          hjemmel        path '$.hjemmel',
-          stonad_fom     path '$.stønadFom',
-          stonad_tom     path '$.stønadTom',
-          nested path '$.utbetalingsDetaljer[*]'
-          columns(
-            klassekode path '$.klassekode',
-            utbetalt_per_mnd path '$.utbetaltPrMnd',
-            delytelse_id     path '$.delytelseId',
-            nested path '$.person'
+          behandlings_id  path  '$.behandlingsId',
+            nested path '$.utbetalingsperioder[*]'
+            columns(
+              hjemmel        path '$.hjemmel',
+              stonad_fom     path '$.stønadFom',
+              stonad_tom     path '$.stønadTom',
+              nested path '$.utbetalingsDetaljer[*]'
               columns(
-                person_ident path '$.personIdent',
-                rolle path '$.rolle',
-                bosteds_land path '$.bostedsland',
-                delingsprosent_ytelse path '$.delingsprosentYtelse'
-                )
-            ))
-      )
-  ) j
+                klassekode path '$.klassekode',
+                utbetalt_per_mnd path '$.utbetaltPrMnd',
+                delytelse_id     path '$.delytelseId',
+                nested path '$.person'
+                  columns(
+                    person_ident path '$.personIdent',
+                    rolle path '$.rolle',
+                    bosteds_land path '$.bostedsland',
+                    delingsprosent_ytelse path '$.delingsprosentYtelse'
+                    )
+                ))
+          )
+      ) j
+  )
+  where delytelse_id is not null
+--where json_exists(melding, '$.utbetalingsperioder.utbetalingsDetaljer.delytelseId')
 ),
 
 final as (
