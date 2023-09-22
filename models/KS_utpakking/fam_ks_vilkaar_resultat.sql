@@ -41,6 +41,7 @@ final as (
   to_number(pre_final.behandlings_id) as fk_ks_fagsak,
   resultat,
   ident,
+  replace(antall_timer, '.', ',') antall_timer,
   --case when antall_timer is not null
   --  then to_number(antall_timer)
   --else antall_timer
@@ -61,7 +62,7 @@ left outer join dt_person.ident_off_id_til_fk_person1 b on
 SELECT
   dvh_fam_ks.hibernate_sequence.nextval as PK_KS_VILKAAR_RESULTAT,
   RESULTAT,
-  0 as ANTALL_TIMER,
+  ANTALL_TIMER,
   PERIODE_FOM,
   PERIODE_TOM,
   case when FK_PERSON1 = -1 then IDENT
