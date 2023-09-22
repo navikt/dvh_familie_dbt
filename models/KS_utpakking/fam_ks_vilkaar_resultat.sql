@@ -38,7 +38,7 @@ pre_final as (
 
 final as (
   Select
-  to_number(pre_final.behandlings_id) as fk_ks_fagsak,
+  pre_final.behandlings_id as fk_ks_fagsak,
   resultat,
   ident,
   antall_timer,
