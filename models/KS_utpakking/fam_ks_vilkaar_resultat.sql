@@ -38,10 +38,13 @@ pre_final as (
 
 final as (
   Select
-  pre_final.behandlings_id as fk_ks_fagsak,
+  to_number(pre_final.behandlings_id) as fk_ks_fagsak,
   resultat,
   ident,
-  antall_timer,
+  case when antall_timer is not null
+    then to_number(antall_timer)
+  else antall_timer
+  end antall_timer,
   to_date(periode_fom, 'yyyy-mm-dd') periode_fom,
   to_date(periode_tom, 'yyyy-mm-dd') periode_tom,
   nvl(b.fk_person1, -1) fk_person1,
