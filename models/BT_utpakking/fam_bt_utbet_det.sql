@@ -5,8 +5,7 @@
 }}
 
 with barnetrygd_meta_data as (
-  select pk_bt_meta_data, kafka_offset, kafka_mottatt_dato, melding from {{ source ('fam_bt', 'fam_bt_meta_data') }}
-    where kafka_offset in (select kafka_offset from {{ source ('fam_bt', 'fam_bt_duplikat_offset_bk26092023') }})
+  select * from {{ref ('bt_meldinger_til_aa_pakke_ut')}}
 ),
 
 
