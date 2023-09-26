@@ -5,8 +5,10 @@
 }}
 
 with barnetrygd_meta_data as (
-  select * from {{ref ('bt_meldinger_til_aa_pakke_ut')}}
+  select pk_bt_meta_data, kafka_offset, kafka_mottatt_dato, melding from {{ source ('fam_bt', 'fam_bt_meta_data') }}
+    where kafka_offset in (select kafka_offset from {{ source ('fam_bt', 'fam_bt_duplikat_offset_bk26092023') }})
 ),
+
 
 bt_utbetaling AS (
   SELECT * FROM {{ ref ('fam_bt_utbetaling') }}
@@ -33,10 +35,9 @@ SELECT * FROM barnetrygd_meta_data,
       ,utbetalt_pr_mnd          VARCHAR2 PATH '$..utbetaltPrMnd'
       ,person_ident             VARCHAR2 PATH '$.person.personIdent'
       ,delingsprosentYtelse     VARCHAR2 PATH '$.person.delingsprosentYtelse'
+      ,rolle                    VARCHAR2 PATH '$.person.rolle'
       )))
       ) j
-      where delytelse_id is not null
-      --where json_value (melding, '$.utbetalingsperioderV2.utbetalingsDetaljer.size()' )> 0
   ),
 
 joining_pre_final as (
@@ -48,6 +49,7 @@ joining_pre_final as (
     DELYTELSE_ID,
     UTBETALT_PR_MND,
     KAFKA_OFFSET,
+    rolle,
     BEHANDLINGS_ID,
     TO_DATE(stønadfom, 'YYYY-MM-DD') stønadfom,
     TO_DATE(stønadtom, 'YYYY-MM-DD') stønadtom,
@@ -77,9 +79,15 @@ final as (
     u.PK_BT_UTBETALING as FK_BT_UTBETALING,
     per.PK_BT_PERSON as FK_BT_PERSON
   from joining_pre_final p
-  join bt_person per
+  join
+  (
+    select fk_person1, kafka_offset, delingsprosent_ytelse, rolle, max(pk_bt_person) as pk_bt_person
+    from bt_person
+    group by fk_person1, kafka_offset, delingsprosent_ytelse, rolle
+  ) per
   on p.fk_person1 = per.fk_person1 and p.kafka_offset = per.kafka_offset
   and p.delingsprosentYtelse = per.delingsprosent_ytelse
+  and p.rolle = per.rolle
   join bt_utbetaling u
   on p.stønadfom = u.stønad_fom and p.stønadtom = u.stønad_tom and p.kafka_offset = u.kafka_offset
 )
@@ -97,3 +105,4 @@ select
   ,localtimestamp AS lastet_dato
   ,YTELSE_TYPE
 from final
+
