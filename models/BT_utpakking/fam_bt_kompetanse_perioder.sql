@@ -28,6 +28,7 @@ select * from barnetrygd_meta_data,
       ,kompetanse_Resultat            VARCHAR2 PATH '$.resultat'
     ))
     )j
+    where fom is not null
     --where json_value (melding, '$.kompetanseperioder.size()' )> 0
   ),
 
