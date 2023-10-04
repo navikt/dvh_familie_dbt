@@ -1,9 +1,14 @@
-create or replace PACKAGE fam_ks AS
-PROCEDURE fam_ks_mottaker_insert(p_in_period IN VARCHAR2
-                                  ,p_in_gyldig_flagg in number default 0
-                                  ,p_error_melding OUT VARCHAR2);
-PROCEDURE fam_ks_barn_insert(p_in_period IN VARCHAR2
-                                  ,p_in_gyldig_flagg in number default 0
-                                  ,p_error_melding OUT VARCHAR2);
+CREATE OR REPLACE PACKAGE FAM_KS AS
 
-END fam_ks;
+  PROCEDURE FAM_KS_MOTTAKER_INSERT(
+    P_IN_PERIOD_YYYYMM IN NUMBER,
+    P_IN_GYLDIG_FLAGG IN NUMBER DEFAULT 0,
+    P_ERROR_MELDING OUT VARCHAR2
+  );
+
+  PROCEDURE FAM_KS_BARN_INSERT(
+    P_IN_PERIOD_YYYYMM IN NUMBER,
+    P_IN_GYLDIG_FLAGG IN NUMBER DEFAULT 0,
+    P_ERROR_MELDING OUT VARCHAR2
+  );
+END FAM_KS;
