@@ -27,6 +27,7 @@ CREATE OR REPLACE PACKAGE BODY FAM_KS AS
           UR.BELOP,
           UR.HENVISNING,
           UTBET_DET.FK_PERSON1_BARN,
+          UTBET_DET.DELYTELSE_ID               AS DELYTELSE_ID_DET,
           FAGSAK.BEHANDLINGS_ID,
           FAGSAK.FAGSAK_ID,
           FAGSAK.PK_KS_FAGSAK,
@@ -67,6 +68,14 @@ CREATE OR REPLACE PACKAGE BODY FAM_KS AS
           ) SISTE
           ON UR_VEDTAK1.DELYTELSE_ID = SISTE.DELYTELSE_ID
           AND UR_VEDTAK1.BEHANDLINGS_ID = SISTE.SISTE_VERSJON
+        WHERE
+          UR_VEDTAK1.DELYTELSE_ID_DET IS NOT NULL UNION ALL
+          SELECT
+            *
+          FROM
+            UR_VEDTAK1
+          WHERE
+            DELYTELSE_ID_DET IS NULL
       )
       SELECT
         UR.FK_PERSON1,
@@ -312,6 +321,7 @@ CREATE OR REPLACE PACKAGE BODY FAM_KS AS
           UR.BELOP,
           UR.HENVISNING,
           UTBET_DET.FK_PERSON1_BARN,
+          UTBET_DET.DELYTELSE_ID               AS DELYTELSE_ID_DET,
           FAGSAK.BEHANDLINGS_ID,
           FAGSAK.FAGSAK_ID,
           FAGSAK.PK_KS_FAGSAK,
@@ -338,7 +348,8 @@ CREATE OR REPLACE PACKAGE BODY FAM_KS AS
           ON UTBETALING.FK_KS_FAGSAK = VILKAAR.FK_KS_FAGSAK
           AND UTBET_DET.FK_PERSON1_BARN = VILKAAR.FK_PERSON1
  --and vilkaar.periode_fom between utbetaling.stonad_fom and utbetaling.stonad_tom
-          AND UTBETALING.STONAD_FOM >= VILKAAR.PERIODE_FOM
+ --and utbetaling.stonad_fom >= vilkaar.periode_fom
+          AND UTBETALING.STONAD_TOM >= VILKAAR.PERIODE_FOM
           AND UTBETALING.STONAD_TOM <= NVL(VILKAAR.PERIODE_TOM,
           UTBETALING.STONAD_TOM)
           AND VILKAAR.VILKAAR_TYPE = 'BARNEHAGEPLASS'
@@ -363,6 +374,14 @@ CREATE OR REPLACE PACKAGE BODY FAM_KS AS
           ) SISTE
           ON UR_VEDTAK1.DELYTELSE_ID = SISTE.DELYTELSE_ID
           AND UR_VEDTAK1.BEHANDLINGS_ID = SISTE.SISTE_VERSJON
+        WHERE
+          UR_VEDTAK1.DELYTELSE_ID_DET IS NOT NULL UNION ALL
+          SELECT
+            *
+          FROM
+            UR_VEDTAK1
+          WHERE
+            DELYTELSE_ID_DET IS NULL
       )
       SELECT
         UR.FK_PERSON1                                      FK_PERSON1_MOTTAKER,
@@ -382,7 +401,9 @@ CREATE OR REPLACE PACKAGE BODY FAM_KS AS
         EXTRACT( YEAR FROM DIM_PERSON_BARN.FODT_DATO)      FODSEL_AAR_BARN,
         EXTRACT (MONTH FROM DIM_PERSON_BARN.FODT_DATO)     FODSEL_MND_BARN,
         UR.FK_DIM_TID_MND,
-        MAX(UR.ANTALL_TIMER)                               AS ANTALL_TIMER
+        MAX(UR.ANTALL_TIMER)                               AS ANTALL_TIMER,
+        MIN(UR.DATO_UTBET_FOM)                             AS DATO_UTBET_FOM,
+        MAX(UR.DATO_UTBET_TOM)                             AS DATO_UTBET_TOM
       FROM
         UR_VEDTAK2            UR
         JOIN DT_PERSON.DIM_PERSON DIM_PERSON_MOTTAKER
@@ -417,7 +438,9 @@ CREATE OR REPLACE PACKAGE BODY FAM_KS AS
         UR.FK_DIM_TID_MND,
         DIM_KJONN_BARN.PK_DIM_KJONN
       HAVING
-        SUM(UR.BELOP) > 0;
+        SUM(UR.BELOP) != 0
+ --having sum(case when ur.posteringsdato between ur.dato_utbet_fom and ur.dato_utbet_tom then belop else 0 end) > 0
+;
   BEGIN
  -- Slett mottakere dvh_fam_fp.fam_bt_mottaker_hist for aktuell periode
     BEGIN
@@ -473,7 +496,9 @@ CREATE OR REPLACE PACKAGE BODY FAM_KS AS
           KILDE,
           LASTET_DATO,
           GYLDIG_FLAGG,
-          ANTALL_TIMER
+          ANTALL_TIMER,
+          DATO_UTBET_FOM,
+          DATO_UTBET_TOM
         ) VALUES (
           P_IN_PERIOD_YYYYMM,
           REC_BARN.FK_DIM_TID_MND,
@@ -495,7 +520,9 @@ CREATE OR REPLACE PACKAGE BODY FAM_KS AS
           V_KILDE,
           SYSDATE,
           P_IN_GYLDIG_FLAGG,
-          REC_BARN.ANTALL_TIMER
+          REC_BARN.ANTALL_TIMER,
+          REC_BARN.DATO_UTBET_FOM,
+          REC_BARN.DATO_UTBET_TOM
         );
         L_COMMIT := L_COMMIT + 1;
       EXCEPTION
