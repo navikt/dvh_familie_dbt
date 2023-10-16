@@ -62,10 +62,19 @@ sources:
     schema: dt_kodeverk
     tables:
      - name: dim_alder
+
   - name: fam_ef
     schema: dvh_fam_ef
     tables:
       - name: fam_ef_meta_data
         description: 'inneholder meta_data for ensligforsørger'
       - name: fam_ef_fagsak
+        description: 'inneholder vedtaks informasjon'
+
+  - name: fam_pp
+    schema: dvh_fam_pp
+    tables:
+      - name: fam_pp_meta_data
+        description: 'inneholder meta_data for PP, OMP, PPN'
+      - name: fam_pp_fagsak
         description: 'inneholder vedtaks informasjon'
