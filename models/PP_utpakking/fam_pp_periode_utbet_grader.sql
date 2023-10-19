@@ -33,6 +33,7 @@ pre_final as (
       )
     )
   ) j
+  where utbetalingsgrad is not null and bruker_er_mottaker is not null
 ),
 
 final as (
@@ -61,8 +62,8 @@ select
   ,ARBEIDSFORHOLD_ORGNR
   ,ARBEIDSFORHOLD_TYPE
   ,DAGSATS
-  ,null as DELYTELSE_ID_DIREKTE
-  ,null as DELYTELSE_ID_REFUSJON
+  ,cast(null as varchar2(4)) as DELYTELSE_ID_DIREKTE
+  ,cast(null as varchar2(4)) as DELYTELSE_ID_REFUSJON
   ,NORMAL_ARBEIDSTID
   ,FAKTISK_ARBEIDSTID
   ,UTBETALINGSGRAD

@@ -34,9 +34,10 @@ mottaker_final as (
     ,p.ytelse_type
     ,p.kafka_offset
     ,p.kafka_topic
+    ,p.kafka_mottatt_dato
     ,nvl(ident.fk_person1, -1) as FK_PERSON1_MOTTAKER
     ,p.kafka_partition
-    ,p.pk_pp_meta_data as fk_pp_meta_data
+    ,p.pk_pp_meta_data as fk_pp_metadata
     ,CASE
     WHEN LENGTH(p.vedtaks_tidspunkt) = 25 THEN CAST(to_timestamp_tz(p.vedtaks_tidspunkt, 'yyyy-mm-dd"T"hh24:mi:ss TZH:TZM') AT TIME ZONE 'Europe/Belgrade' AS TIMESTAMP)
     ELSE CAST(to_timestamp_tz(p.vedtaks_tidspunkt, 'FXYYYY-MM-DD"T"HH24:MI:SS.FXFFTZH:TZM') AT TIME ZONE 'Europe/Belgrade' AS TIMESTAMP)
@@ -79,7 +80,7 @@ select
   ,utbetalingsreferanse
   ,ytelse_type
   ,VEDTAKS_TIDSPUNKT
-  ,fk_pp_meta_data
+  ,fk_pp_metadata
 from pleietrengende_final
 
 

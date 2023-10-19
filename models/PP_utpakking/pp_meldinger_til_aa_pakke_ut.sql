@@ -10,4 +10,4 @@ with pleiepenger_meta_data as (
       select kafka_offset from {{ source ('fam_pp', 'fam_pp_fagsak') }})
 )
 
-select * from kontantstotte_meta_data
+select * from pleiepenger_meta_data

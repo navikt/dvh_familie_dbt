@@ -25,6 +25,7 @@ pre_final as (
       )
     )
   ) j
+  where aarsak is not null
 ),
 
 final as (

@@ -23,6 +23,7 @@ select * from pp_meta_data,
       )
     )
   ) j
+  where kode is not null
 ),
 
 final as (

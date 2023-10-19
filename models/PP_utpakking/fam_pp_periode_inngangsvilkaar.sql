@@ -26,14 +26,16 @@ pre_final as (
     )
   )
   ) j
+  where utfall is not null
 ),
 
 final as (
   select
     p.utfall
     ,p.vilkaar
-    ,dato_fom
-    ,dato_tom
+    ,p.dato_fom
+    ,p.dato_tom
+    ,p.kafka_offset
     ,periode.pk_pp_perioder as FK_PP_PERIODER
   from pre_final p
   join pp_perioder periode
@@ -48,7 +50,7 @@ select
   ,VILKAAR
   ,FK_PP_PERIODER
   ,localtimestamp as LASTET_DATO
-  ,null as DETALJERT_UTFALL
+  ,cast(null as varchar2(4)) as DETALJERT_UTFALL
   ,dato_fom
   ,dato_tom
   ,kafka_offset

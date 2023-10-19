@@ -23,6 +23,7 @@ select * from pp_meta_data,
       )
     )
   ) j
+  where kode is not null
 ),
 
 pre_final_dim_diagnose as (
@@ -33,7 +34,7 @@ pre_final_dim_diagnose as (
   join dt_p.dim_diagnose d
   on p.kode = d.diagnose_kode
   and p.type = upper(d.diagnose_tabell)
-  and p.vedtaks_tidspunkt between d.gyldig_fra_dato and d.gyldig_til_dato
+  and trunc(TO_TIMESTAMP(SUBSTR(p.vedtaks_tidspunkt,1,23), 'YYYY-MM-DD"T"HH24:MI:SS:FF3')) between d.gyldig_fra_dato and d.gyldig_til_dato
 ),
 
 final as (

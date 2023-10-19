@@ -19,8 +19,8 @@ pre_final as (
       nested path '$.perioder[*]' columns (
       beredskap                         varchar2 path '$.beredskap'
       ,brutto_beregningsgrunnlag         varchar2 path '$.bruttoBeregningsgrunnlag'
-      ,dato_fom                          varchar2 path '$.fom'
-      ,dato_tom                          varchar2 path '$.tom'
+      ,dato_fom                          date path '$.fom'
+      ,dato_tom                          date path '$.tom'
       ,gmt_andre_sokers_tilsyn           varchar2 path '$.graderingMotTilsyn.andreSøkeresTilsyn'
       ,gmt_etablert_tilsyn               varchar2 path '$.graderingMotTilsyn.etablertTilsyn'
       ,gmt_overse_etablert_tilsyn_aarsak varchar2 path '$.graderingMotTilsyn.overseEtablertTilsynÅrsak'
@@ -35,14 +35,15 @@ pre_final as (
       )
     )
   ) j
+  where dato_fom is not null
 ),
 
 final as (
   select
     p.beredskap
     ,p.brutto_beregningsgrunnlag
-    ,to_date(p.dato_fom, 'yyyy-mm-yy') dato_fom
-    ,to_date(p.dato_tom, 'yyyy-mm-yy') dato_tom
+    ,p.dato_fom
+    ,p.dato_tom
     ,p.gmt_andre_sokers_tilsyn
     ,p.gmt_etablert_tilsyn
     ,p.gmt_overse_etablert_tilsyn_aarsak
@@ -80,5 +81,5 @@ select
   ,UTTAKSGRAD
   ,FK_PP_FAGSAK
   ,localtimestamp as LASTET_DATO
-  kafka_offset
+  ,kafka_offset
 from final

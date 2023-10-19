@@ -34,6 +34,7 @@ pre_final as (
       )
     )
   ) j
+  where GJELDER_ORGANISASJONSNUMMER is not null and GJELDER_AKTIVITET_TYPE is not null
 ),
 
 final as (
@@ -57,5 +58,5 @@ select
   ,GJELDER_ARBEIDSFORHOLD_ID
   ,DET_UTFALL
   ,localtimestamp as LASTET_DATO
-  FK_PP_PERIODE_INNGANGSVILKAAR
+  ,FK_PP_PERIODE_INNGANGSVILKAAR
 from final
