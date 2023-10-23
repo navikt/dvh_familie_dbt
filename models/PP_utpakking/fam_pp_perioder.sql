@@ -5,7 +5,8 @@
 }}
 
 with pp_meta_data as (
-  select * from {{ref ('pp_meldinger_til_aa_pakke_ut')}}
+    select pk_pp_meta_data, kafka_offset, kafka_mottatt_dato, kafka_topic, KAFKA_PARTITION, melding from {{ source ('fam_pp', 'fam_pp_meta_data') }}
+    where kafka_offset > 432782
 ),
 
 pp_fagsak AS (
@@ -17,21 +18,21 @@ pre_final as (
   json_table(melding, '$'
     columns (
       nested path '$.perioder[*]' columns (
-      beredskap                         varchar2 path '$.beredskap'
-      ,brutto_beregningsgrunnlag         varchar2 path '$.bruttoBeregningsgrunnlag'
+      beredskap                          varchar2 path '$.beredskap'
+      ,brutto_beregningsgrunnlag         number path '$.bruttoBeregningsgrunnlag'
       ,dato_fom                          date path '$.fom'
       ,dato_tom                          date path '$.tom'
       ,gmt_andre_sokers_tilsyn           varchar2 path '$.graderingMotTilsyn.andreSøkeresTilsyn'
-      ,gmt_etablert_tilsyn               varchar2 path '$.graderingMotTilsyn.etablertTilsyn'
+      ,gmt_etablert_tilsyn               number path '$.graderingMotTilsyn.etablertTilsyn'
       ,gmt_overse_etablert_tilsyn_aarsak varchar2 path '$.graderingMotTilsyn.overseEtablertTilsynÅrsak'
-      ,gmt_tilgjengelig_for_soker        varchar2 path '$.graderingMotTilsyn.tilgjengeligForSøker'
+      ,gmt_tilgjengelig_for_soker        number path '$.graderingMotTilsyn.tilgjengeligForSøker'
       ,nattevaak                         varchar2 path '$.nattevåk'
       ,oppgitt_tilsyn                    varchar2 path '$.oppgittTilsyn'
-      ,pleiebehov                        varchar2 path '$.pleiebehov'
+      ,pleiebehov                        number path '$.pleiebehov'
       ,sokers_tapte_timer                varchar2 path '$.søkersTapteTimer'
       ,utfall                            varchar2 path '$.utfall'
-      ,uttaksgrad                        varchar2 path '$.uttaksgrad'
-      ,sokers_tapte_arbeidstid           varchar2 path '$.søkersTapteArbeidstid'
+      ,uttaksgrad                        number path '$.uttaksgrad'
+      ,sokers_tapte_arbeidstid           number path '$.søkersTapteArbeidstid'
       )
     )
   ) j
