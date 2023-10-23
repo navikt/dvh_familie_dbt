@@ -26,24 +26,12 @@ select * from pp_meta_data,
   where kode is not null
 ),
 
-pre_final_dim_diagnose as (
-  select
-    p.*
-    ,d.pk_dim_diagnose as fk_dim_diagnose
-  from pre_final p
-  join dt_p.dim_diagnose d
-  on p.kode = d.diagnose_kode
-  and p.type = upper(d.diagnose_tabell)
-  and trunc(TO_TIMESTAMP(SUBSTR(p.vedtaks_tidspunkt,1,23), 'YYYY-MM-DD"T"HH24:MI:SS:FF3')) between d.gyldig_fra_dato and d.gyldig_til_dato
-),
-
 final as (
   select
     p.kode
     ,p.type
-    ,p.fk_dim_diagnose
     ,f.pk_pp_fagsak as FK_PP_FAGSAK
-  from pre_final_dim_diagnose p
+  from pre_final p
   join pp_fagsak f
   on p.kafka_offset = f.kafka_offset
 )
@@ -54,5 +42,5 @@ select
   ,TYPE
   ,FK_PP_FAGSAK
   ,localtimestamp AS LASTET_DATO
-  ,FK_DIM_DIAGNOSE
+  ,cast(null as varchar2(4)) as FK_DIM_DIAGNOSE
 from final
