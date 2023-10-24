@@ -24,10 +24,10 @@ pre_final as (
         ,arbeidsforhold_id      varchar2 path '$.arbeidsforhold.arbeidsforholdId'
         ,arbeidsforhold_orgnr   varchar2 path '$.arbeidsforhold.organisasjonsnummer'
         ,arbeidsforhold_type    varchar2 path '$.arbeidsforhold.type'
-        ,dagsats                varchar2 path '$.dagsats'
+        ,dagsats                NUMBER path '$.dagsats'
         ,faktisk_arbeidstid     varchar2 path '$.faktiskArbeidstid'
         ,normal_arbeidstid      varchar2 path '$.normalArbeidstid'
-        ,utbetalingsgrad        varchar2 path '$.utbetalingsgrad'
+        ,utbetalingsgrad        NUMBER path '$.utbetalingsgrad'
         ,bruker_er_mottaker     varchar2 path '$.brukerErMottaker'
         )
       )
