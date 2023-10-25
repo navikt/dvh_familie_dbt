@@ -5,8 +5,7 @@
 }}
 
 with pp_meta_data as (
-    select pk_pp_meta_data, kafka_offset, kafka_mottatt_dato, kafka_topic, KAFKA_PARTITION, melding from {{ source ('fam_pp', 'fam_pp_meta_data') }}
-    where kafka_offset > 432782
+  select * from {{ref ('pp_meldinger_til_aa_pakke_ut')}}
 ),
 
 pp_fagsak AS (

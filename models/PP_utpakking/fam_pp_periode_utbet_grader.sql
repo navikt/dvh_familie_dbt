@@ -46,7 +46,10 @@ final as (
     ,p.faktisk_arbeidstid
     ,p.normal_arbeidstid
     ,p.utbetalingsgrad
-    ,p.bruker_er_mottaker
+    ,CASE
+      when p.bruker_er_mottaker = 'true' then 1
+      when p.bruker_er_mottaker = 'false' then 0
+    end bruker_er_mottaker
     ,perioder.pk_pp_perioder as FK_PP_PERIODER
   from pre_final p
   join pp_perioder perioder
