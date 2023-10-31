@@ -1,3307 +1,6063 @@
-create or replace PACKAGE BODY                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         FAM_FP AS
+CREATE OR REPLACE PACKAGE BODY FAM_FP AS
 
-  function dim_tid_antall(p_in_tid_fom in number, p_in_tid_tom in number)
-    return number as
-    v_dim_tid_antall number := 0;
-  begin
-    select count(1)
-    into v_dim_tid_antall
-    from dt_kodeverk.dim_tid
-    where dag_i_uke < 6
-    and dim_nivaa = 1
-    and gyldig_flagg = 1
-    and pk_dim_tid between p_in_tid_fom and p_in_tid_tom;
-    return v_dim_tid_antall;
-  exception
-    when others then
-      return 0;
-  end;
+  FUNCTION DIM_TID_ANTALL(
+    P_IN_TID_FOM IN NUMBER,
+    P_IN_TID_TOM IN NUMBER
+  ) RETURN NUMBER AS
+    V_DIM_TID_ANTALL NUMBER := 0;
+  BEGIN
+    SELECT
+      COUNT(1) INTO V_DIM_TID_ANTALL
+    FROM
+      DT_KODEVERK.DIM_TID
+    WHERE
+      DAG_I_UKE < 6
+      AND DIM_NIVAA = 1
+      AND GYLDIG_FLAGG = 1
+      AND PK_DIM_TID BETWEEN P_IN_TID_FOM AND P_IN_TID_TOM;
+    RETURN V_DIM_TID_ANTALL;
+  EXCEPTION
+    WHEN OTHERS THEN
+      RETURN 0;
+  END;
 
-  procedure fam_fp_statistikk_maaned(p_in_vedtak_tom in varchar2, p_in_rapport_dato in varchar2, p_in_forskyvninger in number
-                                     ,p_in_gyldig_flagg in number default 0
-                                     ,p_in_periode_type in varchar2 default 'M'
-                                     ,p_out_error out varchar2) as
-    cursor cur_periode(p_rapport_dato in varchar2, p_forskyvninger in number
-                      ,p_tid_fom in varchar2, p_tid_tom in varchar2
-                      ,p_budsjett in varchar2) is
-      with fagsak as
-      (
-        select fagsak_id, max(behandlingstema) as behandlingstema, max(fagsakannenforelder_id) as annenforelderfagsak_id
-              ,max(trans_id) keep(dense_rank first order by funksjonell_tid desc) as max_trans_id
-              ,max(soeknadsdato) keep(dense_rank first order by funksjonell_tid desc) as soknadsdato
-              ,min(soeknadsdato) as forste_soknadsdato
-              ,min(vedtaksdato) as forste_vedtaksdato
-              ,max(funksjonell_tid) as funksjonell_tid, max(vedtaksdato) as siste_vedtaksdato
-              ,p_in_periode_type as periode, last_day(to_date(p_rapport_dato,'yyyymm')) + p_forskyvninger as max_vedtaksdato
-        from dvh_fam_fp.fam_fp_fagsak
-        where fam_fp_fagsak.funksjonell_tid <= last_day(to_date(p_rapport_dato,'yyyymm')) + p_forskyvninger
-        group by fagsak_id
-      ),
-      termin as
-      (
-        select fagsak_id, max(termindato) termindato, max(foedselsdato) foedselsdato
-              ,max(antall_barn_termin) antall_barn_termin, max(antall_barn_foedsel) antall_barn_foedsel
-              ,max(foedselsdato_adopsjon) foedselsdato_adopsjon, max(antall_barn_adopsjon) antall_barn_adopsjon
-        from
-        (
-          select fam_fp_fagsak.fagsak_id, max(fodsel.termindato) termindato
-                ,max(fodsel.foedselsdato) foedselsdato, max(fodsel.antall_barn_foedsel) antall_barn_foedsel
-                ,max(fodsel.antall_barn_termin) antall_barn_termin
-                ,max(adopsjon.foedselsdato_adopsjon) foedselsdato_adopsjon
-                ,count(adopsjon.trans_id) antall_barn_adopsjon
-          from dvh_fam_fp.fam_fp_fagsak
-          left join dvh_fam_fp.fam_fp_fodseltermin fodsel
-          on fodsel.fagsak_id = fam_fp_fagsak.fagsak_id
-          and upper(fam_fp_fagsak.behandlingstema) = 'FORP_FODS'
-          left join dvh_fam_fp.fam_fp_fodseltermin adopsjon
-          on adopsjon.fagsak_id = fam_fp_fagsak.fagsak_id
-          and adopsjon.trans_id = fam_fp_fagsak.trans_id
-          and upper(fam_fp_fagsak.behandlingstema) = 'FORP_ADOP'
-          group by fam_fp_fagsak.fagsak_id, fam_fp_fagsak.trans_id
-        )
-        group by fagsak_id
-      ),
-      fk_person1 as
-      (
-        select person.person, person.fagsak_id, max(person.behandlingstema) as behandlingstema, person.max_trans_id
-              ,max(person.annenforelderfagsak_id) as annenforelderfagsak_id
-              ,person.aktoer_id, max(person.kjonn) as kjonn
-              ,max(person_67_vasket.fk_person1) keep
-                (dense_rank first order by person_67_vasket.gyldig_fra_dato desc) as fk_person1
-              ,max(foedselsdato) as foedselsdato, max(sivilstand) as sivilstand
-              ,max(statsborgerskap) as statsborgerskap
-        from
-        (
-          select 'MOTTAKER' as person, fagsak.fagsak_id, fagsak.behandlingstema, fagsak.max_trans_id
-                ,fagsak.annenforelderfagsak_id
-                ,fam_fp_personopplysninger.aktoer_id, fam_fp_personopplysninger.kjonn
-                ,fam_fp_personopplysninger.foedselsdato, fam_fp_personopplysninger.sivilstand
-                ,fam_fp_personopplysninger.statsborgerskap
-          from dvh_fam_fp.fam_fp_personopplysninger
-          join fagsak
-          on fam_fp_personopplysninger.trans_id = fagsak.max_trans_id
-          union all
-          select 'BARN' as person, fagsak.fagsak_id, max(fagsak.behandlingstema) as behandlingstema, fagsak.max_trans_id
-                ,max(fagsak.annenforelderfagsak_id) annenforelderfagsak_id
-                ,max(fam_fp_familiehendelse.til_aktoer_id) as aktoer_id, max(fam_fp_familiehendelse.kjoenn) as kjonn
-                ,null as foedselsdato, null as sivilstand, null as statsborgerskap
-          from dvh_fam_fp.fam_fp_familiehendelse
-          join fagsak
-          on fam_fp_familiehendelse.fagsak_id = fagsak.fagsak_id
-          where upper(fam_fp_familiehendelse.relasjon) = 'BARN'
-          group by fagsak.fagsak_id, fagsak.max_trans_id
-        ) person
-        join dt_person.dvh_person_ident_aktor_ikke_skjermet person_67_vasket
-        on person_67_vasket.aktor_id = person.aktoer_id
-        and to_date(p_tid_tom,'yyyymmdd') between person_67_vasket.gyldig_fra_dato and person_67_vasket.gyldig_til_dato
-        group by person.person, person.fagsak_id, person.max_trans_id, person.aktoer_id
-      ),
-      barn as
-      (
-        select fagsak_id, listagg(fk_person1, ',') within group (order by fk_person1) as fk_person1_barn
-        from fk_person1
-        where person = 'BARN'
-        group by fagsak_id
-      ),
-      mottaker as
-      (
-        select fk_person1.fagsak_id, fk_person1.behandlingstema
-              ,fk_person1.max_trans_id, fk_person1.annenforelderfagsak_id, fk_person1.aktoer_id
-              ,fk_person1.kjonn, fk_person1.fk_person1 as fk_person1_mottaker
-              ,extract(year from fk_person1.foedselsdato) as mottaker_fodsels_aar
-              ,extract(month from fk_person1.foedselsdato) as mottaker_fodsels_mnd
-              ,fk_person1.sivilstand, fk_person1.statsborgerskap
-              ,barn.fk_person1_barn
-              ,termin.termindato, termin.foedselsdato, termin.antall_barn_termin, termin.antall_barn_foedsel
-              ,termin.foedselsdato_adopsjon, termin.antall_barn_adopsjon
-        from fk_person1
-        left join barn
-        on barn.fagsak_id = fk_person1.fagsak_id
-        left join termin
-        on fk_person1.fagsak_id = termin.fagsak_id
-        where fk_person1.person = 'MOTTAKER'
-      ),
-      adopsjon as
-      (
-        select fam_fp_vilkaar.fagsak_id
-              ,max(fam_fp_vilkaar.omsorgs_overtakelsesdato) as adopsjonsdato
-              ,max(fam_fp_vilkaar.ektefelles_barn) as stebarnsadopsjon
-        from fagsak
-        join dvh_fam_fp.fam_fp_vilkaar
-        on fagsak.fagsak_id = fam_fp_vilkaar.fagsak_id
-        where fagsak.behandlingstema = 'FORP_ADOP'
-        group by fam_fp_vilkaar.fagsak_id
-      ),
-      eos as
-      (
-       select a.trans_id
-             ,case when upper(er_borger_av_eu_eos) = 'TRUE' then 'J'
-                   when upper(er_borger_av_eu_eos) = 'FALSE' then 'N'
-				  		    else null
-              end	eos_sak
-       from
-       (select fam_fp_vilkaar.trans_id, max(fam_fp_vilkaar.er_borger_av_eu_eos) as er_borger_av_eu_eos
-        from fagsak
-        join dvh_fam_fp.fam_fp_vilkaar
-        on fagsak.max_trans_id = fam_fp_vilkaar.trans_id
-        and length(fam_fp_vilkaar.person_status) > 0
-        group by fam_fp_vilkaar.trans_id
-       ) a
-      ),
-      annenforelderfagsak as
-      (
-        select annenforelderfagsak.*, mottaker.fk_person1_mottaker as fk_person1_annen_part
-        from
-        (
-          select fagsak_id, max_trans_id, max(annenforelderfagsak_id) as annenforelderfagsak_id
-          from
+  PROCEDURE FAM_FP_STATISTIKK_MAANED(
+    P_IN_VEDTAK_TOM IN VARCHAR2,
+    P_IN_RAPPORT_DATO IN VARCHAR2,
+    P_IN_FORSKYVNINGER IN NUMBER,
+    P_IN_GYLDIG_FLAGG IN NUMBER DEFAULT 0,
+    P_IN_PERIODE_TYPE IN VARCHAR2 DEFAULT 'M',
+    P_OUT_ERROR OUT VARCHAR2
+  ) AS
+    CURSOR CUR_PERIODE(P_RAPPORT_DATO IN VARCHAR2, P_FORSKYVNINGER IN NUMBER, P_TID_FOM IN VARCHAR2, P_TID_TOM IN VARCHAR2, P_BUDSJETT IN VARCHAR2) IS
+      WITH FAGSAK AS (
+        SELECT
+          FAGSAK_ID,
+          MAX(BEHANDLINGSTEMA)                                                   AS BEHANDLINGSTEMA,
+          MAX(FAGSAKANNENFORELDER_ID)                                            AS ANNENFORELDERFAGSAK_ID,
+          MAX(TRANS_ID) KEEP(DENSE_RANK FIRST ORDER BY FUNKSJONELL_TID DESC)     AS MAX_TRANS_ID,
+          MAX(SOEKNADSDATO) KEEP(DENSE_RANK FIRST ORDER BY FUNKSJONELL_TID DESC) AS SOKNADSDATO,
+          MIN(SOEKNADSDATO)                                                      AS FORSTE_SOKNADSDATO,
+          MIN(VEDTAKSDATO)                                                       AS FORSTE_VEDTAKSDATO,
+          MAX(FUNKSJONELL_TID)                                                   AS FUNKSJONELL_TID,
+          MAX(VEDTAKSDATO)                                                       AS SISTE_VEDTAKSDATO,
+          P_IN_PERIODE_TYPE                                                      AS PERIODE,
+          LAST_DAY(TO_DATE(P_RAPPORT_DATO, 'yyyymm')) + P_FORSKYVNINGER          AS MAX_VEDTAKSDATO
+        FROM
+          DVH_FAM_FP.FAM_FP_FAGSAK
+        WHERE
+          FAM_FP_FAGSAK.FUNKSJONELL_TID <= LAST_DAY(TO_DATE(P_RAPPORT_DATO, 'yyyymm')) + P_FORSKYVNINGER
+        GROUP BY
+          FAGSAK_ID
+      ), TERMIN AS (
+        SELECT
+          FAGSAK_ID,
+          MAX(TERMINDATO)            TERMINDATO,
+          MAX(FOEDSELSDATO)          FOEDSELSDATO,
+          MAX(ANTALL_BARN_TERMIN)    ANTALL_BARN_TERMIN,
+          MAX(ANTALL_BARN_FOEDSEL)   ANTALL_BARN_FOEDSEL,
+          MAX(FOEDSELSDATO_ADOPSJON) FOEDSELSDATO_ADOPSJON,
+          MAX(ANTALL_BARN_ADOPSJON) ANTALL_BARN_ADOPSJON
+        FROM
           (
-            select forelder1.fagsak_id, forelder1.max_trans_id
-                  ,nvl(forelder1.annenforelderfagsak_id, forelder2.fagsak_id) as annenforelderfagsak_id
-            from mottaker forelder1
-            join mottaker forelder2
-            on forelder1.fk_person1_barn = forelder2.fk_person1_barn
-            and forelder1.fk_person1_mottaker != forelder2.fk_person1_mottaker
+            SELECT
+              FAM_FP_FAGSAK.FAGSAK_ID,
+              MAX(FODSEL.TERMINDATO)              TERMINDATO,
+              MAX(FODSEL.FOEDSELSDATO)            FOEDSELSDATO,
+              MAX(FODSEL.ANTALL_BARN_FOEDSEL)     ANTALL_BARN_FOEDSEL,
+              MAX(FODSEL.ANTALL_BARN_TERMIN)      ANTALL_BARN_TERMIN,
+              MAX(ADOPSJON.FOEDSELSDATO_ADOPSJON) FOEDSELSDATO_ADOPSJON,
+              COUNT(ADOPSJON.TRANS_ID)            ANTALL_BARN_ADOPSJON
+            FROM
+              DVH_FAM_FP.FAM_FP_FAGSAK
+              LEFT JOIN DVH_FAM_FP.FAM_FP_FODSELTERMIN FODSEL
+              ON FODSEL.FAGSAK_ID = FAM_FP_FAGSAK.FAGSAK_ID
+              AND UPPER(FAM_FP_FAGSAK.BEHANDLINGSTEMA) = 'FORP_FODS'
+              LEFT JOIN DVH_FAM_FP.FAM_FP_FODSELTERMIN ADOPSJON
+              ON ADOPSJON.FAGSAK_ID = FAM_FP_FAGSAK.FAGSAK_ID
+              AND ADOPSJON.TRANS_ID = FAM_FP_FAGSAK.TRANS_ID
+              AND UPPER(FAM_FP_FAGSAK.BEHANDLINGSTEMA) = 'FORP_ADOP'
+            GROUP BY
+              FAM_FP_FAGSAK.FAGSAK_ID,
+              FAM_FP_FAGSAK.TRANS_ID
           )
-          group by fagsak_id, max_trans_id
-        ) annenforelderfagsak
-        join mottaker
-        on annenforelderfagsak.annenforelderfagsak_id = mottaker.fagsak_id
-      ),
-      tid as
-      (
-        select pk_dim_tid, dato, aar, halvaar, kvartal, aar_maaned
-        from dt_kodeverk.dim_tid
-        where dag_i_uke < 6
-        and dim_nivaa = 1
-        and gyldig_flagg = 1
-        and pk_dim_tid between p_tid_fom and p_tid_tom
-        and ((p_budsjett = 'A' and pk_dim_tid <= to_char(last_day(to_date(p_rapport_dato,'yyyymm')),'yyyymmdd'))
-             or p_budsjett = 'B')
-      ),
-      uttak as
-      (
-        select uttak.trans_id, uttak.trekkonto, uttak.uttak_arbeid_type, uttak.virksomhet, uttak.utbetalingsprosent
-              ,uttak.gradering_innvilget, uttak.gradering, uttak.arbeidstidsprosent, uttak.samtidig_uttak
-              ,uttak.periode_resultat_aarsak, uttak.fom as uttak_fom, uttak.tom as uttak_tom
-              ,uttak.trekkdager
-              ,fagsak.fagsak_id, fagsak.periode, fagsak.funksjonell_tid, fagsak.forste_vedtaksdato, fagsak.siste_vedtaksdato
-              ,fagsak.max_vedtaksdato, fagsak.forste_soknadsdato, fagsak.soknadsdato
-              ,fam_fp_trekkonto.pk_fam_fp_trekkonto
-              ,aarsak_uttak.pk_fam_fp_periode_resultat_aarsak
-              ,uttak.arbeidsforhold_id, uttak.graderingsdager
-              ,fam_fp_uttak_fordelingsper.mors_aktivitet
-         from dvh_fam_fp.fam_fp_uttak_res_per_aktiv uttak
-         join fagsak
-         on fagsak.max_trans_id = uttak.trans_id
-         left join dvh_fam_fp.fam_fp_trekkonto
-         on upper(uttak.trekkonto) = fam_fp_trekkonto.trekkonto
-         left join
-         (select aarsak_uttak, max(pk_fam_fp_periode_resultat_aarsak) as pk_fam_fp_periode_resultat_aarsak
-          from dvh_fam_fp.fam_fp_periode_resultat_aarsak
-          group by aarsak_uttak
-         ) aarsak_uttak
-         on upper(uttak.periode_resultat_aarsak) = aarsak_uttak.aarsak_uttak
-         left join dvh_fam_fp.fam_fp_uttak_fordelingsper
-         on fam_fp_uttak_fordelingsper.trans_id = uttak.trans_id
-         and uttak.fom between fam_fp_uttak_fordelingsper.fom and fam_fp_uttak_fordelingsper.tom
-         and upper(uttak.trekkonto) = upper(fam_fp_uttak_fordelingsper.periode_type)
-         and length(fam_fp_uttak_fordelingsper.mors_aktivitet) > 1
-         where uttak.utbetalingsprosent > 0
-      ),
-      stonadsdager_kvote as
-      (
-        select uttak.*, tid1.pk_dim_tid as fk_dim_tid_min_dato_kvote
-              ,tid2.pk_dim_tid as fk_dim_tid_max_dato_kvote
-        from
-        (select fagsak_id, trans_id, trekkonto, virksomhet, uttak_arbeid_type
-               ,sum(trekkdager) as stonadsdager_kvote, min(uttak_fom) as min_uttak_fom
-               ,max(uttak_tom) as max_uttak_tom
-         from
-         (select fagsak_id, trans_id, uttak_fom, uttak_tom, trekkonto, virksomhet, uttak_arbeid_type
-                ,max(trekkdager) as trekkdager
-          from uttak
-          group by fagsak_id, trans_id, uttak_fom, uttak_tom, trekkonto, virksomhet, uttak_arbeid_type
-         ) a
-         group by fagsak_id, trans_id, trekkonto, virksomhet, uttak_arbeid_type
-        ) uttak
-        join dt_kodeverk.dim_tid tid1
-        on tid1.dim_nivaa = 1
-        and tid1.dato = trunc(uttak.min_uttak_fom,'dd')
-        join dt_kodeverk.dim_tid tid2
-        on tid2.dim_nivaa = 1
-        and tid2.dato = trunc(uttak.max_uttak_tom,'dd')
-      ),
-      uttak_dager AS
-      (
-        select uttak.*
-              ,tid.pk_dim_tid, tid.dato, tid.aar, tid.halvaar, tid.kvartal, tid.aar_maaned
-        from uttak
-        join tid
-        on tid.dato between uttak.uttak_fom and uttak.uttak_tom
-      ),
-      aleneomsorg as
-      (
-        select uttak.fagsak_id, uttak.uttak_fom
-        from uttak
-        join dvh_fam_fp.fam_fp_dokumentasjonsperioder dok1
-        on dok1.fagsak_id = uttak.fagsak_id
-        and uttak.uttak_fom >= dok1.fom
-        and dok1.dokumentasjon_type = 'ALENEOMSORG'
-        left join dvh_fam_fp.fam_fp_dokumentasjonsperioder dok2
-        on dok1.fagsak_id = dok2.fagsak_id
-        and uttak.uttak_fom >= dok2.fom
-        and dok1.trans_id < dok2.trans_id
-        and dok2.dokumentasjon_type = 'ANNEN_FORELDER_HAR_RETT'
-        and dok2.fagsak_id is null
-        group by uttak.fagsak_id, uttak.uttak_fom
-      ),
-      beregningsgrunnlag as
-      (
-        select fagsak_id, trans_id, virksomhetsnummer, max(status_og_andel_brutto) as status_og_andel_brutto
-              ,max(status_og_andel_avkortet) as status_og_andel_avkortet
-              ,fom as beregningsgrunnlag_fom, tom as beregningsgrunnlag_tom
-              ,max(dekningsgrad) as dekningsgrad, max(dagsats) as dagsats, dagsats_bruker
-              ,dagsats_arbeidsgiver
-              ,dagsats_bruker+dagsats_arbeidsgiver dagsats_virksomhet
-              ,max(status_og_andel_inntektskat) as status_og_andel_inntektskat
-              ,aktivitet_status, max(brutto) as brutto_inntekt, max(avkortet) as avkortet_inntekt
-              ,count(1) as antall_beregningsgrunnlag
-        from dvh_fam_fp.fam_fp_beregningsgrunnlag
-        group by fagsak_id, trans_id, virksomhetsnummer, fom, tom, aktivitet_status, dagsats_bruker, dagsats_arbeidsgiver
-      ),
-      beregningsgrunnlag_detalj as
-      (
-        select uttak_dager.*
-              ,stonadsdager_kvote.stonadsdager_kvote, stonadsdager_kvote.min_uttak_fom, stonadsdager_kvote.max_uttak_tom
-              ,stonadsdager_kvote.fk_dim_tid_min_dato_kvote, stonadsdager_kvote.fk_dim_tid_max_dato_kvote
-              ,bereg.status_og_andel_brutto, bereg.status_og_andel_avkortet, bereg.beregningsgrunnlag_fom
-              ,bereg.dekningsgrad, bereg.beregningsgrunnlag_tom, bereg.dagsats, bereg.dagsats_bruker
-              ,bereg.dagsats_arbeidsgiver
-              ,bereg.dagsats_virksomhet, bereg.status_og_andel_inntektskat
-              ,bereg.aktivitet_status, bereg.brutto_inntekt, bereg.avkortet_inntekt
-              ,bereg.dagsats*uttak_dager.utbetalingsprosent/100 as dagsats_erst
-              ,bereg.antall_beregningsgrunnlag
-        from beregningsgrunnlag bereg
-        join uttak_dager
-        on uttak_dager.trans_id = bereg.trans_id
-        and nvl(uttak_dager.virksomhet,'X') = nvl(bereg.virksomhetsnummer,'X')
-        and bereg.beregningsgrunnlag_fom <= uttak_dager.dato
-        and nvl(bereg.beregningsgrunnlag_tom,to_date('20991201','YYYYMMDD')) >= uttak_dager.dato
-        left join stonadsdager_kvote
-        on uttak_dager.trans_id = stonadsdager_kvote.trans_id
-        and uttak_dager.trekkonto = stonadsdager_kvote.trekkonto
-        and nvl(uttak_dager.virksomhet,'X') = nvl(stonadsdager_kvote.virksomhet,'X')
-        and uttak_dager.uttak_arbeid_type = stonadsdager_kvote.uttak_arbeid_type
-        join dvh_fam_fp.fam_fp_uttak_aktivitet_mapping uttak_mapping
-        on uttak_dager.uttak_arbeid_type = uttak_mapping.uttak_arbeid
-        and bereg.aktivitet_status = uttak_mapping.aktivitet_status
-        where bereg.dagsats_bruker + bereg.dagsats_arbeidsgiver != 0
-      ),
-      beregningsgrunnlag_agg as
-      (
-        select a.*
-              ,dager_erst*dagsats_virksomhet/dagsats*antall_beregningsgrunnlag tilfelle_erst
-              ,dager_erst*round(utbetalingsprosent/100*dagsats_virksomhet) belop
-              ,round(utbetalingsprosent/100*dagsats_virksomhet-0.5) dagsats_redusert
-              ,case when periode_resultat_aarsak in (2004,2033) then 'N'
-			 	            when trekkonto in ('FEDREKVOTE','FELLESPERIODE','MØDREKVOTE') then 'J'
-				            when trekkonto = 'FORELDREPENGER' then 'N'
-			         end mor_rettighet
-        from
-        (
-          select fagsak_id, trans_id, trekkonto, trekkdager, stonadsdager_kvote, uttak_arbeid_type
-                ,aar, halvaar, kvartal, aar_maaned
-                ,uttak_fom, uttak_tom
-                ,sum(dagsats_virksomhet/dagsats* case when ((upper(gradering_innvilget) ='TRUE' and upper(gradering)='TRUE')
-                                       or upper(samtidig_uttak)='TRUE') then (100-arbeidstidsprosent)/100
-                               else 1.0
-                          end
-                     ) dager_erst2
-                ,max(arbeidstidsprosent) as arbeidstidsprosent
-                ,count(distinct pk_dim_tid) dager_erst
-                ,
-                 --count(distinct pk_dim_tid)*dagsats_virksomhet/dagsats tilfelle_erst,
-                 min(beregningsgrunnlag_fom) beregningsgrunnlag_fom, max(beregningsgrunnlag_tom) beregningsgrunnlag_tom
-                ,dekningsgrad
-                ,
-                 --count(distinct pk_dim_tid)*
-                 --      round(utbetalingsprosent/100*dagsats_virksomhet-0.5) belop,
-                 dagsats_bruker, dagsats_arbeidsgiver, dagsats_virksomhet
-                ,virksomhet, periode_resultat_aarsak, dagsats, dagsats_erst
-                , --dagsats_virksomhet,
-                 utbetalingsprosent graderingsprosent, status_og_andel_inntektskat
-                ,aktivitet_status, brutto_inntekt, avkortet_inntekt, status_og_andel_brutto, status_og_andel_avkortet
-                ,
-                 --round(utbetalingsprosent/100*dagsats_virksomhet-0.5) dagsats_redusert,
-                 utbetalingsprosent
-                ,min(pk_dim_tid) pk_dim_tid_dato_utbet_fom, max(pk_dim_tid) pk_dim_tid_dato_utbet_tom
-                ,funksjonell_tid, forste_vedtaksdato, siste_vedtaksdato, max_vedtaksdato, periode
-                ,max(forste_soknadsdato) as forste_soknadsdato, max(soknadsdato) as soknadsdato
-                ,samtidig_uttak, gradering, gradering_innvilget
-                ,min_uttak_fom, max_uttak_tom
-                ,fk_dim_tid_min_dato_kvote, fk_dim_tid_max_dato_kvote
-                ,max(pk_fam_fp_trekkonto) as pk_fam_fp_trekkonto
-                ,max(pk_fam_fp_periode_resultat_aarsak) as pk_fam_fp_periode_resultat_aarsak
-                ,antall_beregningsgrunnlag, max(graderingsdager) as graderingsdager
-                ,max(mors_aktivitet) as mors_aktivitet
-          from beregningsgrunnlag_detalj
-          group by fagsak_id, trans_id, trekkonto, trekkdager, stonadsdager_kvote, uttak_arbeid_type
-                  ,aar, halvaar, kvartal, aar_maaned
-                  ,uttak_fom, uttak_tom, dekningsgrad
-                  ,virksomhet, utbetalingsprosent, periode_resultat_aarsak
-                  ,dagsats, dagsats_erst, dagsats_bruker, dagsats_arbeidsgiver, dagsats_virksomhet
-                  ,utbetalingsprosent
-                  ,status_og_andel_inntektskat, aktivitet_status, brutto_inntekt, avkortet_inntekt
-                  ,status_og_andel_brutto, status_og_andel_avkortet
-                  ,funksjonell_tid, forste_vedtaksdato, siste_vedtaksdato, max_vedtaksdato, periode
-                  ,samtidig_uttak, gradering, gradering_innvilget, min_uttak_fom, max_uttak_tom
-                  ,fk_dim_tid_min_dato_kvote, fk_dim_tid_max_dato_kvote
-                  ,antall_beregningsgrunnlag
-        ) a
-      ),
-      grunnlag as
-      (
-        select beregningsgrunnlag_agg.*, sysdate as lastet_dato
-              ,mottaker.behandlingstema, mottaker.max_trans_id, mottaker.fk_person1_mottaker, mottaker.kjonn
-              ,mottaker.fk_person1_barn
-              ,mottaker.termindato, mottaker.foedselsdato, mottaker.antall_barn_termin
-              ,mottaker.antall_barn_foedsel, mottaker.foedselsdato_adopsjon
-              ,mottaker.antall_barn_adopsjon
-              ,mottaker.mottaker_fodsels_aar, mottaker.mottaker_fodsels_mnd
-              ,substr(p_tid_fom,1,4) - mottaker.mottaker_fodsels_aar as mottaker_alder
-              ,mottaker.sivilstand, mottaker.statsborgerskap
-              ,dim_person.pk_dim_person, dim_person.bosted_kommune_nr
-              ,dim_person.fk_dim_sivilstatus
-              ,dim_geografi.pk_dim_geografi, dim_geografi.bydel_kommune_nr, dim_geografi.kommune_nr
-              ,dim_geografi.kommune_navn, dim_geografi.bydel_nr, dim_geografi.bydel_navn
-              ,annenforelderfagsak.annenforelderfagsak_id, annenforelderfagsak.fk_person1_annen_part
-              ,fam_fp_uttak_fp_kontoer.max_dager max_stonadsdager_konto
-              ,case when aleneomsorg.fagsak_id is not null then 'J' else NULL end as aleneomsorg
-              ,case when behandlingstema = 'FORP_FODS' then '214'
-                    when behandlingstema = 'FORP_ADOP' then '216'
-               end as hovedkontonr
-              ,case when status_og_andel_inntektskat='ARBEIDSTAKER'
-                         and dagsats_arbeidsgiver/dagsats*100<=50 then '1000'
-               when status_og_andel_inntektskat='ARBEIDSTAKER'
-                         and dagsats_arbeidsgiver/dagsats*100>50 then '8020'
-               --when status_og_andel_inntektskat='ARBEIDSTAKER' then '1000'
-               when status_og_andel_inntektskat='JORDBRUKER' then '5210'
-               when status_og_andel_inntektskat='SJØMANN' then '1300'
-               when status_og_andel_inntektskat='SELVSTENDIG_NÆRINGSDRIVENDE' then '5010'
-               when status_og_andel_inntektskat='DAGPENGER' then '1200'
-               when status_og_andel_inntektskat='ARBEIDSTAKER_UTEN_FERIEPENGER' then '1000'
-               when status_og_andel_inntektskat='FISKER' then '5300'
-               when status_og_andel_inntektskat='DAGMAMMA' then '5110'
-               when status_og_andel_inntektskat='FRILANSER' then '1100'
-               end as underkontonr
-              ,case when rett_til_mødrekvote.trans_id is null then 'N' else 'J' end as rett_til_mødrekvote
-              ,case when rett_til_fedrekvote.trans_id is null then 'N' else 'J' end as rett_til_fedrekvote
-              ,flerbarnsdager.flerbarnsdager
-              ,round(dagsats_arbeidsgiver/dagsats*100,0) as andel_av_refusjon
-              ,adopsjon.adopsjonsdato, adopsjon.stebarnsadopsjon
-              ,eos.eos_sak
-        from beregningsgrunnlag_agg
-        left join mottaker
-        on beregningsgrunnlag_agg.fagsak_id = mottaker.fagsak_id
-        and beregningsgrunnlag_agg.trans_id = mottaker.max_trans_id
-        left join annenforelderfagsak
-        on beregningsgrunnlag_agg.fagsak_id = annenforelderfagsak.fagsak_id
-        and beregningsgrunnlag_agg.trans_id = annenforelderfagsak.max_trans_id
-        left join dvh_fam_fp.fam_fp_uttak_fp_kontoer
-        on beregningsgrunnlag_agg.fagsak_id = fam_fp_uttak_fp_kontoer.fagsak_id
-        and mottaker.max_trans_id = fam_fp_uttak_fp_kontoer.trans_id
-        --AND UPPER(REGEXP_REPLACE(grunnlag_drp1.TREKKONTO, '_|-|[[:space:]]', '')) = UPPER(REGEXP_REPLACE(FAM_FP_Uttak_FP_Kontoer.STOENADSKONTOTYPE, '_|-|[[:space:]]', ''))
-        and upper(replace(beregningsgrunnlag_agg.trekkonto,'_','')) = upper(replace(fam_fp_uttak_fp_kontoer.stoenadskontotype,' ',''))
-        left join dt_person.dim_person
-        on mottaker.fk_person1_mottaker = dim_person.fk_person1
-        and beregningsgrunnlag_agg.uttak_tom between dim_person.gyldig_fra_dato and dim_person.gyldig_til_dato
-        left join dt_kodeverk.dim_geografi
-        on dim_person.fk_dim_geografi_bosted = dim_geografi.pk_dim_geografi
-        left join aleneomsorg
-        on aleneomsorg.fagsak_id = beregningsgrunnlag_agg.fagsak_id
-        and aleneomsorg.uttak_fom = beregningsgrunnlag_agg.uttak_fom
-        left join
-        (select trans_id
-         from dvh_fam_fp.fam_fp_uttak_fp_kontoer
-         where upper(stoenadskontotype) = 'MØDREKVOTE'
-         group by trans_id
-        ) rett_til_mødrekvote
-        on rett_til_mødrekvote.trans_id = beregningsgrunnlag_agg.trans_id
-        left join
-        (select trans_id
-         from dvh_fam_fp.fam_fp_uttak_fp_kontoer
-         where upper(stoenadskontotype) = 'FEDREKVOTE'
-         group by trans_id
-        ) rett_til_fedrekvote
-        on rett_til_fedrekvote.trans_id = beregningsgrunnlag_agg.trans_id
-        left join
-        (select trans_id, max(max_dager) as flerbarnsdager
-         from dvh_fam_fp.fam_fp_uttak_fp_kontoer
-         where upper(stoenadskontotype) = 'FLERBARNSDAGER'
-         group by trans_id
-        ) flerbarnsdager
-        on flerbarnsdager.trans_id = beregningsgrunnlag_agg.trans_id
-        left join adopsjon
-        on beregningsgrunnlag_agg.fagsak_id = adopsjon.fagsak_id
-        left join eos
-        on beregningsgrunnlag_agg.trans_id = eos.trans_id
-      )
-      select /*+ PARALLEL(8) */ *
-      --from uttak_dager
-      from grunnlag order by fagsak_id
-      --where fagsak_id in (1035184)
-      ;
-    v_tid_fom varchar2(8) := null;
-    v_tid_tom varchar2(8) := null;
-    v_commit number := 0;
-    v_error_melding varchar2(1000) := null;
-    v_dim_tid_antall number := 0;
-    v_utbetalingsprosent_kalkulert number := 0;
-    v_budsjett varchar2(5);
-  begin
-    v_tid_fom := p_in_vedtak_tom || '01';
-    v_tid_tom := to_char(last_day(to_date(p_in_vedtak_tom,'yyyymm')),'yyyymmdd');
-    if to_date(p_in_vedtak_tom,'yyyymm') <= to_date(p_in_rapport_dato,'yyyymm') then
-      v_budsjett := 'A';
-    else
-      v_budsjett := 'B';
-    end if;
-
-    --dbms_output.put_line(v_tid_fom||v_tid_tom);--TEST!!!
-
-    for rec_periode in cur_periode(p_in_rapport_dato, p_in_forskyvninger, v_tid_fom, v_tid_tom, v_budsjett) loop
-      v_dim_tid_antall := 0;
-      v_utbetalingsprosent_kalkulert := 0;
-      v_dim_tid_antall := dim_tid_antall(to_number(to_char(rec_periode.uttak_fom,'yyyymmdd'))
-                                        ,to_number(to_char(rec_periode.uttak_tom,'yyyymmdd')));
-      if v_dim_tid_antall != 0 then
-        v_utbetalingsprosent_kalkulert := round(rec_periode.trekkdager/v_dim_tid_antall*100,2);
-      else
-        v_utbetalingsprosent_kalkulert := 0;
-      end if;
-      begin
-        insert into dvh_fam_fp.fak_fam_fp_vedtak_utbetaling
-        (fagsak_id, trans_id, behandlingstema, trekkonto, stonadsdager_kvote
-        ,uttak_arbeid_type
-        ,aar, halvaar, kvartal, aar_maaned
-        ,rapport_periode, uttak_fom, uttak_tom, dager_erst, beregningsgrunnlag_fom
-        ,beregningsgrunnlag_tom, dekningsgrad, dagsats_bruker, dagsats_arbeidsgiver, virksomhet
-        ,periode_resultat_aarsak, dagsats, graderingsprosent, status_og_andel_inntektskat
-        ,aktivitet_status, brutto_inntekt, avkortet_inntekt, status_og_andel_brutto, status_og_andel_avkortet
-        ,utbetalingsprosent, fk_dim_tid_dato_utbet_fom
-        ,fk_dim_tid_dato_utbet_tom, funksjonell_tid, forste_vedtaksdato, vedtaksdato, max_vedtaksdato, periode_type, tilfelle_erst
-        ,belop, dagsats_redusert, lastet_dato, max_trans_id, fk_person1_mottaker, fk_person1_annen_part
-        ,kjonn, fk_person1_barn, termindato, foedselsdato, antall_barn_termin, antall_barn_foedsel
-        ,foedselsdato_adopsjon, antall_barn_adopsjon, annenforelderfagsak_id, max_stonadsdager_konto
-        ,fk_dim_person, bosted_kommune_nr, fk_dim_geografi, bydel_kommune_nr, kommune_nr
-        ,kommune_navn, bydel_nr, bydel_navn, aleneomsorg, hovedkontonr, underkontonr
-        ,mottaker_fodsels_aar, mottaker_fodsels_mnd, mottaker_alder
-        ,rett_til_fedrekvote, rett_til_modrekvote, dagsats_erst, trekkdager
-        ,samtidig_uttak, gradering, gradering_innvilget, antall_dager_periode
-        ,flerbarnsdager, utbetalingsprosent_kalkulert, min_uttak_fom, max_uttak_tom
-        ,fk_fam_fp_trekkonto, fk_fam_fp_periode_resultat_aarsak
-        ,sivilstatus, fk_dim_sivilstatus, antall_beregningsgrunnlag, graderingsdager
-        ,fk_dim_tid_min_dato_kvote, fk_dim_tid_max_dato_kvote
-        ,adopsjonsdato, stebarnsadopsjon, eos_sak, mor_rettighet, statsborgerskap
-        ,arbeidstidsprosent, mors_aktivitet, gyldig_flagg
-        ,andel_av_refusjon, forste_soknadsdato, soknadsdato
-        ,budsjett)
-        values
-        (rec_periode.fagsak_id, rec_periode.trans_id, rec_periode.behandlingstema, rec_periode.trekkonto
-        ,rec_periode.stonadsdager_kvote
-        ,rec_periode.uttak_arbeid_type, rec_periode.aar, rec_periode.halvaar, rec_periode.kvartal, rec_periode.aar_maaned
-        ,p_in_rapport_dato, rec_periode.uttak_fom, rec_periode.uttak_tom
-        ,rec_periode.dager_erst, rec_periode.beregningsgrunnlag_fom, rec_periode.beregningsgrunnlag_tom
-        ,rec_periode.dekningsgrad, rec_periode.dagsats_bruker, rec_periode.dagsats_arbeidsgiver
-        ,rec_periode.virksomhet, rec_periode.periode_resultat_aarsak, rec_periode.dagsats
-        ,rec_periode.graderingsprosent, rec_periode.status_og_andel_inntektskat
-        ,rec_periode.aktivitet_status, rec_periode.brutto_inntekt, rec_periode.avkortet_inntekt
-        ,rec_periode.status_og_andel_brutto, rec_periode.status_og_andel_avkortet
-        ,rec_periode.utbetalingsprosent, rec_periode.pk_dim_tid_dato_utbet_fom, rec_periode.pk_dim_tid_dato_utbet_tom
-        ,rec_periode.funksjonell_tid, rec_periode.forste_vedtaksdato, rec_periode.siste_vedtaksdato, rec_periode.max_vedtaksdato, rec_periode.periode
-        ,rec_periode.tilfelle_erst, rec_periode.belop, rec_periode.dagsats_redusert, rec_periode.lastet_dato
-        ,rec_periode.max_trans_id, rec_periode.fk_person1_mottaker, rec_periode.fk_person1_annen_part
-        ,rec_periode.kjonn, rec_periode.fk_person1_barn
-        ,rec_periode.termindato, rec_periode.foedselsdato, rec_periode.antall_barn_termin
-        ,rec_periode.antall_barn_foedsel, rec_periode.foedselsdato_adopsjon
-        ,rec_periode.antall_barn_adopsjon, rec_periode.annenforelderfagsak_id, rec_periode.max_stonadsdager_konto
-        ,rec_periode.pk_dim_person, rec_periode.bosted_kommune_nr, rec_periode.pk_dim_geografi
-        ,rec_periode.bydel_kommune_nr, rec_periode.kommune_nr, rec_periode.kommune_navn
-        ,rec_periode.bydel_nr, rec_periode.bydel_navn, rec_periode.aleneomsorg, rec_periode.hovedkontonr
-        ,rec_periode.underkontonr
-        ,rec_periode.mottaker_fodsels_aar, rec_periode.mottaker_fodsels_mnd, rec_periode.mottaker_alder
-        ,rec_periode.rett_til_fedrekvote, rec_periode.rett_til_mødrekvote, rec_periode.dagsats_erst
-        ,rec_periode.trekkdager, rec_periode.samtidig_uttak, rec_periode.gradering, rec_periode.gradering_innvilget
-        ,v_dim_tid_antall, rec_periode.flerbarnsdager, v_utbetalingsprosent_kalkulert
-        ,rec_periode.min_uttak_fom, rec_periode.max_uttak_tom, rec_periode.pk_fam_fp_trekkonto
-        ,rec_periode.pk_fam_fp_periode_resultat_aarsak
-        ,rec_periode.sivilstand, rec_periode.fk_dim_sivilstatus
-        ,rec_periode.antall_beregningsgrunnlag, rec_periode.graderingsdager
-        ,rec_periode.fk_dim_tid_min_dato_kvote, rec_periode.fk_dim_tid_max_dato_kvote
-        ,rec_periode.adopsjonsdato, rec_periode.stebarnsadopsjon, rec_periode.eos_sak
-        ,rec_periode.mor_rettighet, rec_periode.statsborgerskap
-        ,rec_periode.arbeidstidsprosent, rec_periode.mors_aktivitet, p_in_gyldig_flagg
-        ,rec_periode.andel_av_refusjon, rec_periode.forste_soknadsdato, rec_periode.soknadsdato
-        ,v_budsjett);
-
-        v_commit := v_commit + 1;
-      exception
-        when others then
-          rollback;
-          v_error_melding := substr(SQLCODE || ' ' || sqlerrm, 1, 1000);
-          insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
-          values(null, rec_periode.fagsak_id, v_error_melding, sysdate, 'FAM_FP_STATISTIKK_MAANED:INSERT');
-          commit;
-          p_out_error := substr(p_out_error || v_error_melding, 1, 1000);
-      end;
-
-      if v_commit > 100000 then
-        commit;
-        v_commit := 0;
-      end if;
-   end loop;
-   commit;
-  exception
-    when others then
-      rollback;
-      v_error_melding := substr(SQLCODE || ' ' || sqlerrm, 1, 1000);
-      insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
-      values(null, null, v_error_melding, sysdate, 'FAM_FP_STATISTIKK_MAANED');
-      commit;
-      p_out_error := substr(p_out_error || v_error_melding, 1, 1000);
-  end fam_fp_statistikk_maaned;
-
-  procedure fam_fp_statistikk_kvartal(p_in_vedtak_tom in varchar2, p_in_rapport_dato in varchar2, p_in_forskyvninger in number
-                                     ,p_in_gyldig_flagg in number default 0
-                                     ,p_in_periode_type in varchar2 default 'K'
-                                     ,p_out_error out varchar2) as
-    cursor cur_periode(p_rapport_dato in varchar2, p_forskyvninger in number, p_tid_fom in varchar2, p_tid_tom in varchar2) is
-      with fagsak as
-      (
-        select fagsak_id, max(behandlingstema) as behandlingstema, max(fagsakannenforelder_id) as annenforelderfagsak_id
-              ,max(trans_id) keep(dense_rank first order by funksjonell_tid desc) as max_trans_id
-              ,max(soeknadsdato) keep(dense_rank first order by funksjonell_tid desc) as soknadsdato
-              ,min(soeknadsdato) as forste_soknadsdato
-              ,min(vedtaksdato) as forste_vedtaksdato
-              ,max(funksjonell_tid) as funksjonell_tid, max(vedtaksdato) as siste_vedtaksdato
-              ,p_in_periode_type as periode, last_day(to_date(p_rapport_dato,'yyyymm')) + p_forskyvninger as max_vedtaksdato
-        from dvh_fam_fp.fam_fp_fagsak
-        where fam_fp_fagsak.funksjonell_tid <= last_day(to_date(p_rapport_dato,'yyyymm')) + p_forskyvninger
-        group by fagsak_id
-      ),
-      termin as
-      (
-        select fagsak_id, max(termindato) termindato, max(foedselsdato) foedselsdato
-              ,max(antall_barn_termin) antall_barn_termin, max(antall_barn_foedsel) antall_barn_foedsel
-              ,max(foedselsdato_adopsjon) foedselsdato_adopsjon, max(antall_barn_adopsjon) antall_barn_adopsjon
-        from
-        (
-          select fam_fp_fagsak.fagsak_id, max(fodsel.termindato) termindato
-                ,max(fodsel.foedselsdato) foedselsdato, max(fodsel.antall_barn_foedsel) antall_barn_foedsel
-                ,max(fodsel.antall_barn_termin) antall_barn_termin
-                ,max(adopsjon.foedselsdato_adopsjon) foedselsdato_adopsjon
-                ,count(adopsjon.trans_id) antall_barn_adopsjon
-          from dvh_fam_fp.fam_fp_fagsak
-          left join dvh_fam_fp.fam_fp_fodseltermin fodsel
-          on fodsel.fagsak_id = fam_fp_fagsak.fagsak_id
-          and upper(fam_fp_fagsak.behandlingstema) = 'FORP_FODS'
-          left join dvh_fam_fp.fam_fp_fodseltermin adopsjon
-          on adopsjon.fagsak_id = fam_fp_fagsak.fagsak_id
-          and adopsjon.trans_id = fam_fp_fagsak.trans_id
-          and upper(fam_fp_fagsak.behandlingstema) = 'FORP_ADOP'
-          group by fam_fp_fagsak.fagsak_id, fam_fp_fagsak.trans_id
-        )
-        group by fagsak_id
-      ),
-      fk_person1 as
-      (
-        select person.person, person.fagsak_id, max(person.behandlingstema) as behandlingstema, person.max_trans_id
-              ,max(person.annenforelderfagsak_id) as annenforelderfagsak_id
-              ,person.aktoer_id, max(person.kjonn) as kjonn
-              ,max(person_67_vasket.fk_person1) keep
-                (dense_rank first order by person_67_vasket.gyldig_fra_dato desc) as fk_person1
-              ,max(foedselsdato) as foedselsdato, max(sivilstand) as sivilstand
-              ,max(statsborgerskap) as statsborgerskap
-        from
-        (
-          select 'MOTTAKER' as person, fagsak.fagsak_id, fagsak.behandlingstema, fagsak.max_trans_id
-                ,fagsak.annenforelderfagsak_id
-                ,fam_fp_personopplysninger.aktoer_id, fam_fp_personopplysninger.kjonn
-                ,fam_fp_personopplysninger.foedselsdato, fam_fp_personopplysninger.sivilstand
-                ,fam_fp_personopplysninger.statsborgerskap
-          from dvh_fam_fp.fam_fp_personopplysninger
-          join fagsak
-          on fam_fp_personopplysninger.trans_id = fagsak.max_trans_id
-          union all
-          select 'BARN' as person, fagsak.fagsak_id, max(fagsak.behandlingstema) as behandlingstema, fagsak.max_trans_id
-                ,max(fagsak.annenforelderfagsak_id) annenforelderfagsak_id
-                ,max(fam_fp_familiehendelse.til_aktoer_id) as aktoer_id, max(fam_fp_familiehendelse.kjoenn) as kjonn
-                ,null as foedselsdato, null as sivilstand, null as statsborgerskap
-          from dvh_fam_fp.fam_fp_familiehendelse
-          join fagsak
-          on fam_fp_familiehendelse.fagsak_id = fagsak.fagsak_id
-          where upper(fam_fp_familiehendelse.relasjon) = 'BARN'
-          group by fagsak.fagsak_id, fagsak.max_trans_id
-        ) person
-        join dt_person.dvh_person_ident_aktor_ikke_skjermet person_67_vasket
-        on person_67_vasket.aktor_id = person.aktoer_id
-        and to_date(p_tid_tom,'yyyymmdd') between person_67_vasket.gyldig_fra_dato and person_67_vasket.gyldig_til_dato
-        group by person.person, person.fagsak_id, person.max_trans_id, person.aktoer_id
-      ),
-      barn as
-      (
-        select fagsak_id, listagg(fk_person1, ',') within group (order by fk_person1) as fk_person1_barn
-        from fk_person1
-        where person = 'BARN'
-        group by fagsak_id
-      ),
-      mottaker as
-      (
-        select fk_person1.fagsak_id, fk_person1.behandlingstema
-              ,fk_person1.max_trans_id, fk_person1.annenforelderfagsak_id, fk_person1.aktoer_id
-              ,fk_person1.kjonn, fk_person1.fk_person1 as fk_person1_mottaker
-              ,extract(year from fk_person1.foedselsdato) as mottaker_fodsels_aar
-              ,extract(month from fk_person1.foedselsdato) as mottaker_fodsels_mnd
-              ,fk_person1.sivilstand, fk_person1.statsborgerskap
-              ,barn.fk_person1_barn
-              ,termin.termindato, termin.foedselsdato, termin.antall_barn_termin, termin.antall_barn_foedsel
-              ,termin.foedselsdato_adopsjon, termin.antall_barn_adopsjon
-        from fk_person1
-        left join barn
-        on barn.fagsak_id = fk_person1.fagsak_id
-        left join termin
-        on fk_person1.fagsak_id = termin.fagsak_id
-        where fk_person1.person = 'MOTTAKER'
-      ),
-      adopsjon as
-      (
-        select fam_fp_vilkaar.fagsak_id
-              ,max(fam_fp_vilkaar.omsorgs_overtakelsesdato) as adopsjonsdato
-              ,max(fam_fp_vilkaar.ektefelles_barn) as stebarnsadopsjon
-        from fagsak
-        join dvh_fam_fp.fam_fp_vilkaar
-        on fagsak.fagsak_id = fam_fp_vilkaar.fagsak_id
-        where fagsak.behandlingstema = 'FORP_ADOP'
-        group by fam_fp_vilkaar.fagsak_id
-      ),
-      eos as
-      (
-       select a.trans_id
-             ,case when upper(er_borger_av_eu_eos) = 'TRUE' then 'J'
-                   when upper(er_borger_av_eu_eos) = 'FALSE' then 'N'
-				  		    else null
-              end	eos_sak
-       from
-       (select fam_fp_vilkaar.trans_id, max(fam_fp_vilkaar.er_borger_av_eu_eos) as er_borger_av_eu_eos
-        from fagsak
-        join dvh_fam_fp.fam_fp_vilkaar
-        on fagsak.max_trans_id = fam_fp_vilkaar.trans_id
-        and length(fam_fp_vilkaar.person_status) > 0
-        group by fam_fp_vilkaar.trans_id
-       ) a
-      ),
-      annenforelderfagsak as
-      (
-        select annenforelderfagsak.*, mottaker.fk_person1_mottaker as fk_person1_annen_part
-        from
-        (
-          select fagsak_id, max_trans_id, max(annenforelderfagsak_id) as annenforelderfagsak_id
-          from
+        GROUP BY
+          FAGSAK_ID
+      ), FK_PERSON1 AS (
+        SELECT
+          PERSON.PERSON,
+          PERSON.FAGSAK_ID,
+          MAX(PERSON.BEHANDLINGSTEMA)                                                                             AS BEHANDLINGSTEMA,
+          PERSON.MAX_TRANS_ID,
+          MAX(PERSON.ANNENFORELDERFAGSAK_ID)                                                                      AS ANNENFORELDERFAGSAK_ID,
+          PERSON.AKTOER_ID,
+          MAX(PERSON.KJONN)                                                                                       AS KJONN,
+          MAX(PERSON_67_VASKET.FK_PERSON1) KEEP (DENSE_RANK FIRST ORDER BY PERSON_67_VASKET.GYLDIG_FRA_DATO DESC) AS FK_PERSON1,
+          MAX(FOEDSELSDATO)                                                                                       AS FOEDSELSDATO,
+          MAX(SIVILSTAND)                                                                                         AS SIVILSTAND,
+          MAX(STATSBORGERSKAP)                                                                                    AS STATSBORGERSKAP
+        FROM
           (
-            select forelder1.fagsak_id, forelder1.max_trans_id
-                  ,nvl(forelder1.annenforelderfagsak_id, forelder2.fagsak_id) as annenforelderfagsak_id
-            from mottaker forelder1
-            join mottaker forelder2
-            on forelder1.fk_person1_barn = forelder2.fk_person1_barn
-            and forelder1.fk_person1_mottaker != forelder2.fk_person1_mottaker
-          )
-          group by fagsak_id, max_trans_id
-        ) annenforelderfagsak
-        join mottaker
-        on annenforelderfagsak.annenforelderfagsak_id = mottaker.fagsak_id
-      ),
-      tid as
-      (
-        select pk_dim_tid, dato, aar, halvaar, kvartal, aar_maaned
-        from dt_kodeverk.dim_tid
-        where dag_i_uke < 6
-        and dim_nivaa = 1
-        and gyldig_flagg = 1
-        and pk_dim_tid between p_tid_fom and p_tid_tom
-        and pk_dim_tid <= to_char(last_day(to_date(p_rapport_dato,'yyyymm')),'yyyymmdd')
-      ),
-      uttak as
-      (
-        select uttak.trans_id, uttak.trekkonto, uttak.uttak_arbeid_type, uttak.virksomhet, uttak.utbetalingsprosent
-              ,uttak.gradering_innvilget, uttak.gradering, uttak.arbeidstidsprosent, uttak.samtidig_uttak
-              ,uttak.periode_resultat_aarsak, uttak.fom as uttak_fom, uttak.tom as uttak_tom
-              ,uttak.trekkdager
-              ,fagsak.fagsak_id, fagsak.periode, fagsak.funksjonell_tid, fagsak.forste_vedtaksdato, fagsak.siste_vedtaksdato
-              ,fagsak.max_vedtaksdato, fagsak.forste_soknadsdato, fagsak.soknadsdato
-              ,fam_fp_trekkonto.pk_fam_fp_trekkonto
-              ,aarsak_uttak.pk_fam_fp_periode_resultat_aarsak
-              ,uttak.arbeidsforhold_id, uttak.graderingsdager
-              ,fam_fp_uttak_fordelingsper.mors_aktivitet
-         from dvh_fam_fp.fam_fp_uttak_res_per_aktiv uttak
-         join fagsak
-         on fagsak.max_trans_id = uttak.trans_id
-         left join dvh_fam_fp.fam_fp_trekkonto
-         on upper(uttak.trekkonto) = fam_fp_trekkonto.trekkonto
-         left join
-         (select aarsak_uttak, max(pk_fam_fp_periode_resultat_aarsak) as pk_fam_fp_periode_resultat_aarsak
-          from dvh_fam_fp.fam_fp_periode_resultat_aarsak
-          group by aarsak_uttak
-         ) aarsak_uttak
-         on upper(uttak.periode_resultat_aarsak) = aarsak_uttak.aarsak_uttak
-         left join dvh_fam_fp.fam_fp_uttak_fordelingsper
-         on fam_fp_uttak_fordelingsper.trans_id = uttak.trans_id
-         and uttak.fom between fam_fp_uttak_fordelingsper.fom and fam_fp_uttak_fordelingsper.tom
-         and upper(uttak.trekkonto) = upper(fam_fp_uttak_fordelingsper.periode_type)
-         and length(fam_fp_uttak_fordelingsper.mors_aktivitet) > 1
-         where uttak.utbetalingsprosent > 0
-      ),
-      stonadsdager_kvote as
-      (
-        select uttak.*, tid1.pk_dim_tid as fk_dim_tid_min_dato_kvote
-              ,tid2.pk_dim_tid as fk_dim_tid_max_dato_kvote
-        from
-        (select fagsak_id, trans_id, trekkonto, virksomhet, uttak_arbeid_type
-               ,sum(trekkdager) as stonadsdager_kvote, min(uttak_fom) as min_uttak_fom
-               ,max(uttak_tom) as max_uttak_tom
-         from
-         (select fagsak_id, trans_id, uttak_fom, uttak_tom, trekkonto, virksomhet, uttak_arbeid_type
-                ,max(trekkdager) as trekkdager
-          from uttak
-          group by fagsak_id, trans_id, uttak_fom, uttak_tom, trekkonto, virksomhet, uttak_arbeid_type
-         ) a
-         group by fagsak_id, trans_id, trekkonto, virksomhet, uttak_arbeid_type
-        ) uttak
-        join dt_kodeverk.dim_tid tid1
-        on tid1.dim_nivaa = 1
-        and tid1.dato = trunc(uttak.min_uttak_fom,'dd')
-        join dt_kodeverk.dim_tid tid2
-        on tid2.dim_nivaa = 1
-        and tid2.dato = trunc(uttak.max_uttak_tom,'dd')
-      ),
-      uttak_dager AS
-      (
-        select uttak.*
-              ,tid.pk_dim_tid, tid.dato, tid.aar, tid.halvaar, tid.kvartal, tid.aar_maaned
-        from uttak
-        join tid
-        on tid.dato between uttak.uttak_fom and uttak.uttak_tom
-      ),
-      aleneomsorg as
-      (
-        select uttak.fagsak_id, uttak.uttak_fom
-        from uttak
-        join dvh_fam_fp.fam_fp_dokumentasjonsperioder dok1
-        on dok1.fagsak_id = uttak.fagsak_id
-        and uttak.uttak_fom >= dok1.fom
-        and dok1.dokumentasjon_type = 'ALENEOMSORG'
-        left join dvh_fam_fp.fam_fp_dokumentasjonsperioder dok2
-        on dok1.fagsak_id = dok2.fagsak_id
-        and uttak.uttak_fom >= dok2.fom
-        and dok1.trans_id < dok2.trans_id
-        and dok2.dokumentasjon_type = 'ANNEN_FORELDER_HAR_RETT'
-        and dok2.fagsak_id is null
-        group by uttak.fagsak_id, uttak.uttak_fom
-      ),
-      beregningsgrunnlag as
-      (
-        select fagsak_id, trans_id, virksomhetsnummer, max(status_og_andel_brutto) as status_og_andel_brutto
-              ,max(status_og_andel_avkortet) as status_og_andel_avkortet
-              ,fom as beregningsgrunnlag_fom, tom as beregningsgrunnlag_tom
-              ,max(dekningsgrad) as dekningsgrad, max(dagsats) as dagsats, dagsats_bruker
-              ,dagsats_arbeidsgiver
-              ,dagsats_bruker+dagsats_arbeidsgiver dagsats_virksomhet
-              ,max(status_og_andel_inntektskat) as status_og_andel_inntektskat
-              ,aktivitet_status, max(brutto) as brutto_inntekt, max(avkortet) as avkortet_inntekt
-              ,count(1) as antall_beregningsgrunnlag
-        from dvh_fam_fp.fam_fp_beregningsgrunnlag
-        group by fagsak_id, trans_id, virksomhetsnummer, fom, tom, aktivitet_status, dagsats_bruker, dagsats_arbeidsgiver
-      ),
-      beregningsgrunnlag_detalj as
-      (
-        select uttak_dager.*
-              ,stonadsdager_kvote.stonadsdager_kvote, stonadsdager_kvote.min_uttak_fom, stonadsdager_kvote.max_uttak_tom
-              ,stonadsdager_kvote.fk_dim_tid_min_dato_kvote, stonadsdager_kvote.fk_dim_tid_max_dato_kvote
-              ,bereg.status_og_andel_brutto, bereg.status_og_andel_avkortet, bereg.beregningsgrunnlag_fom
-              ,bereg.dekningsgrad, bereg.beregningsgrunnlag_tom, bereg.dagsats, bereg.dagsats_bruker
-              ,bereg.dagsats_arbeidsgiver
-              ,bereg.dagsats_virksomhet, bereg.status_og_andel_inntektskat
-              ,bereg.aktivitet_status, bereg.brutto_inntekt, bereg.avkortet_inntekt
-              ,bereg.dagsats*uttak_dager.utbetalingsprosent/100 as dagsats_erst
-              ,bereg.antall_beregningsgrunnlag
-        from beregningsgrunnlag bereg
-        join uttak_dager
-        on uttak_dager.trans_id = bereg.trans_id
-        and nvl(uttak_dager.virksomhet,'X') = nvl(bereg.virksomhetsnummer,'X')
-        and bereg.beregningsgrunnlag_fom <= uttak_dager.dato
-        and nvl(bereg.beregningsgrunnlag_tom,to_date('20991201','YYYYMMDD')) >= uttak_dager.dato
-        left join stonadsdager_kvote
-        on uttak_dager.trans_id = stonadsdager_kvote.trans_id
-        and uttak_dager.trekkonto = stonadsdager_kvote.trekkonto
-        and nvl(uttak_dager.virksomhet,'X') = nvl(stonadsdager_kvote.virksomhet,'X')
-        and uttak_dager.uttak_arbeid_type = stonadsdager_kvote.uttak_arbeid_type
-        join dvh_fam_fp.fam_fp_uttak_aktivitet_mapping uttak_mapping
-        on uttak_dager.uttak_arbeid_type = uttak_mapping.uttak_arbeid
-        and bereg.aktivitet_status = uttak_mapping.aktivitet_status
-        where bereg.dagsats_bruker + bereg.dagsats_arbeidsgiver != 0
-      ),
-      beregningsgrunnlag_agg as
-      (
-        select a.*
-              ,dager_erst*dagsats_virksomhet/dagsats*antall_beregningsgrunnlag tilfelle_erst
-              ,dager_erst*round(utbetalingsprosent/100*dagsats_virksomhet) belop
-              ,round(utbetalingsprosent/100*dagsats_virksomhet-0.5) dagsats_redusert
-              ,case when periode_resultat_aarsak in (2004,2033) then 'N'
-			 	            when trekkonto in ('FEDREKVOTE','FELLESPERIODE','MØDREKVOTE') then 'J'
-				            when trekkonto = 'FORELDREPENGER' then 'N'
-			         end mor_rettighet
-        from
-        (
-          select fagsak_id, trans_id, trekkonto, trekkdager, stonadsdager_kvote, uttak_arbeid_type
-                ,aar, halvaar, kvartal--, aar_maaned
-                ,uttak_fom, uttak_tom
-                ,sum(dagsats_virksomhet/dagsats* case when ((upper(gradering_innvilget) ='TRUE' and upper(gradering)='TRUE')
-                                       or upper(samtidig_uttak)='TRUE') then (100-arbeidstidsprosent)/100
-                               else 1.0
-                          end
-                     ) dager_erst2
-                ,max(arbeidstidsprosent) as arbeidstidsprosent
-                ,count(distinct pk_dim_tid) dager_erst
-                ,
-                 --count(distinct pk_dim_tid)*dagsats_virksomhet/dagsats tilfelle_erst,
-                 min(beregningsgrunnlag_fom) beregningsgrunnlag_fom, max(beregningsgrunnlag_tom) beregningsgrunnlag_tom
-                ,dekningsgrad
-                ,
-                 --count(distinct pk_dim_tid)*
-                 --      round(utbetalingsprosent/100*dagsats_virksomhet-0.5) belop,
-                 dagsats_bruker, dagsats_arbeidsgiver, dagsats_virksomhet
-                ,virksomhet, periode_resultat_aarsak, dagsats, dagsats_erst
-                , --dagsats_virksomhet,
-                 utbetalingsprosent graderingsprosent, status_og_andel_inntektskat
-                ,aktivitet_status, brutto_inntekt, avkortet_inntekt, status_og_andel_brutto, status_og_andel_avkortet
-                ,
-                 --round(utbetalingsprosent/100*dagsats_virksomhet-0.5) dagsats_redusert,
-                 utbetalingsprosent
-                ,min(pk_dim_tid) pk_dim_tid_dato_utbet_fom, max(pk_dim_tid) pk_dim_tid_dato_utbet_tom
-                ,funksjonell_tid, forste_vedtaksdato, siste_vedtaksdato, max_vedtaksdato, periode
-                ,max(forste_soknadsdato) as forste_soknadsdato, max(soknadsdato) as soknadsdato
-                ,samtidig_uttak, gradering, gradering_innvilget
-                ,min_uttak_fom, max_uttak_tom
-                ,fk_dim_tid_min_dato_kvote, fk_dim_tid_max_dato_kvote
-                ,max(pk_fam_fp_trekkonto) as pk_fam_fp_trekkonto
-                ,max(pk_fam_fp_periode_resultat_aarsak) as pk_fam_fp_periode_resultat_aarsak
-                ,antall_beregningsgrunnlag, max(graderingsdager) as graderingsdager
-                ,max(mors_aktivitet) as mors_aktivitet
-          from beregningsgrunnlag_detalj
-          group by fagsak_id, trans_id, trekkonto, trekkdager, stonadsdager_kvote, uttak_arbeid_type
-                  ,aar, halvaar, kvartal--, aar_maaned
-                  ,uttak_fom, uttak_tom, dekningsgrad
-                  ,virksomhet, utbetalingsprosent, periode_resultat_aarsak
-                  ,dagsats, dagsats_erst, dagsats_bruker, dagsats_arbeidsgiver, dagsats_virksomhet
-                  ,utbetalingsprosent
-                  ,status_og_andel_inntektskat, aktivitet_status, brutto_inntekt, avkortet_inntekt
-                  ,status_og_andel_brutto, status_og_andel_avkortet
-                  ,funksjonell_tid, forste_vedtaksdato, siste_vedtaksdato, max_vedtaksdato, periode
-                  ,samtidig_uttak, gradering, gradering_innvilget, min_uttak_fom, max_uttak_tom
-                  ,fk_dim_tid_min_dato_kvote, fk_dim_tid_max_dato_kvote
-                  ,antall_beregningsgrunnlag
-        ) a
-      ),
-      grunnlag as
-      (
-        select beregningsgrunnlag_agg.*, sysdate as lastet_dato
-              ,mottaker.behandlingstema, mottaker.max_trans_id, mottaker.fk_person1_mottaker, mottaker.kjonn
-              ,mottaker.fk_person1_barn
-              ,mottaker.termindato, mottaker.foedselsdato, mottaker.antall_barn_termin
-              ,mottaker.antall_barn_foedsel, mottaker.foedselsdato_adopsjon
-              ,mottaker.antall_barn_adopsjon
-              ,mottaker.mottaker_fodsels_aar, mottaker.mottaker_fodsels_mnd
-              ,substr(p_tid_fom,1,4) - mottaker.mottaker_fodsels_aar as mottaker_alder
-              ,mottaker.sivilstand, mottaker.statsborgerskap
-              ,dim_person.pk_dim_person, dim_person.bosted_kommune_nr
-              ,dim_person.fk_dim_sivilstatus
-              ,dim_geografi.pk_dim_geografi, dim_geografi.bydel_kommune_nr, dim_geografi.kommune_nr
-              ,dim_geografi.kommune_navn, dim_geografi.bydel_nr, dim_geografi.bydel_navn
-              ,annenforelderfagsak.annenforelderfagsak_id, annenforelderfagsak.fk_person1_annen_part
-              ,fam_fp_uttak_fp_kontoer.max_dager max_stonadsdager_konto
-              ,case when aleneomsorg.fagsak_id is not null then 'J' else NULL end as aleneomsorg
-              ,case when behandlingstema = 'FORP_FODS' then '214'
-                    when behandlingstema = 'FORP_ADOP' then '216'
-               end as hovedkontonr
-              ,case when status_og_andel_inntektskat='ARBEIDSTAKER'
-                         and dagsats_arbeidsgiver/dagsats*100<=50 then '1000'
-               when status_og_andel_inntektskat='ARBEIDSTAKER'
-                         and dagsats_arbeidsgiver/dagsats*100>50 then '8020'
-               --when status_og_andel_inntektskat='ARBEIDSTAKER' then '1000'
-               when status_og_andel_inntektskat='JORDBRUKER' then '5210'
-               when status_og_andel_inntektskat='SJØMANN' then '1300'
-               when status_og_andel_inntektskat='SELVSTENDIG_NÆRINGSDRIVENDE' then '5010'
-               when status_og_andel_inntektskat='DAGPENGER' then '1200'
-               when status_og_andel_inntektskat='ARBEIDSTAKER_UTEN_FERIEPENGER' then '1000'
-               when status_og_andel_inntektskat='FISKER' then '5300'
-               when status_og_andel_inntektskat='DAGMAMMA' then '5110'
-               when status_og_andel_inntektskat='FRILANSER' then '1100'
-               end as underkontonr
-              ,round(dagsats_arbeidsgiver/dagsats*100,0) as andel_av_refusjon
-              ,case when rett_til_mødrekvote.trans_id is null then 'N' else 'J' end as rett_til_mødrekvote
-              ,case when rett_til_fedrekvote.trans_id is null then 'N' else 'J' end as rett_til_fedrekvote
-              ,flerbarnsdager.flerbarnsdager
-              ,adopsjon.adopsjonsdato, adopsjon.stebarnsadopsjon
-              ,eos.eos_sak
-        from beregningsgrunnlag_agg
-        left join mottaker
-        on beregningsgrunnlag_agg.fagsak_id = mottaker.fagsak_id
-        and beregningsgrunnlag_agg.trans_id = mottaker.max_trans_id
-        left join annenforelderfagsak
-        on beregningsgrunnlag_agg.fagsak_id = annenforelderfagsak.fagsak_id
-        and beregningsgrunnlag_agg.trans_id = annenforelderfagsak.max_trans_id
-        left join dvh_fam_fp.fam_fp_uttak_fp_kontoer
-        on beregningsgrunnlag_agg.fagsak_id = fam_fp_uttak_fp_kontoer.fagsak_id
-        and mottaker.max_trans_id = fam_fp_uttak_fp_kontoer.trans_id
-        --AND UPPER(REGEXP_REPLACE(grunnlag_drp1.TREKKONTO, '_|-|[[:space:]]', '')) = UPPER(REGEXP_REPLACE(FAM_FP_Uttak_FP_Kontoer.STOENADSKONTOTYPE, '_|-|[[:space:]]', ''))
-        and upper(replace(beregningsgrunnlag_agg.trekkonto,'_','')) = upper(replace(fam_fp_uttak_fp_kontoer.stoenadskontotype,' ',''))
-        left join dt_person.dim_person
-        on mottaker.fk_person1_mottaker = dim_person.fk_person1
-        and beregningsgrunnlag_agg.uttak_tom between dim_person.gyldig_fra_dato and dim_person.gyldig_til_dato
-        left join dt_kodeverk.dim_geografi
-        on dim_person.fk_dim_geografi_bosted = dim_geografi.pk_dim_geografi
-        left join aleneomsorg
-        on aleneomsorg.fagsak_id = beregningsgrunnlag_agg.fagsak_id
-        and aleneomsorg.uttak_fom = beregningsgrunnlag_agg.uttak_fom
-        left join
-        (select trans_id
-         from dvh_fam_fp.fam_fp_uttak_fp_kontoer
-         where upper(stoenadskontotype) = 'MØDREKVOTE'
-         group by trans_id
-        ) rett_til_mødrekvote
-        on rett_til_mødrekvote.trans_id = beregningsgrunnlag_agg.trans_id
-        left join
-        (select trans_id
-         from dvh_fam_fp.fam_fp_uttak_fp_kontoer
-         where upper(stoenadskontotype) = 'FEDREKVOTE'
-         group by trans_id
-        ) rett_til_fedrekvote
-        on rett_til_fedrekvote.trans_id = beregningsgrunnlag_agg.trans_id
-        left join
-        (select trans_id, max(max_dager) as flerbarnsdager
-         from dvh_fam_fp.fam_fp_uttak_fp_kontoer
-         where upper(stoenadskontotype) = 'FLERBARNSDAGER'
-         group by trans_id
-        ) flerbarnsdager
-        on flerbarnsdager.trans_id = beregningsgrunnlag_agg.trans_id
-        left join adopsjon
-        on beregningsgrunnlag_agg.fagsak_id = adopsjon.fagsak_id
-        left join eos
-        on beregningsgrunnlag_agg.trans_id = eos.trans_id
-      )
-      select /*+ PARALLEL(8) */ *
-      --from uttak_dager
-      from grunnlag
-      where fagsak_id not in (1679117)
-      --where fagsak_id in (1035184)
-      ;
-    v_tid_fom varchar2(8) := null;
-    v_tid_tom varchar2(8) := null;
-    v_commit number := 0;
-    v_error_melding varchar2(1000) := null;
-    v_dim_tid_antall number := 0;
-    v_utbetalingsprosent_kalkulert number := 0;
-  begin
-    v_tid_fom := substr(p_in_vedtak_tom,1,4) || substr(p_in_vedtak_tom,5,6)-2 || '01';
-    v_tid_tom := to_char(last_day(to_date(p_in_vedtak_tom,'yyyymm')),'yyyymmdd');
-
-    --dbms_output.put_line(v_tid_fom||v_tid_tom);--TEST!!!
-
-    for rec_periode in cur_periode(p_in_rapport_dato, p_in_forskyvninger, v_tid_fom, v_tid_tom) loop
-      v_dim_tid_antall := 0;
-      v_utbetalingsprosent_kalkulert := 0;
-      v_dim_tid_antall := dim_tid_antall(to_number(to_char(rec_periode.uttak_fom,'yyyymmdd'))
-                                        ,to_number(to_char(rec_periode.uttak_tom,'yyyymmdd')));
-      if v_dim_tid_antall != 0 then
-        v_utbetalingsprosent_kalkulert := round(rec_periode.trekkdager/v_dim_tid_antall*100,2);
-      else
-        v_utbetalingsprosent_kalkulert := 0;
-      end if;
-      begin
-        insert into dvh_fam_fp.fak_fam_fp_vedtak_utbetaling
-        (fagsak_id, trans_id, behandlingstema, trekkonto, stonadsdager_kvote
-        ,uttak_arbeid_type
-        ,aar, halvaar, kvartal--, aar_maaned
-        ,rapport_periode, uttak_fom, uttak_tom, dager_erst, beregningsgrunnlag_fom
-        ,beregningsgrunnlag_tom, dekningsgrad, dagsats_bruker, dagsats_arbeidsgiver, virksomhet
-        ,periode_resultat_aarsak, dagsats, graderingsprosent, status_og_andel_inntektskat
-        ,aktivitet_status, brutto_inntekt, avkortet_inntekt, status_og_andel_brutto, status_og_andel_avkortet
-        ,utbetalingsprosent, fk_dim_tid_dato_utbet_fom
-        ,fk_dim_tid_dato_utbet_tom, funksjonell_tid, forste_vedtaksdato, vedtaksdato, max_vedtaksdato, periode_type, tilfelle_erst
-        ,belop, dagsats_redusert, lastet_dato, max_trans_id, fk_person1_mottaker, fk_person1_annen_part
-        ,kjonn, fk_person1_barn, termindato, foedselsdato, antall_barn_termin, antall_barn_foedsel
-        ,foedselsdato_adopsjon, antall_barn_adopsjon, annenforelderfagsak_id, max_stonadsdager_konto
-        ,fk_dim_person, bosted_kommune_nr, fk_dim_geografi, bydel_kommune_nr, kommune_nr
-        ,kommune_navn, bydel_nr, bydel_navn, aleneomsorg, hovedkontonr, underkontonr
-        ,mottaker_fodsels_aar, mottaker_fodsels_mnd, mottaker_alder
-        ,rett_til_fedrekvote, rett_til_modrekvote, dagsats_erst, trekkdager
-        ,samtidig_uttak, gradering, gradering_innvilget, antall_dager_periode
-        ,flerbarnsdager, utbetalingsprosent_kalkulert, min_uttak_fom, max_uttak_tom
-        ,fk_fam_fp_trekkonto, fk_fam_fp_periode_resultat_aarsak
-        ,sivilstatus, fk_dim_sivilstatus, antall_beregningsgrunnlag, graderingsdager
-        ,fk_dim_tid_min_dato_kvote, fk_dim_tid_max_dato_kvote
-        ,adopsjonsdato, stebarnsadopsjon, eos_sak, mor_rettighet, statsborgerskap
-        ,arbeidstidsprosent, mors_aktivitet, gyldig_flagg
-        ,andel_av_refusjon, forste_soknadsdato, soknadsdato)
-        values
-        (rec_periode.fagsak_id, rec_periode.trans_id, rec_periode.behandlingstema, rec_periode.trekkonto
-        ,rec_periode.stonadsdager_kvote
-        ,rec_periode.uttak_arbeid_type, rec_periode.aar, rec_periode.halvaar, rec_periode.kvartal--, rec_periode.aar_maaned
-        ,p_in_rapport_dato, rec_periode.uttak_fom, rec_periode.uttak_tom
-        ,rec_periode.dager_erst, rec_periode.beregningsgrunnlag_fom, rec_periode.beregningsgrunnlag_tom
-        ,rec_periode.dekningsgrad, rec_periode.dagsats_bruker, rec_periode.dagsats_arbeidsgiver
-        ,rec_periode.virksomhet, rec_periode.periode_resultat_aarsak, rec_periode.dagsats
-        ,rec_periode.graderingsprosent, rec_periode.status_og_andel_inntektskat
-        ,rec_periode.aktivitet_status, rec_periode.brutto_inntekt, rec_periode.avkortet_inntekt
-        ,rec_periode.status_og_andel_brutto, rec_periode.status_og_andel_avkortet
-        ,rec_periode.utbetalingsprosent, rec_periode.pk_dim_tid_dato_utbet_fom, rec_periode.pk_dim_tid_dato_utbet_tom
-        ,rec_periode.funksjonell_tid, rec_periode.forste_vedtaksdato, rec_periode.siste_vedtaksdato, rec_periode.max_vedtaksdato, rec_periode.periode
-        ,rec_periode.tilfelle_erst, rec_periode.belop, rec_periode.dagsats_redusert, rec_periode.lastet_dato
-        ,rec_periode.max_trans_id, rec_periode.fk_person1_mottaker, rec_periode.fk_person1_annen_part
-        ,rec_periode.kjonn, rec_periode.fk_person1_barn
-        ,rec_periode.termindato, rec_periode.foedselsdato, rec_periode.antall_barn_termin
-        ,rec_periode.antall_barn_foedsel, rec_periode.foedselsdato_adopsjon
-        ,rec_periode.antall_barn_adopsjon, rec_periode.annenforelderfagsak_id, rec_periode.max_stonadsdager_konto
-        ,rec_periode.pk_dim_person, rec_periode.bosted_kommune_nr, rec_periode.pk_dim_geografi
-        ,rec_periode.bydel_kommune_nr, rec_periode.kommune_nr, rec_periode.kommune_navn
-        ,rec_periode.bydel_nr, rec_periode.bydel_navn, rec_periode.aleneomsorg, rec_periode.hovedkontonr
-        ,rec_periode.underkontonr
-        ,rec_periode.mottaker_fodsels_aar, rec_periode.mottaker_fodsels_mnd, rec_periode.mottaker_alder
-        ,rec_periode.rett_til_fedrekvote, rec_periode.rett_til_mødrekvote, rec_periode.dagsats_erst
-        ,rec_periode.trekkdager, rec_periode.samtidig_uttak, rec_periode.gradering, rec_periode.gradering_innvilget
-        ,v_dim_tid_antall, rec_periode.flerbarnsdager, v_utbetalingsprosent_kalkulert
-        ,rec_periode.min_uttak_fom, rec_periode.max_uttak_tom, rec_periode.pk_fam_fp_trekkonto
-        ,rec_periode.pk_fam_fp_periode_resultat_aarsak
-        ,rec_periode.sivilstand, rec_periode.fk_dim_sivilstatus
-        ,rec_periode.antall_beregningsgrunnlag, rec_periode.graderingsdager
-        ,rec_periode.fk_dim_tid_min_dato_kvote, rec_periode.fk_dim_tid_max_dato_kvote
-        ,rec_periode.adopsjonsdato, rec_periode.stebarnsadopsjon, rec_periode.eos_sak
-        ,rec_periode.mor_rettighet, rec_periode.statsborgerskap
-        ,rec_periode.arbeidstidsprosent, rec_periode.mors_aktivitet, p_in_gyldig_flagg
-        ,rec_periode.andel_av_refusjon, rec_periode.forste_soknadsdato, rec_periode.soknadsdato);
-
-        v_commit := v_commit + 1;
-      exception
-        when others then
-          rollback;
-          v_error_melding := substr(SQLCODE || ' ' || sqlerrm, 1, 1000);
-          insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
-          values(null, rec_periode.fagsak_id, v_error_melding, sysdate, 'FAM_FP_STATISTIKK_KVARTAL:INSERT');
-          commit;
-          p_out_error := substr(p_out_error || v_error_melding, 1, 1000);
-      end;
-
-      if v_commit > 100000 then
-        commit;
-        v_commit := 0;
-      end if;
-   end loop;
-   commit;
-  exception
-    when others then
-      rollback;
-      v_error_melding := substr(SQLCODE || ' ' || sqlerrm, 1, 1000);
-      insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
-      values(null, null, v_error_melding, sysdate, 'FAM_FP_STATISTIKK_KVARTAL');
-      commit;
-      p_out_error := substr(p_out_error || v_error_melding, 1, 1000);
-  end fam_fp_statistikk_kvartal;
-
-  procedure fam_fp_statistikk_halvaar(p_in_vedtak_tom in varchar2, p_in_rapport_dato in varchar2, p_in_forskyvninger in number
-                                     ,p_in_gyldig_flagg in number default 0
-                                     ,p_in_periode_type in varchar2 default 'H'
-                                     ,p_out_error out varchar2) as
-    cursor cur_periode(p_rapport_dato in varchar2, p_forskyvninger in number, p_tid_fom in varchar2, p_tid_tom in varchar2) is
-      with fagsak as
-      (
-        select fagsak_id, max(behandlingstema) as behandlingstema, max(fagsakannenforelder_id) as annenforelderfagsak_id
-              ,max(trans_id) keep(dense_rank first order by funksjonell_tid desc) as max_trans_id
-              ,max(soeknadsdato) keep(dense_rank first order by funksjonell_tid desc) as soknadsdato
-              ,min(soeknadsdato) as forste_soknadsdato
-              ,min(vedtaksdato) as forste_vedtaksdato
-              ,max(funksjonell_tid) as funksjonell_tid, max(vedtaksdato) as siste_vedtaksdato
-              ,p_in_periode_type as periode, last_day(to_date(p_rapport_dato,'yyyymm')) + p_forskyvninger as max_vedtaksdato
-        from dvh_fam_fp.fam_fp_fagsak
-        where fam_fp_fagsak.funksjonell_tid <= last_day(to_date(p_rapport_dato,'yyyymm')) + p_forskyvninger
-        group by fagsak_id
-      ),
-      termin as
-      (
-        select fagsak_id, max(termindato) termindato, max(foedselsdato) foedselsdato
-              ,max(antall_barn_termin) antall_barn_termin, max(antall_barn_foedsel) antall_barn_foedsel
-              ,max(foedselsdato_adopsjon) foedselsdato_adopsjon, max(antall_barn_adopsjon) antall_barn_adopsjon
-        from
-        (
-          select fam_fp_fagsak.fagsak_id, max(fodsel.termindato) termindato
-                ,max(fodsel.foedselsdato) foedselsdato, max(fodsel.antall_barn_foedsel) antall_barn_foedsel
-                ,max(fodsel.antall_barn_termin) antall_barn_termin
-                ,max(adopsjon.foedselsdato_adopsjon) foedselsdato_adopsjon
-                ,count(adopsjon.trans_id) antall_barn_adopsjon
-          from dvh_fam_fp.fam_fp_fagsak
-          left join dvh_fam_fp.fam_fp_fodseltermin fodsel
-          on fodsel.fagsak_id = fam_fp_fagsak.fagsak_id
-          and upper(fam_fp_fagsak.behandlingstema) = 'FORP_FODS'
-          left join dvh_fam_fp.fam_fp_fodseltermin adopsjon
-          on adopsjon.fagsak_id = fam_fp_fagsak.fagsak_id
-          and adopsjon.trans_id = fam_fp_fagsak.trans_id
-          and upper(fam_fp_fagsak.behandlingstema) = 'FORP_ADOP'
-          group by fam_fp_fagsak.fagsak_id, fam_fp_fagsak.trans_id
-        )
-        group by fagsak_id
-      ),
-      fk_person1 as
-      (
-        select person.person, person.fagsak_id, max(person.behandlingstema) as behandlingstema, person.max_trans_id
-              ,max(person.annenforelderfagsak_id) as annenforelderfagsak_id
-              ,person.aktoer_id, max(person.kjonn) as kjonn
-              ,max(person_67_vasket.fk_person1) keep
-                (dense_rank first order by person_67_vasket.gyldig_fra_dato desc) as fk_person1
-              ,max(foedselsdato) as foedselsdato, max(sivilstand) as sivilstand
-              ,max(statsborgerskap) as statsborgerskap
-        from
-        (
-          select 'MOTTAKER' as person, fagsak.fagsak_id, fagsak.behandlingstema, fagsak.max_trans_id
-                ,fagsak.annenforelderfagsak_id
-                ,fam_fp_personopplysninger.aktoer_id, fam_fp_personopplysninger.kjonn
-                ,fam_fp_personopplysninger.foedselsdato, fam_fp_personopplysninger.sivilstand
-                ,fam_fp_personopplysninger.statsborgerskap
-          from dvh_fam_fp.fam_fp_personopplysninger
-          join fagsak
-          on fam_fp_personopplysninger.trans_id = fagsak.max_trans_id
-          union all
-          select 'BARN' as person, fagsak.fagsak_id, max(fagsak.behandlingstema) as behandlingstema, fagsak.max_trans_id
-                ,max(fagsak.annenforelderfagsak_id) annenforelderfagsak_id
-                ,max(fam_fp_familiehendelse.til_aktoer_id) as aktoer_id, max(fam_fp_familiehendelse.kjoenn) as kjonn
-                ,null as foedselsdato, null as sivilstand, null as statsborgerskap
-          from dvh_fam_fp.fam_fp_familiehendelse
-          join fagsak
-          on fam_fp_familiehendelse.fagsak_id = fagsak.fagsak_id
-          where upper(fam_fp_familiehendelse.relasjon) = 'BARN'
-          group by fagsak.fagsak_id, fagsak.max_trans_id
-        ) person
-        join dt_person.dvh_person_ident_aktor_ikke_skjermet person_67_vasket
-        --join fk_person.fam_fp_person_67_vasket person_67_vasket
-        on person_67_vasket.aktor_id = person.aktoer_id
-        and to_date(p_tid_tom,'yyyymmdd') between person_67_vasket.gyldig_fra_dato and person_67_vasket.gyldig_til_dato
-        --on person_67_vasket.lk_person_id_kilde_num = person.aktoer_id
-        group by person.person, person.fagsak_id, person.max_trans_id, person.aktoer_id
-      ),
-      barn as
-      (
-        select fagsak_id, listagg(fk_person1, ',') within group (order by fk_person1) as fk_person1_barn
-        from fk_person1
-        where person = 'BARN'
-        group by fagsak_id
-      ),
-      mottaker as
-      (
-        select fk_person1.fagsak_id, fk_person1.behandlingstema
-              ,fk_person1.max_trans_id, fk_person1.annenforelderfagsak_id, fk_person1.aktoer_id
-              ,fk_person1.kjonn, fk_person1.fk_person1 as fk_person1_mottaker
-              ,extract(year from fk_person1.foedselsdato) as mottaker_fodsels_aar
-              ,extract(month from fk_person1.foedselsdato) as mottaker_fodsels_mnd
-              ,fk_person1.sivilstand, fk_person1.statsborgerskap
-              ,barn.fk_person1_barn
-              ,termin.termindato, termin.foedselsdato, termin.antall_barn_termin, termin.antall_barn_foedsel
-              ,termin.foedselsdato_adopsjon, termin.antall_barn_adopsjon
-        from fk_person1
-        left join barn
-        on barn.fagsak_id = fk_person1.fagsak_id
-        left join termin
-        on fk_person1.fagsak_id = termin.fagsak_id
-        where fk_person1.person = 'MOTTAKER'
-      ),
-      adopsjon as
-      (
-        select fam_fp_vilkaar.fagsak_id
-              ,max(fam_fp_vilkaar.omsorgs_overtakelsesdato) as adopsjonsdato
-              ,max(fam_fp_vilkaar.ektefelles_barn) as stebarnsadopsjon
-        from fagsak
-        join dvh_fam_fp.fam_fp_vilkaar
-        on fagsak.fagsak_id = fam_fp_vilkaar.fagsak_id
-        where fagsak.behandlingstema = 'FORP_ADOP'
-        group by fam_fp_vilkaar.fagsak_id
-      ),
-      eos as
-      (
-       select a.trans_id
-             ,case when upper(er_borger_av_eu_eos) = 'TRUE' then 'J'
-                   when upper(er_borger_av_eu_eos) = 'FALSE' then 'N'
-				  		    else null
-              end	eos_sak
-       from
-       (select fam_fp_vilkaar.trans_id, max(fam_fp_vilkaar.er_borger_av_eu_eos) as er_borger_av_eu_eos
-        from fagsak
-        join dvh_fam_fp.fam_fp_vilkaar
-        on fagsak.max_trans_id = fam_fp_vilkaar.trans_id
-        and length(fam_fp_vilkaar.person_status) > 0
-        group by fam_fp_vilkaar.trans_id
-       ) a
-      ),
-      annenforelderfagsak as
-      (
-        select annenforelderfagsak.*, mottaker.fk_person1_mottaker as fk_person1_annen_part
-        from
-        (
-          select fagsak_id, max_trans_id, max(annenforelderfagsak_id) as annenforelderfagsak_id
-          from
+            SELECT
+              'MOTTAKER'                                AS PERSON,
+              FAGSAK.FAGSAK_ID,
+              FAGSAK.BEHANDLINGSTEMA,
+              FAGSAK.MAX_TRANS_ID,
+              FAGSAK.ANNENFORELDERFAGSAK_ID,
+              FAM_FP_PERSONOPPLYSNINGER.AKTOER_ID,
+              FAM_FP_PERSONOPPLYSNINGER.KJONN,
+              FAM_FP_PERSONOPPLYSNINGER.FOEDSELSDATO,
+              FAM_FP_PERSONOPPLYSNINGER.SIVILSTAND,
+              FAM_FP_PERSONOPPLYSNINGER.STATSBORGERSKAP
+            FROM
+              DVH_FAM_FP.FAM_FP_PERSONOPPLYSNINGER
+              JOIN FAGSAK
+              ON FAM_FP_PERSONOPPLYSNINGER.TRANS_ID = FAGSAK.MAX_TRANS_ID UNION ALL
+              SELECT
+                'BARN'                                    AS PERSON,
+                FAGSAK.FAGSAK_ID,
+                MAX(FAGSAK.BEHANDLINGSTEMA)               AS BEHANDLINGSTEMA,
+                FAGSAK.MAX_TRANS_ID,
+                MAX(FAGSAK.ANNENFORELDERFAGSAK_ID)        ANNENFORELDERFAGSAK_ID,
+                MAX(FAM_FP_FAMILIEHENDELSE.TIL_AKTOER_ID) AS AKTOER_ID,
+                MAX(FAM_FP_FAMILIEHENDELSE.KJOENN)        AS KJONN,
+                NULL                                      AS FOEDSELSDATO,
+                NULL                                      AS SIVILSTAND,
+                NULL                                      AS STATSBORGERSKAP
+              FROM
+                DVH_FAM_FP.FAM_FP_FAMILIEHENDELSE
+                JOIN FAGSAK
+                ON FAM_FP_FAMILIEHENDELSE.FAGSAK_ID = FAGSAK.FAGSAK_ID
+              WHERE
+                UPPER(FAM_FP_FAMILIEHENDELSE.RELASJON) = 'BARN'
+              GROUP BY
+                FAGSAK.FAGSAK_ID, FAGSAK.MAX_TRANS_ID
+          )                                    PERSON
+          JOIN DT_PERSON.DVH_PERSON_IDENT_AKTOR_IKKE_SKJERMET PERSON_67_VASKET
+          ON PERSON_67_VASKET.AKTOR_ID = PERSON.AKTOER_ID
+          AND TO_DATE(P_TID_TOM, 'yyyymmdd') BETWEEN PERSON_67_VASKET.GYLDIG_FRA_DATO
+          AND PERSON_67_VASKET.GYLDIG_TIL_DATO
+        GROUP BY
+          PERSON.PERSON, PERSON.FAGSAK_ID, PERSON.MAX_TRANS_ID, PERSON.AKTOER_ID
+      ), BARN AS (
+        SELECT
+          FAGSAK_ID,
+          LISTAGG(FK_PERSON1, ',') WITHIN GROUP (ORDER BY FK_PERSON1) AS FK_PERSON1_BARN
+        FROM
+          FK_PERSON1
+        WHERE
+          PERSON = 'BARN'
+        GROUP BY
+          FAGSAK_ID
+      ), MOTTAKER AS (
+        SELECT
+          FK_PERSON1.FAGSAK_ID,
+          FK_PERSON1.BEHANDLINGSTEMA,
+          FK_PERSON1.MAX_TRANS_ID,
+          FK_PERSON1.ANNENFORELDERFAGSAK_ID,
+          FK_PERSON1.AKTOER_ID,
+          FK_PERSON1.KJONN,
+          FK_PERSON1.FK_PERSON1                       AS FK_PERSON1_MOTTAKER,
+          EXTRACT(YEAR FROM FK_PERSON1.FOEDSELSDATO) AS MOTTAKER_FODSELS_AAR,
+          EXTRACT(MONTH FROM FK_PERSON1.FOEDSELSDATO) AS MOTTAKER_FODSELS_MND,
+          FK_PERSON1.SIVILSTAND,
+          FK_PERSON1.STATSBORGERSKAP,
+          BARN.FK_PERSON1_BARN,
+          TERMIN.TERMINDATO,
+          TERMIN.FOEDSELSDATO,
+          TERMIN.ANTALL_BARN_TERMIN,
+          TERMIN.ANTALL_BARN_FOEDSEL,
+          TERMIN.FOEDSELSDATO_ADOPSJON,
+          TERMIN.ANTALL_BARN_ADOPSJON
+        FROM
+          FK_PERSON1
+          LEFT JOIN BARN
+          ON BARN.FAGSAK_ID = FK_PERSON1.FAGSAK_ID
+          LEFT JOIN TERMIN
+          ON FK_PERSON1.FAGSAK_ID = TERMIN.FAGSAK_ID
+        WHERE
+          FK_PERSON1.PERSON = 'MOTTAKER'
+      ), ADOPSJON AS (
+        SELECT
+          FAM_FP_VILKAAR.FAGSAK_ID,
+          MAX(FAM_FP_VILKAAR.OMSORGS_OVERTAKELSESDATO) AS ADOPSJONSDATO,
+          MAX(FAM_FP_VILKAAR.EKTEFELLES_BARN)          AS STEBARNSADOPSJON
+        FROM
+          FAGSAK
+          JOIN DVH_FAM_FP.FAM_FP_VILKAAR
+          ON FAGSAK.FAGSAK_ID = FAM_FP_VILKAAR.FAGSAK_ID
+        WHERE
+          FAGSAK.BEHANDLINGSTEMA = 'FORP_ADOP'
+        GROUP BY
+          FAM_FP_VILKAAR.FAGSAK_ID
+      ), EOS AS (
+        SELECT
+          A.TRANS_ID,
+          CASE
+            WHEN UPPER(ER_BORGER_AV_EU_EOS) = 'TRUE' THEN
+              'J'
+            WHEN UPPER(ER_BORGER_AV_EU_EOS) = 'FALSE' THEN
+              'N'
+            ELSE
+              NULL
+          END EOS_SAK
+        FROM
           (
-            select forelder1.fagsak_id, forelder1.max_trans_id
-                  ,nvl(forelder1.annenforelderfagsak_id, forelder2.fagsak_id) as annenforelderfagsak_id
-            from mottaker forelder1
-            join mottaker forelder2
-            on forelder1.fk_person1_barn = forelder2.fk_person1_barn
-            and forelder1.fk_person1_mottaker != forelder2.fk_person1_mottaker
-          )
-          group by fagsak_id, max_trans_id
-        ) annenforelderfagsak
-        join mottaker
-        on annenforelderfagsak.annenforelderfagsak_id = mottaker.fagsak_id
-      ),
-      tid as
-      (
-        select pk_dim_tid, dato, aar, halvaar, kvartal, aar_maaned
-        from dt_kodeverk.dim_tid
-        where dag_i_uke < 6
-        and dim_nivaa = 1
-        and gyldig_flagg = 1
-        and pk_dim_tid between p_tid_fom and p_tid_tom
-        and pk_dim_tid <= to_char(last_day(to_date(p_rapport_dato,'yyyymm')),'yyyymmdd')
-      ),
-      uttak as
-      (
-        select uttak.trans_id, uttak.trekkonto, uttak.uttak_arbeid_type, uttak.virksomhet, uttak.utbetalingsprosent
-              ,uttak.gradering_innvilget, uttak.gradering, uttak.arbeidstidsprosent, uttak.samtidig_uttak
-              ,uttak.periode_resultat_aarsak, uttak.fom as uttak_fom, uttak.tom as uttak_tom
-              ,uttak.trekkdager
-              ,fagsak.fagsak_id, fagsak.periode, fagsak.funksjonell_tid, fagsak.forste_vedtaksdato, fagsak.siste_vedtaksdato
-              ,fagsak.max_vedtaksdato, fagsak.forste_soknadsdato, fagsak.soknadsdato
-              ,fam_fp_trekkonto.pk_fam_fp_trekkonto
-              ,aarsak_uttak.pk_fam_fp_periode_resultat_aarsak
-              ,uttak.arbeidsforhold_id, uttak.graderingsdager
-              ,fam_fp_uttak_fordelingsper.mors_aktivitet
-         from dvh_fam_fp.fam_fp_uttak_res_per_aktiv uttak
-         join fagsak
-         on fagsak.max_trans_id = uttak.trans_id
-         left join dvh_fam_fp.fam_fp_trekkonto
-         on upper(uttak.trekkonto) = fam_fp_trekkonto.trekkonto
-         left join
-         (select aarsak_uttak, max(pk_fam_fp_periode_resultat_aarsak) as pk_fam_fp_periode_resultat_aarsak
-          from dvh_fam_fp.fam_fp_periode_resultat_aarsak
-          group by aarsak_uttak
-         ) aarsak_uttak
-         on upper(uttak.periode_resultat_aarsak) = aarsak_uttak.aarsak_uttak
-         left join dvh_fam_fp.fam_fp_uttak_fordelingsper
-         on fam_fp_uttak_fordelingsper.trans_id = uttak.trans_id
-         and uttak.fom between fam_fp_uttak_fordelingsper.fom and fam_fp_uttak_fordelingsper.tom
-         and upper(uttak.trekkonto) = upper(fam_fp_uttak_fordelingsper.periode_type)
-         and length(fam_fp_uttak_fordelingsper.mors_aktivitet) > 1
-         where uttak.utbetalingsprosent > 0
-      ),
-      stonadsdager_kvote as
-      (
-        select uttak.*, tid1.pk_dim_tid as fk_dim_tid_min_dato_kvote
-              ,tid2.pk_dim_tid as fk_dim_tid_max_dato_kvote
-        from
-        (select fagsak_id, trans_id, trekkonto, virksomhet, uttak_arbeid_type
-               ,sum(trekkdager) as stonadsdager_kvote, min(uttak_fom) as min_uttak_fom
-               ,max(uttak_tom) as max_uttak_tom
-         from
-         (select fagsak_id, trans_id, uttak_fom, uttak_tom, trekkonto, virksomhet, uttak_arbeid_type
-                ,max(trekkdager) as trekkdager
-          from uttak
-          group by fagsak_id, trans_id, uttak_fom, uttak_tom, trekkonto, virksomhet, uttak_arbeid_type
-         ) a
-         group by fagsak_id, trans_id, trekkonto, virksomhet, uttak_arbeid_type
-        ) uttak
-        join dt_kodeverk.dim_tid tid1
-        on tid1.dim_nivaa = 1
-        and tid1.dato = trunc(uttak.min_uttak_fom,'dd')
-        join dt_kodeverk.dim_tid tid2
-        on tid2.dim_nivaa = 1
-        and tid2.dato = trunc(uttak.max_uttak_tom,'dd')
-      ),
-      uttak_dager AS
-      (
-        select uttak.*
-              ,tid.pk_dim_tid, tid.dato, tid.aar, tid.halvaar, tid.kvartal, tid.aar_maaned
-        from uttak
-        join tid
-        on tid.dato between uttak.uttak_fom and uttak.uttak_tom
-      ),
-      aleneomsorg as
-      (
-        select uttak.fagsak_id, uttak.uttak_fom
-        from uttak
-        join dvh_fam_fp.fam_fp_dokumentasjonsperioder dok1
-        on dok1.fagsak_id = uttak.fagsak_id
-        and uttak.uttak_fom >= dok1.fom
-        and dok1.dokumentasjon_type = 'ALENEOMSORG'
-        left join dvh_fam_fp.fam_fp_dokumentasjonsperioder dok2
-        on dok1.fagsak_id = dok2.fagsak_id
-        and uttak.uttak_fom >= dok2.fom
-        and dok1.trans_id < dok2.trans_id
-        and dok2.dokumentasjon_type = 'ANNEN_FORELDER_HAR_RETT'
-        and dok2.fagsak_id is null
-        group by uttak.fagsak_id, uttak.uttak_fom
-      ),
-      beregningsgrunnlag as
-      (
-        select fagsak_id, trans_id, virksomhetsnummer, max(status_og_andel_brutto) as status_og_andel_brutto
-              ,max(status_og_andel_avkortet) as status_og_andel_avkortet
-              ,fom as beregningsgrunnlag_fom, tom as beregningsgrunnlag_tom
-              ,max(dekningsgrad) as dekningsgrad, max(dagsats) as dagsats, dagsats_bruker
-              ,dagsats_arbeidsgiver
-              ,dagsats_bruker+dagsats_arbeidsgiver dagsats_virksomhet
-              ,max(status_og_andel_inntektskat) as status_og_andel_inntektskat
-              ,aktivitet_status, max(brutto) as brutto_inntekt, max(avkortet) as avkortet_inntekt
-              ,count(1) as antall_beregningsgrunnlag
-        from dvh_fam_fp.fam_fp_beregningsgrunnlag
-        group by fagsak_id, trans_id, virksomhetsnummer, fom, tom, aktivitet_status, dagsats_bruker, dagsats_arbeidsgiver
-      ),
-      beregningsgrunnlag_detalj as
-      (
-        select uttak_dager.*
-              ,stonadsdager_kvote.stonadsdager_kvote, stonadsdager_kvote.min_uttak_fom, stonadsdager_kvote.max_uttak_tom
-              ,stonadsdager_kvote.fk_dim_tid_min_dato_kvote, stonadsdager_kvote.fk_dim_tid_max_dato_kvote
-              ,bereg.status_og_andel_brutto, bereg.status_og_andel_avkortet, bereg.beregningsgrunnlag_fom
-              ,bereg.dekningsgrad, bereg.beregningsgrunnlag_tom, bereg.dagsats, bereg.dagsats_bruker
-              ,bereg.dagsats_arbeidsgiver
-              ,bereg.dagsats_virksomhet, bereg.status_og_andel_inntektskat
-              ,bereg.aktivitet_status, bereg.brutto_inntekt, bereg.avkortet_inntekt
-              ,bereg.dagsats*uttak_dager.utbetalingsprosent/100 as dagsats_erst
-              ,bereg.antall_beregningsgrunnlag
-        from beregningsgrunnlag bereg
-        join uttak_dager
-        on uttak_dager.trans_id = bereg.trans_id
-        and nvl(uttak_dager.virksomhet,'X') = nvl(bereg.virksomhetsnummer,'X')
-        and bereg.beregningsgrunnlag_fom <= uttak_dager.dato
-        and nvl(bereg.beregningsgrunnlag_tom,to_date('20991201','YYYYMMDD')) >= uttak_dager.dato
-        left join stonadsdager_kvote
-        on uttak_dager.trans_id = stonadsdager_kvote.trans_id
-        and uttak_dager.trekkonto = stonadsdager_kvote.trekkonto
-        and nvl(uttak_dager.virksomhet,'X') = nvl(stonadsdager_kvote.virksomhet,'X')
-        and uttak_dager.uttak_arbeid_type = stonadsdager_kvote.uttak_arbeid_type
-        join dvh_fam_fp.fam_fp_uttak_aktivitet_mapping uttak_mapping
-        on uttak_dager.uttak_arbeid_type = uttak_mapping.uttak_arbeid
-        and bereg.aktivitet_status = uttak_mapping.aktivitet_status
-        where bereg.dagsats_bruker + bereg.dagsats_arbeidsgiver != 0
-      ),
-      beregningsgrunnlag_agg as
-      (
-        select a.*
-              ,dager_erst*dagsats_virksomhet/dagsats*antall_beregningsgrunnlag tilfelle_erst
-              ,dager_erst*round(utbetalingsprosent/100*dagsats_virksomhet) belop
-              ,round(utbetalingsprosent/100*dagsats_virksomhet-0.5) dagsats_redusert
-              ,case when periode_resultat_aarsak in (2004,2033) then 'N'
-			 	            when trekkonto in ('FEDREKVOTE','FELLESPERIODE','MØDREKVOTE') then 'J'
-				            when trekkonto = 'FORELDREPENGER' then 'N'
-			         end mor_rettighet
-        from
-        (
-          select fagsak_id, trans_id, trekkonto, trekkdager, stonadsdager_kvote, uttak_arbeid_type
-                ,aar, halvaar--, kvartal, aar_maaned
-                ,uttak_fom, uttak_tom
-                ,sum(dagsats_virksomhet/dagsats* case when ((upper(gradering_innvilget) ='TRUE' and upper(gradering)='TRUE')
-                                       or upper(samtidig_uttak)='TRUE') then (100-arbeidstidsprosent)/100
-                               else 1.0
-                          end
-                     ) dager_erst2
-                ,max(arbeidstidsprosent) as arbeidstidsprosent
-                ,count(distinct pk_dim_tid) dager_erst
-                ,
-                 --count(distinct pk_dim_tid)*dagsats_virksomhet/dagsats tilfelle_erst,
-                 min(beregningsgrunnlag_fom) beregningsgrunnlag_fom, max(beregningsgrunnlag_tom) beregningsgrunnlag_tom
-                ,dekningsgrad
-                ,
-                 --count(distinct pk_dim_tid)*
-                 --      round(utbetalingsprosent/100*dagsats_virksomhet-0.5) belop,
-                 dagsats_bruker, dagsats_arbeidsgiver, dagsats_virksomhet
-                ,virksomhet, periode_resultat_aarsak, dagsats, dagsats_erst
-                , --dagsats_virksomhet,
-                 utbetalingsprosent graderingsprosent, status_og_andel_inntektskat
-                ,aktivitet_status, brutto_inntekt, avkortet_inntekt, status_og_andel_brutto, status_og_andel_avkortet
-                ,
-                 --round(utbetalingsprosent/100*dagsats_virksomhet-0.5) dagsats_redusert,
-                 utbetalingsprosent
-                ,min(pk_dim_tid) pk_dim_tid_dato_utbet_fom, max(pk_dim_tid) pk_dim_tid_dato_utbet_tom
-                ,funksjonell_tid, forste_vedtaksdato, siste_vedtaksdato, max_vedtaksdato, periode
-                ,max(forste_soknadsdato) as forste_soknadsdato, max(soknadsdato) as soknadsdato
-                ,samtidig_uttak, gradering, gradering_innvilget
-                ,min_uttak_fom, max_uttak_tom
-                ,fk_dim_tid_min_dato_kvote, fk_dim_tid_max_dato_kvote
-                ,max(pk_fam_fp_trekkonto) as pk_fam_fp_trekkonto
-                ,max(pk_fam_fp_periode_resultat_aarsak) as pk_fam_fp_periode_resultat_aarsak
-                ,antall_beregningsgrunnlag, max(graderingsdager) as graderingsdager
-                ,max(mors_aktivitet) as mors_aktivitet
-          from beregningsgrunnlag_detalj
-          group by fagsak_id, trans_id, trekkonto, trekkdager, stonadsdager_kvote, uttak_arbeid_type
-                  ,aar, halvaar--, kvartal, aar_maaned
-                  ,uttak_fom, uttak_tom, dekningsgrad
-                  ,virksomhet, utbetalingsprosent, periode_resultat_aarsak
-                  ,dagsats, dagsats_erst, dagsats_bruker, dagsats_arbeidsgiver, dagsats_virksomhet
-                  ,utbetalingsprosent
-                  ,status_og_andel_inntektskat, aktivitet_status, brutto_inntekt, avkortet_inntekt
-                  ,status_og_andel_brutto, status_og_andel_avkortet
-                  ,funksjonell_tid, forste_vedtaksdato, siste_vedtaksdato, max_vedtaksdato, periode
-                  ,samtidig_uttak, gradering, gradering_innvilget, min_uttak_fom, max_uttak_tom
-                  ,fk_dim_tid_min_dato_kvote, fk_dim_tid_max_dato_kvote
-                  ,antall_beregningsgrunnlag
-        ) a
-      ),
-      grunnlag as
-      (
-        select beregningsgrunnlag_agg.*, sysdate as lastet_dato
-              ,mottaker.behandlingstema, mottaker.max_trans_id, mottaker.fk_person1_mottaker, mottaker.kjonn
-              ,mottaker.fk_person1_barn
-              ,mottaker.termindato, mottaker.foedselsdato, mottaker.antall_barn_termin
-              ,mottaker.antall_barn_foedsel, mottaker.foedselsdato_adopsjon
-              ,mottaker.antall_barn_adopsjon
-              ,mottaker.mottaker_fodsels_aar, mottaker.mottaker_fodsels_mnd
-              ,substr(p_tid_fom,1,4) - mottaker.mottaker_fodsels_aar as mottaker_alder
-              ,mottaker.sivilstand, mottaker.statsborgerskap
-              ,dim_person.pk_dim_person, dim_person.bosted_kommune_nr
-              ,dim_person.fk_dim_sivilstatus
-              ,dim_geografi.pk_dim_geografi, dim_geografi.bydel_kommune_nr, dim_geografi.kommune_nr
-              ,dim_geografi.kommune_navn, dim_geografi.bydel_nr, dim_geografi.bydel_navn
-              ,annenforelderfagsak.annenforelderfagsak_id, annenforelderfagsak.fk_person1_annen_part
-              ,fam_fp_uttak_fp_kontoer.max_dager max_stonadsdager_konto
-              ,case when aleneomsorg.fagsak_id is not null then 'J' else NULL end as aleneomsorg
-              ,case when behandlingstema = 'FORP_FODS' then '214'
-                    when behandlingstema = 'FORP_ADOP' then '216'
-               end as hovedkontonr
-              ,case when status_og_andel_inntektskat='ARBEIDSTAKER'
-                         and dagsats_arbeidsgiver/dagsats*100<=50 then '1000'
-               when status_og_andel_inntektskat='ARBEIDSTAKER'
-                         and dagsats_arbeidsgiver/dagsats*100>50 then '8020'
-               --when status_og_andel_inntektskat='ARBEIDSTAKER' then '1000'
-               when status_og_andel_inntektskat='JORDBRUKER' then '5210'
-               when status_og_andel_inntektskat='SJØMANN' then '1300'
-               when status_og_andel_inntektskat='SELVSTENDIG_NÆRINGSDRIVENDE' then '5010'
-               when status_og_andel_inntektskat='DAGPENGER' then '1200'
-               when status_og_andel_inntektskat='ARBEIDSTAKER_UTEN_FERIEPENGER' then '1000'
-               when status_og_andel_inntektskat='FISKER' then '5300'
-               when status_og_andel_inntektskat='DAGMAMMA' then '5110'
-               when status_og_andel_inntektskat='FRILANSER' then '1100'
-               end as underkontonr
-              ,round(dagsats_arbeidsgiver/dagsats*100,0) as andel_av_refusjon
-              ,case when rett_til_mødrekvote.trans_id is null then 'N' else 'J' end as rett_til_mødrekvote
-              ,case when rett_til_fedrekvote.trans_id is null then 'N' else 'J' end as rett_til_fedrekvote
-              ,flerbarnsdager.flerbarnsdager
-              ,adopsjon.adopsjonsdato, adopsjon.stebarnsadopsjon
-              ,eos.eos_sak
-        from beregningsgrunnlag_agg
-        left join mottaker
-        on beregningsgrunnlag_agg.fagsak_id = mottaker.fagsak_id
-        and beregningsgrunnlag_agg.trans_id = mottaker.max_trans_id
-        left join annenforelderfagsak
-        on beregningsgrunnlag_agg.fagsak_id = annenforelderfagsak.fagsak_id
-        and beregningsgrunnlag_agg.trans_id = annenforelderfagsak.max_trans_id
-        left join dvh_fam_fp.fam_fp_uttak_fp_kontoer
-        on beregningsgrunnlag_agg.fagsak_id = fam_fp_uttak_fp_kontoer.fagsak_id
-        and mottaker.max_trans_id = fam_fp_uttak_fp_kontoer.trans_id
-        --AND UPPER(REGEXP_REPLACE(grunnlag_drp1.TREKKONTO, '_|-|[[:space:]]', '')) = UPPER(REGEXP_REPLACE(FAM_FP_Uttak_FP_Kontoer.STOENADSKONTOTYPE, '_|-|[[:space:]]', ''))
-        and upper(replace(beregningsgrunnlag_agg.trekkonto,'_','')) = upper(replace(fam_fp_uttak_fp_kontoer.stoenadskontotype,' ',''))
-        left join dt_person.dim_person
-        on mottaker.fk_person1_mottaker = dim_person.fk_person1
-        and beregningsgrunnlag_agg.uttak_tom between dim_person.gyldig_fra_dato and dim_person.gyldig_til_dato
-        left join dt_kodeverk.dim_geografi
-        on dim_person.fk_dim_geografi_bosted = dim_geografi.pk_dim_geografi
-        left join aleneomsorg
-        on aleneomsorg.fagsak_id = beregningsgrunnlag_agg.fagsak_id
-        and aleneomsorg.uttak_fom = beregningsgrunnlag_agg.uttak_fom
-        left join
-        (select trans_id
-         from dvh_fam_fp.fam_fp_uttak_fp_kontoer
-         where upper(stoenadskontotype) = 'MØDREKVOTE'
-         group by trans_id
-        ) rett_til_mødrekvote
-        on rett_til_mødrekvote.trans_id = beregningsgrunnlag_agg.trans_id
-        left join
-        (select trans_id
-         from dvh_fam_fp.fam_fp_uttak_fp_kontoer
-         where upper(stoenadskontotype) = 'FEDREKVOTE'
-         group by trans_id
-        ) rett_til_fedrekvote
-        on rett_til_fedrekvote.trans_id = beregningsgrunnlag_agg.trans_id
-        left join
-        (select trans_id, max(max_dager) as flerbarnsdager
-         from dvh_fam_fp.fam_fp_uttak_fp_kontoer
-         where upper(stoenadskontotype) = 'FLERBARNSDAGER'
-         group by trans_id
-        ) flerbarnsdager
-        on flerbarnsdager.trans_id = beregningsgrunnlag_agg.trans_id
-        left join adopsjon
-        on beregningsgrunnlag_agg.fagsak_id = adopsjon.fagsak_id
-        left join eos
-        on beregningsgrunnlag_agg.trans_id = eos.trans_id
-      )
-      select /*+ PARALLEL(8) */ *
-      --from uttak_dager
-      from grunnlag
-      where fagsak_id not in (1679117)
-      --where fagsak_id in (1035184)
-      ;
-    v_tid_fom varchar2(8) := null;
-    v_tid_tom varchar2(8) := null;
-    v_commit number := 0;
-    v_error_melding varchar2(1000) := null;
-    v_dim_tid_antall number := 0;
-    v_utbetalingsprosent_kalkulert number := 0;
-  begin
-    v_tid_fom := substr(p_in_vedtak_tom,1,4) || substr(p_in_vedtak_tom,5,6)-5 || '01';
-    v_tid_tom := to_char(last_day(to_date(p_in_vedtak_tom,'yyyymm')),'yyyymmdd');
-    --dbms_output.put_line(v_tid_fom||v_tid_tom);--TEST!!!
-
-    for rec_periode in cur_periode(p_in_rapport_dato, p_in_forskyvninger, v_tid_fom, v_tid_tom) loop
-      v_dim_tid_antall := 0;
-      v_utbetalingsprosent_kalkulert := 0;
-      v_dim_tid_antall := dim_tid_antall(to_number(to_char(rec_periode.uttak_fom,'yyyymmdd'))
-                                        ,to_number(to_char(rec_periode.uttak_tom,'yyyymmdd')));
-      if v_dim_tid_antall != 0 then
-        v_utbetalingsprosent_kalkulert := round(rec_periode.trekkdager/v_dim_tid_antall*100,2);
-      else
-        v_utbetalingsprosent_kalkulert := 0;
-      end if;
-      begin
-        insert into dvh_fam_fp.fak_fam_fp_vedtak_utbetaling
-        (fagsak_id, trans_id, behandlingstema, trekkonto, stonadsdager_kvote
-        ,uttak_arbeid_type
-        ,aar, halvaar, --AAR_MAANED,
-         rapport_periode, uttak_fom, uttak_tom, dager_erst, beregningsgrunnlag_fom
-        ,beregningsgrunnlag_tom, dekningsgrad, dagsats_bruker, dagsats_arbeidsgiver, virksomhet
-        ,periode_resultat_aarsak, dagsats, graderingsprosent, status_og_andel_inntektskat
-        ,aktivitet_status, brutto_inntekt, avkortet_inntekt, status_og_andel_brutto, status_og_andel_avkortet
-        ,utbetalingsprosent, fk_dim_tid_dato_utbet_fom
-        ,fk_dim_tid_dato_utbet_tom, funksjonell_tid, forste_vedtaksdato, vedtaksdato, max_vedtaksdato, periode_type, tilfelle_erst
-        ,belop, dagsats_redusert, lastet_dato, max_trans_id, fk_person1_mottaker, fk_person1_annen_part
-        ,kjonn, fk_person1_barn, termindato, foedselsdato, antall_barn_termin, antall_barn_foedsel
-        ,foedselsdato_adopsjon, antall_barn_adopsjon, annenforelderfagsak_id, max_stonadsdager_konto
-        ,fk_dim_person, bosted_kommune_nr, fk_dim_geografi, bydel_kommune_nr, kommune_nr
-        ,kommune_navn, bydel_nr, bydel_navn, aleneomsorg, hovedkontonr, underkontonr
-        ,mottaker_fodsels_aar, mottaker_fodsels_mnd, mottaker_alder
-        ,rett_til_fedrekvote, rett_til_modrekvote, dagsats_erst, trekkdager
-        ,samtidig_uttak, gradering, gradering_innvilget, antall_dager_periode
-        ,flerbarnsdager, utbetalingsprosent_kalkulert, min_uttak_fom, max_uttak_tom
-        ,fk_fam_fp_trekkonto, fk_fam_fp_periode_resultat_aarsak
-        ,sivilstatus, fk_dim_sivilstatus, antall_beregningsgrunnlag, graderingsdager
-        ,fk_dim_tid_min_dato_kvote, fk_dim_tid_max_dato_kvote
-        ,adopsjonsdato, stebarnsadopsjon, eos_sak, mor_rettighet, statsborgerskap
-        ,arbeidstidsprosent, mors_aktivitet, gyldig_flagg
-        ,andel_av_refusjon, forste_soknadsdato, soknadsdato)
-        values
-        (rec_periode.fagsak_id, rec_periode.trans_id, rec_periode.behandlingstema, rec_periode.trekkonto
-        ,rec_periode.stonadsdager_kvote
-        ,rec_periode.uttak_arbeid_type, rec_periode.aar, rec_periode.halvaar--, AAR_MAANED
-        ,p_in_rapport_dato, rec_periode.uttak_fom, rec_periode.uttak_tom
-        ,rec_periode.dager_erst, rec_periode.beregningsgrunnlag_fom, rec_periode.beregningsgrunnlag_tom
-        ,rec_periode.dekningsgrad, rec_periode.dagsats_bruker, rec_periode.dagsats_arbeidsgiver
-        ,rec_periode.virksomhet, rec_periode.periode_resultat_aarsak, rec_periode.dagsats
-        ,rec_periode.graderingsprosent, rec_periode.status_og_andel_inntektskat
-        ,rec_periode.aktivitet_status, rec_periode.brutto_inntekt, rec_periode.avkortet_inntekt
-        ,rec_periode.status_og_andel_brutto, rec_periode.status_og_andel_avkortet
-        ,rec_periode.utbetalingsprosent, rec_periode.pk_dim_tid_dato_utbet_fom, rec_periode.pk_dim_tid_dato_utbet_tom
-        ,rec_periode.funksjonell_tid, rec_periode.forste_vedtaksdato, rec_periode.siste_vedtaksdato, rec_periode.max_vedtaksdato, rec_periode.periode
-        ,rec_periode.tilfelle_erst, rec_periode.belop, rec_periode.dagsats_redusert, rec_periode.lastet_dato
-        ,rec_periode.max_trans_id, rec_periode.fk_person1_mottaker, rec_periode.fk_person1_annen_part
-        ,rec_periode.kjonn, rec_periode.fk_person1_barn
-        ,rec_periode.termindato, rec_periode.foedselsdato, rec_periode.antall_barn_termin
-        ,rec_periode.antall_barn_foedsel, rec_periode.foedselsdato_adopsjon
-        ,rec_periode.antall_barn_adopsjon, rec_periode.annenforelderfagsak_id, rec_periode.max_stonadsdager_konto
-        ,rec_periode.pk_dim_person, rec_periode.bosted_kommune_nr, rec_periode.pk_dim_geografi
-        ,rec_periode.bydel_kommune_nr, rec_periode.kommune_nr, rec_periode.kommune_navn
-        ,rec_periode.bydel_nr, rec_periode.bydel_navn, rec_periode.aleneomsorg, rec_periode.hovedkontonr
-        ,rec_periode.underkontonr
-        ,rec_periode.mottaker_fodsels_aar, rec_periode.mottaker_fodsels_mnd, rec_periode.mottaker_alder
-        ,rec_periode.rett_til_fedrekvote, rec_periode.rett_til_mødrekvote, rec_periode.dagsats_erst
-        ,rec_periode.trekkdager, rec_periode.samtidig_uttak, rec_periode.gradering, rec_periode.gradering_innvilget
-        ,v_dim_tid_antall, rec_periode.flerbarnsdager, v_utbetalingsprosent_kalkulert
-        ,rec_periode.min_uttak_fom, rec_periode.max_uttak_tom, rec_periode.pk_fam_fp_trekkonto
-        ,rec_periode.pk_fam_fp_periode_resultat_aarsak
-        ,rec_periode.sivilstand, rec_periode.fk_dim_sivilstatus
-        ,rec_periode.antall_beregningsgrunnlag, rec_periode.graderingsdager
-        ,rec_periode.fk_dim_tid_min_dato_kvote, rec_periode.fk_dim_tid_max_dato_kvote
-        ,rec_periode.adopsjonsdato, rec_periode.stebarnsadopsjon, rec_periode.eos_sak
-        ,rec_periode.mor_rettighet, rec_periode.statsborgerskap
-        ,rec_periode.arbeidstidsprosent, rec_periode.mors_aktivitet, p_in_gyldig_flagg
-        ,rec_periode.andel_av_refusjon, rec_periode.forste_soknadsdato, rec_periode.soknadsdato);
-
-        v_commit := v_commit + 1;
-      exception
-        when others then
-          rollback;
-          v_error_melding := substr(SQLCODE || ' ' || sqlerrm, 1, 1000);
-          insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
-          values(null, rec_periode.fagsak_id, v_error_melding, sysdate, 'FAM_FP_STATISTIKK_HALVAAR:INSERT');
-          commit;
-          p_out_error := substr(p_out_error || v_error_melding, 1, 1000);
-      end;
-
-      if v_commit > 100000 then
-        commit;
-        v_commit := 0;
-      end if;
-   end loop;
-   commit;
-  exception
-    when others then
-      rollback;
-      v_error_melding := substr(SQLCODE || ' ' || sqlerrm, 1, 1000);
-      insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
-      values(null, null, v_error_melding, sysdate, 'FAM_FP_STATISTIKK_HALVAAR');
-      commit;
-      p_out_error := substr(p_out_error || v_error_melding, 1, 1000);
-  end fam_fp_statistikk_halvaar;
-
-  procedure fam_fp_statistikk_s(p_in_vedtak_tom in varchar2, p_in_rapport_dato in varchar2, p_in_forskyvninger in number
-                                     ,p_in_gyldig_flagg in number default 0
-                                     ,p_in_periode_type in varchar2 default 'S'
-                                     ,p_out_error out varchar2) as
-    cursor cur_periode(p_rapport_dato in varchar2, p_forskyvninger in number, p_tid_fom in varchar2, p_tid_tom in varchar2) is
-      with fagsak as
-      (
-        select fagsak_id, max(behandlingstema) as behandlingstema, max(fagsakannenforelder_id) as annenforelderfagsak_id
-              ,max(trans_id) keep(dense_rank first order by funksjonell_tid desc) as max_trans_id
-              ,max(soeknadsdato) keep(dense_rank first order by funksjonell_tid desc) as soknadsdato
-              ,min(soeknadsdato) as forste_soknadsdato
-              ,min(vedtaksdato) as forste_vedtaksdato
-              ,max(funksjonell_tid) as funksjonell_tid, max(vedtaksdato) as siste_vedtaksdato
-              ,p_in_periode_type as periode, last_day(to_date(p_rapport_dato,'yyyymm')) + p_forskyvninger as max_vedtaksdato
-        from dvh_fam_fp.fam_fp_fagsak
-        where fam_fp_fagsak.funksjonell_tid <= last_day(to_date(p_rapport_dato,'yyyymm')) + p_forskyvninger
-        group by fagsak_id
-      ),
-      termin as
-      (
-        select fagsak_id, max(termindato) termindato, max(foedselsdato) foedselsdato
-              ,max(antall_barn_termin) antall_barn_termin, max(antall_barn_foedsel) antall_barn_foedsel
-              ,max(foedselsdato_adopsjon) foedselsdato_adopsjon, max(antall_barn_adopsjon) antall_barn_adopsjon
-        from
-        (
-          select fam_fp_fagsak.fagsak_id, max(fodsel.termindato) termindato
-                ,max(fodsel.foedselsdato) foedselsdato, max(fodsel.antall_barn_foedsel) antall_barn_foedsel
-                ,max(fodsel.antall_barn_termin) antall_barn_termin
-                ,max(adopsjon.foedselsdato_adopsjon) foedselsdato_adopsjon
-                ,count(adopsjon.trans_id) antall_barn_adopsjon
-          from dvh_fam_fp.fam_fp_fagsak
-          left join dvh_fam_fp.fam_fp_fodseltermin fodsel
-          on fodsel.fagsak_id = fam_fp_fagsak.fagsak_id
-          and upper(fam_fp_fagsak.behandlingstema) = 'FORP_FODS'
-          left join dvh_fam_fp.fam_fp_fodseltermin adopsjon
-          on adopsjon.fagsak_id = fam_fp_fagsak.fagsak_id
-          and adopsjon.trans_id = fam_fp_fagsak.trans_id
-          and upper(fam_fp_fagsak.behandlingstema) = 'FORP_ADOP'
-          group by fam_fp_fagsak.fagsak_id, fam_fp_fagsak.trans_id
-        )
-        group by fagsak_id
-      ),
-      fk_person1 as
-      (
-        select person.person, person.fagsak_id, max(person.behandlingstema) as behandlingstema, person.max_trans_id
-              ,max(person.annenforelderfagsak_id) as annenforelderfagsak_id
-              ,person.aktoer_id, max(person.kjonn) as kjonn
-              ,max(person_67_vasket.fk_person1) keep
-                (dense_rank first order by person_67_vasket.gyldig_fra_dato desc) as fk_person1
-              ,max(foedselsdato) as foedselsdato, max(sivilstand) as sivilstand
-              ,max(statsborgerskap) as statsborgerskap
-        from
-        (
-          select 'MOTTAKER' as person, fagsak.fagsak_id, fagsak.behandlingstema, fagsak.max_trans_id
-                ,fagsak.annenforelderfagsak_id
-                ,fam_fp_personopplysninger.aktoer_id, fam_fp_personopplysninger.kjonn
-                ,fam_fp_personopplysninger.foedselsdato, fam_fp_personopplysninger.sivilstand
-                ,fam_fp_personopplysninger.statsborgerskap
-          from dvh_fam_fp.fam_fp_personopplysninger
-          join fagsak
-          on fam_fp_personopplysninger.trans_id = fagsak.max_trans_id
-          union all
-          select 'BARN' as person, fagsak.fagsak_id, max(fagsak.behandlingstema) as behandlingstema, fagsak.max_trans_id
-                ,max(fagsak.annenforelderfagsak_id) annenforelderfagsak_id
-                ,max(fam_fp_familiehendelse.til_aktoer_id) as aktoer_id, max(fam_fp_familiehendelse.kjoenn) as kjonn
-                ,null as foedselsdato, null as sivilstand, null as statsborgerskap
-          from dvh_fam_fp.fam_fp_familiehendelse
-          join fagsak
-          on fam_fp_familiehendelse.fagsak_id = fagsak.fagsak_id
-          where upper(fam_fp_familiehendelse.relasjon) = 'BARN'
-          group by fagsak.fagsak_id, fagsak.max_trans_id
-        ) person
-        join dt_person.dvh_person_ident_aktor_ikke_skjermet person_67_vasket
-        on person_67_vasket.aktor_id = person.aktoer_id
-        and to_date(p_tid_tom,'yyyymmdd') between person_67_vasket.gyldig_fra_dato and person_67_vasket.gyldig_til_dato
-        group by person.person, person.fagsak_id, person.max_trans_id, person.aktoer_id
-      ),
-      barn as
-      (
-        select fagsak_id, listagg(fk_person1, ',') within group (order by fk_person1) as fk_person1_barn
-        from fk_person1
-        where person = 'BARN'
-        group by fagsak_id
-      ),
-      mottaker as
-      (
-        select fk_person1.fagsak_id, fk_person1.behandlingstema
-              ,fk_person1.max_trans_id, fk_person1.annenforelderfagsak_id, fk_person1.aktoer_id
-              ,fk_person1.kjonn, fk_person1.fk_person1 as fk_person1_mottaker
-              ,extract(year from fk_person1.foedselsdato) as mottaker_fodsels_aar
-              ,extract(month from fk_person1.foedselsdato) as mottaker_fodsels_mnd
-              ,fk_person1.sivilstand, fk_person1.statsborgerskap
-              ,barn.fk_person1_barn
-              ,termin.termindato, termin.foedselsdato, termin.antall_barn_termin, termin.antall_barn_foedsel
-              ,termin.foedselsdato_adopsjon, termin.antall_barn_adopsjon
-        from fk_person1
-        left join barn
-        on barn.fagsak_id = fk_person1.fagsak_id
-        left join termin
-        on fk_person1.fagsak_id = termin.fagsak_id
-        where fk_person1.person = 'MOTTAKER'
-      ),
-      adopsjon as
-      (
-        select fam_fp_vilkaar.fagsak_id
-              ,max(fam_fp_vilkaar.omsorgs_overtakelsesdato) as adopsjonsdato
-              ,max(fam_fp_vilkaar.ektefelles_barn) as stebarnsadopsjon
-        from fagsak
-        join dvh_fam_fp.fam_fp_vilkaar
-        on fagsak.fagsak_id = fam_fp_vilkaar.fagsak_id
-        where fagsak.behandlingstema = 'FORP_ADOP'
-        group by fam_fp_vilkaar.fagsak_id
-      ),
-      eos as
-      (
-       select a.trans_id
-             ,case when upper(er_borger_av_eu_eos) = 'TRUE' then 'J'
-                   when upper(er_borger_av_eu_eos) = 'FALSE' then 'N'
-				  		    else null
-              end	eos_sak
-       from
-       (select fam_fp_vilkaar.trans_id, max(fam_fp_vilkaar.er_borger_av_eu_eos) as er_borger_av_eu_eos
-        from fagsak
-        join dvh_fam_fp.fam_fp_vilkaar
-        on fagsak.max_trans_id = fam_fp_vilkaar.trans_id
-        and length(fam_fp_vilkaar.person_status) > 0
-        group by fam_fp_vilkaar.trans_id
-       ) a
-      ),
-      annenforelderfagsak as
-      (
-        select annenforelderfagsak.*, mottaker.fk_person1_mottaker as fk_person1_annen_part
-        from
-        (
-          select fagsak_id, max_trans_id, max(annenforelderfagsak_id) as annenforelderfagsak_id
-          from
+            SELECT
+              FAM_FP_VILKAAR.TRANS_ID,
+              MAX(FAM_FP_VILKAAR.ER_BORGER_AV_EU_EOS) AS ER_BORGER_AV_EU_EOS
+            FROM
+              FAGSAK
+              JOIN DVH_FAM_FP.FAM_FP_VILKAAR
+              ON FAGSAK.MAX_TRANS_ID = FAM_FP_VILKAAR.TRANS_ID
+              AND LENGTH(FAM_FP_VILKAAR.PERSON_STATUS) > 0
+            GROUP BY
+              FAM_FP_VILKAAR.TRANS_ID
+          ) A
+      ), ANNENFORELDERFAGSAK AS (
+        SELECT
+          ANNENFORELDERFAGSAK.*,
+          MOTTAKER.FK_PERSON1_MOTTAKER AS FK_PERSON1_ANNEN_PART
+        FROM
           (
-            select forelder1.fagsak_id, forelder1.max_trans_id
-                  ,nvl(forelder1.annenforelderfagsak_id, forelder2.fagsak_id) as annenforelderfagsak_id
-            from mottaker forelder1
-            join mottaker forelder2
-            on forelder1.fk_person1_barn = forelder2.fk_person1_barn
-            and forelder1.fk_person1_mottaker != forelder2.fk_person1_mottaker
-          )
-          group by fagsak_id, max_trans_id
-        ) annenforelderfagsak
-        join mottaker
-        on annenforelderfagsak.annenforelderfagsak_id = mottaker.fagsak_id
-      ),
-      tid as
-      (
-        select pk_dim_tid, dato, aar, halvaar, kvartal, aar_maaned
-        from dt_kodeverk.dim_tid
-        where dag_i_uke < 6
-        and dim_nivaa = 1
-        and gyldig_flagg = 1
-        and pk_dim_tid between p_tid_fom and p_tid_tom
-        and pk_dim_tid <= to_char(last_day(to_date(p_rapport_dato,'yyyymm')),'yyyymmdd')
-      ),
-      uttak as
-      (
-        select uttak.trans_id, uttak.trekkonto, uttak.uttak_arbeid_type, uttak.virksomhet, uttak.utbetalingsprosent
-              ,uttak.gradering_innvilget, uttak.gradering, uttak.arbeidstidsprosent, uttak.samtidig_uttak
-              ,uttak.periode_resultat_aarsak, uttak.fom as uttak_fom, uttak.tom as uttak_tom
-              ,uttak.trekkdager
-              ,fagsak.fagsak_id, fagsak.periode, fagsak.funksjonell_tid, fagsak.forste_vedtaksdato, fagsak.siste_vedtaksdato
-              ,fagsak.max_vedtaksdato, fagsak.forste_soknadsdato, fagsak.soknadsdato
-              ,fam_fp_trekkonto.pk_fam_fp_trekkonto
-              ,aarsak_uttak.pk_fam_fp_periode_resultat_aarsak
-              ,uttak.arbeidsforhold_id, uttak.graderingsdager
-              ,fam_fp_uttak_fordelingsper.mors_aktivitet
-         from dvh_fam_fp.fam_fp_uttak_res_per_aktiv uttak
-         join fagsak
-         on fagsak.max_trans_id = uttak.trans_id
-         left join dvh_fam_fp.fam_fp_trekkonto
-         on upper(uttak.trekkonto) = fam_fp_trekkonto.trekkonto
-         left join
-         (select aarsak_uttak, max(pk_fam_fp_periode_resultat_aarsak) as pk_fam_fp_periode_resultat_aarsak
-          from dvh_fam_fp.fam_fp_periode_resultat_aarsak
-          group by aarsak_uttak
-         ) aarsak_uttak
-         on upper(uttak.periode_resultat_aarsak) = aarsak_uttak.aarsak_uttak
-         left join dvh_fam_fp.fam_fp_uttak_fordelingsper
-         on fam_fp_uttak_fordelingsper.trans_id = uttak.trans_id
-         and uttak.fom between fam_fp_uttak_fordelingsper.fom and fam_fp_uttak_fordelingsper.tom
-         and upper(uttak.trekkonto) = upper(fam_fp_uttak_fordelingsper.periode_type)
-         and length(fam_fp_uttak_fordelingsper.mors_aktivitet) > 1
-         where uttak.utbetalingsprosent > 0
-      ),
-      stonadsdager_kvote as
-      (
-        select uttak.*, tid1.pk_dim_tid as fk_dim_tid_min_dato_kvote
-              ,tid2.pk_dim_tid as fk_dim_tid_max_dato_kvote
-        from
-        (select fagsak_id, trans_id, trekkonto, virksomhet, uttak_arbeid_type
-               ,sum(trekkdager) as stonadsdager_kvote, min(uttak_fom) as min_uttak_fom
-               ,max(uttak_tom) as max_uttak_tom
-         from
-         (select fagsak_id, trans_id, uttak_fom, uttak_tom, trekkonto, virksomhet, uttak_arbeid_type
-                ,max(trekkdager) as trekkdager
-          from uttak
-          group by fagsak_id, trans_id, uttak_fom, uttak_tom, trekkonto, virksomhet, uttak_arbeid_type
-         ) a
-         group by fagsak_id, trans_id, trekkonto, virksomhet, uttak_arbeid_type
-        ) uttak
-        join dt_kodeverk.dim_tid tid1
-        on tid1.dim_nivaa = 1
-        and tid1.dato = trunc(uttak.min_uttak_fom,'dd')
-        join dt_kodeverk.dim_tid tid2
-        on tid2.dim_nivaa = 1
-        and tid2.dato = trunc(uttak.max_uttak_tom,'dd')
-      ),
-      uttak_dager AS
-      (
-        select uttak.*
-              ,tid.pk_dim_tid, tid.dato, tid.aar, tid.halvaar, tid.kvartal, tid.aar_maaned
-        from uttak
-        join tid
-        on tid.dato between uttak.uttak_fom and uttak.uttak_tom
-      ),
-      aleneomsorg as
-      (
-        select uttak.fagsak_id, uttak.uttak_fom
-        from uttak
-        join dvh_fam_fp.fam_fp_dokumentasjonsperioder dok1
-        on dok1.fagsak_id = uttak.fagsak_id
-        and uttak.uttak_fom >= dok1.fom
-        and dok1.dokumentasjon_type = 'ALENEOMSORG'
-        left join dvh_fam_fp.fam_fp_dokumentasjonsperioder dok2
-        on dok1.fagsak_id = dok2.fagsak_id
-        and uttak.uttak_fom >= dok2.fom
-        and dok1.trans_id < dok2.trans_id
-        and dok2.dokumentasjon_type = 'ANNEN_FORELDER_HAR_RETT'
-        and dok2.fagsak_id is null
-        group by uttak.fagsak_id, uttak.uttak_fom
-      ),
-      beregningsgrunnlag as
-      (
-        select fagsak_id, trans_id, virksomhetsnummer, max(status_og_andel_brutto) as status_og_andel_brutto
-              ,max(status_og_andel_avkortet) as status_og_andel_avkortet
-              ,fom as beregningsgrunnlag_fom, tom as beregningsgrunnlag_tom
-              ,max(dekningsgrad) as dekningsgrad, max(dagsats) as dagsats, dagsats_bruker
-              ,dagsats_arbeidsgiver
-              ,dagsats_bruker+dagsats_arbeidsgiver dagsats_virksomhet
-              ,max(status_og_andel_inntektskat) as status_og_andel_inntektskat
-              ,aktivitet_status, max(brutto) as brutto_inntekt, max(avkortet) as avkortet_inntekt
-              ,count(1) as antall_beregningsgrunnlag
-        from dvh_fam_fp.fam_fp_beregningsgrunnlag
-        group by fagsak_id, trans_id, virksomhetsnummer, fom, tom, aktivitet_status, dagsats_bruker, dagsats_arbeidsgiver
-      ),
-      beregningsgrunnlag_detalj as
-      (
-        select uttak_dager.*
-              ,stonadsdager_kvote.stonadsdager_kvote, stonadsdager_kvote.min_uttak_fom, stonadsdager_kvote.max_uttak_tom
-              ,stonadsdager_kvote.fk_dim_tid_min_dato_kvote, stonadsdager_kvote.fk_dim_tid_max_dato_kvote
-              ,bereg.status_og_andel_brutto, bereg.status_og_andel_avkortet, bereg.beregningsgrunnlag_fom
-              ,bereg.dekningsgrad, bereg.beregningsgrunnlag_tom, bereg.dagsats, bereg.dagsats_bruker
-              ,bereg.dagsats_arbeidsgiver
-              ,bereg.dagsats_virksomhet, bereg.status_og_andel_inntektskat
-              ,bereg.aktivitet_status, bereg.brutto_inntekt, bereg.avkortet_inntekt
-              ,bereg.dagsats*uttak_dager.utbetalingsprosent/100 as dagsats_erst
-              ,bereg.antall_beregningsgrunnlag
-        from beregningsgrunnlag bereg
-        join uttak_dager
-        on uttak_dager.trans_id = bereg.trans_id
-        and nvl(uttak_dager.virksomhet,'X') = nvl(bereg.virksomhetsnummer,'X')
-        and bereg.beregningsgrunnlag_fom <= uttak_dager.dato
-        and nvl(bereg.beregningsgrunnlag_tom,to_date('20991201','YYYYMMDD')) >= uttak_dager.dato
-        left join stonadsdager_kvote
-        on uttak_dager.trans_id = stonadsdager_kvote.trans_id
-        and uttak_dager.trekkonto = stonadsdager_kvote.trekkonto
-        and nvl(uttak_dager.virksomhet,'X') = nvl(stonadsdager_kvote.virksomhet,'X')
-        and uttak_dager.uttak_arbeid_type = stonadsdager_kvote.uttak_arbeid_type
-        join dvh_fam_fp.fam_fp_uttak_aktivitet_mapping uttak_mapping
-        on uttak_dager.uttak_arbeid_type = uttak_mapping.uttak_arbeid
-        and bereg.aktivitet_status = uttak_mapping.aktivitet_status
-        where bereg.dagsats_bruker + bereg.dagsats_arbeidsgiver != 0
-      ),
-      beregningsgrunnlag_agg as
-      (
-        select a.*
-              ,dager_erst*dagsats_virksomhet/dagsats*antall_beregningsgrunnlag tilfelle_erst
-              ,dager_erst*round(utbetalingsprosent/100*dagsats_virksomhet) belop
-              ,round(utbetalingsprosent/100*dagsats_virksomhet-0.5) dagsats_redusert
-              ,case when periode_resultat_aarsak in (2004,2033) then 'N'
-			 	            when trekkonto in ('FEDREKVOTE','FELLESPERIODE','MØDREKVOTE') then 'J'
-				            when trekkonto = 'FORELDREPENGER' then 'N'
-			         end mor_rettighet
-        from
-        (
-          select fagsak_id, trans_id, trekkonto, trekkdager, stonadsdager_kvote, uttak_arbeid_type
-                ,aar--, halvaar, kvartal, aar_maaned
-                ,uttak_fom, uttak_tom
-                ,sum(dagsats_virksomhet/dagsats* case when ((upper(gradering_innvilget) ='TRUE' and upper(gradering)='TRUE')
-                                       or upper(samtidig_uttak)='TRUE') then (100-arbeidstidsprosent)/100
-                               else 1.0
-                          end
-                     ) dager_erst2
-                ,max(arbeidstidsprosent) as arbeidstidsprosent
-                ,count(distinct pk_dim_tid) dager_erst
-                ,
-                 --count(distinct pk_dim_tid)*dagsats_virksomhet/dagsats tilfelle_erst,
-                 min(beregningsgrunnlag_fom) beregningsgrunnlag_fom, max(beregningsgrunnlag_tom) beregningsgrunnlag_tom
-                ,dekningsgrad
-                ,
-                 --count(distinct pk_dim_tid)*
-                 --      round(utbetalingsprosent/100*dagsats_virksomhet-0.5) belop,
-                 dagsats_bruker, dagsats_arbeidsgiver, dagsats_virksomhet
-                ,virksomhet, periode_resultat_aarsak, dagsats, dagsats_erst
-                , --dagsats_virksomhet,
-                 utbetalingsprosent graderingsprosent, status_og_andel_inntektskat
-                ,aktivitet_status, brutto_inntekt, avkortet_inntekt, status_og_andel_brutto, status_og_andel_avkortet
-                ,
-                 --round(utbetalingsprosent/100*dagsats_virksomhet-0.5) dagsats_redusert,
-                 utbetalingsprosent
-                ,min(pk_dim_tid) pk_dim_tid_dato_utbet_fom, max(pk_dim_tid) pk_dim_tid_dato_utbet_tom
-                ,funksjonell_tid, forste_vedtaksdato, siste_vedtaksdato, max_vedtaksdato, periode
-                ,max(forste_soknadsdato) as forste_soknadsdato, max(soknadsdato) as soknadsdato
-                ,samtidig_uttak, gradering, gradering_innvilget
-                ,min_uttak_fom, max_uttak_tom
-                ,fk_dim_tid_min_dato_kvote, fk_dim_tid_max_dato_kvote
-                ,max(pk_fam_fp_trekkonto) as pk_fam_fp_trekkonto
-                ,max(pk_fam_fp_periode_resultat_aarsak) as pk_fam_fp_periode_resultat_aarsak
-                ,antall_beregningsgrunnlag, max(graderingsdager) as graderingsdager
-                ,max(mors_aktivitet) as mors_aktivitet
-          from beregningsgrunnlag_detalj
-          group by fagsak_id, trans_id, trekkonto, trekkdager, stonadsdager_kvote, uttak_arbeid_type
-                  ,aar--, halvaar, kvartal, aar_maaned
-                  ,uttak_fom, uttak_tom, dekningsgrad
-                  ,virksomhet, utbetalingsprosent, periode_resultat_aarsak
-                  ,dagsats, dagsats_erst, dagsats_bruker, dagsats_arbeidsgiver, dagsats_virksomhet
-                  ,utbetalingsprosent
-                  ,status_og_andel_inntektskat, aktivitet_status, brutto_inntekt, avkortet_inntekt
-                  ,status_og_andel_brutto, status_og_andel_avkortet
-                  ,funksjonell_tid, forste_vedtaksdato, siste_vedtaksdato, max_vedtaksdato, periode
-                  ,samtidig_uttak, gradering, gradering_innvilget, min_uttak_fom, max_uttak_tom
-                  ,fk_dim_tid_min_dato_kvote, fk_dim_tid_max_dato_kvote
-                  ,antall_beregningsgrunnlag
-        ) a
-      ),
-      grunnlag as
-      (
-        select beregningsgrunnlag_agg.*, sysdate as lastet_dato
-              ,mottaker.behandlingstema, mottaker.max_trans_id, mottaker.fk_person1_mottaker, mottaker.kjonn
-              ,mottaker.fk_person1_barn
-              ,mottaker.termindato, mottaker.foedselsdato, mottaker.antall_barn_termin
-              ,mottaker.antall_barn_foedsel, mottaker.foedselsdato_adopsjon
-              ,mottaker.antall_barn_adopsjon
-              ,mottaker.mottaker_fodsels_aar, mottaker.mottaker_fodsels_mnd
-              ,substr(p_tid_fom,1,4) - mottaker.mottaker_fodsels_aar as mottaker_alder
-              ,mottaker.sivilstand, mottaker.statsborgerskap
-              ,dim_person.pk_dim_person, dim_person.bosted_kommune_nr
-              ,dim_person.fk_dim_sivilstatus
-              ,dim_geografi.pk_dim_geografi, dim_geografi.bydel_kommune_nr, dim_geografi.kommune_nr
-              ,dim_geografi.kommune_navn, dim_geografi.bydel_nr, dim_geografi.bydel_navn
-              ,annenforelderfagsak.annenforelderfagsak_id, annenforelderfagsak.fk_person1_annen_part
-              ,fam_fp_uttak_fp_kontoer.max_dager max_stonadsdager_konto
-              ,case when aleneomsorg.fagsak_id is not null then 'J' else NULL end as aleneomsorg
-              ,case when behandlingstema = 'FORP_FODS' then '214'
-                    when behandlingstema = 'FORP_ADOP' then '216'
-               end as hovedkontonr
-              ,case when status_og_andel_inntektskat='ARBEIDSTAKER'
-                         and dagsats_arbeidsgiver/dagsats*100<=50 then '1000'
-               when status_og_andel_inntektskat='ARBEIDSTAKER'
-                         and dagsats_arbeidsgiver/dagsats*100>50 then '8020'
-               --when status_og_andel_inntektskat='ARBEIDSTAKER' then '1000'
-               when status_og_andel_inntektskat='JORDBRUKER' then '5210'
-               when status_og_andel_inntektskat='SJØMANN' then '1300'
-               when status_og_andel_inntektskat='SELVSTENDIG_NÆRINGSDRIVENDE' then '5010'
-               when status_og_andel_inntektskat='DAGPENGER' then '1200'
-               when status_og_andel_inntektskat='ARBEIDSTAKER_UTEN_FERIEPENGER' then '1000'
-               when status_og_andel_inntektskat='FISKER' then '5300'
-               when status_og_andel_inntektskat='DAGMAMMA' then '5110'
-               when status_og_andel_inntektskat='FRILANSER' then '1100'
-               end as underkontonr
-              ,round(dagsats_arbeidsgiver/dagsats*100,0) as andel_av_refusjon
-              ,case when rett_til_mødrekvote.trans_id is null then 'N' else 'J' end as rett_til_mødrekvote
-              ,case when rett_til_fedrekvote.trans_id is null then 'N' else 'J' end as rett_til_fedrekvote
-              ,flerbarnsdager.flerbarnsdager
-              ,adopsjon.adopsjonsdato, adopsjon.stebarnsadopsjon
-              ,eos.eos_sak
-        from beregningsgrunnlag_agg
-        left join mottaker
-        on beregningsgrunnlag_agg.fagsak_id = mottaker.fagsak_id
-        and beregningsgrunnlag_agg.trans_id = mottaker.max_trans_id
-        left join annenforelderfagsak
-        on beregningsgrunnlag_agg.fagsak_id = annenforelderfagsak.fagsak_id
-        and beregningsgrunnlag_agg.trans_id = annenforelderfagsak.max_trans_id
-        left join dvh_fam_fp.fam_fp_uttak_fp_kontoer
-        on beregningsgrunnlag_agg.fagsak_id = fam_fp_uttak_fp_kontoer.fagsak_id
-        and mottaker.max_trans_id = fam_fp_uttak_fp_kontoer.trans_id
-        --AND UPPER(REGEXP_REPLACE(grunnlag_drp1.TREKKONTO, '_|-|[[:space:]]', '')) = UPPER(REGEXP_REPLACE(FAM_FP_Uttak_FP_Kontoer.STOENADSKONTOTYPE, '_|-|[[:space:]]', ''))
-        and upper(replace(beregningsgrunnlag_agg.trekkonto,'_','')) = upper(replace(fam_fp_uttak_fp_kontoer.stoenadskontotype,' ',''))
-        left join dt_person.dim_person
-        on mottaker.fk_person1_mottaker = dim_person.fk_person1
-        and beregningsgrunnlag_agg.uttak_tom between dim_person.gyldig_fra_dato and dim_person.gyldig_til_dato
-        left join dt_kodeverk.dim_geografi
-        on dim_person.fk_dim_geografi_bosted = dim_geografi.pk_dim_geografi
-        left join aleneomsorg
-        on aleneomsorg.fagsak_id = beregningsgrunnlag_agg.fagsak_id
-        and aleneomsorg.uttak_fom = beregningsgrunnlag_agg.uttak_fom
-        left join
-        (select trans_id
-         from dvh_fam_fp.fam_fp_uttak_fp_kontoer
-         where upper(stoenadskontotype) = 'MØDREKVOTE'
-         group by trans_id
-        ) rett_til_mødrekvote
-        on rett_til_mødrekvote.trans_id = beregningsgrunnlag_agg.trans_id
-        left join
-        (select trans_id
-         from dvh_fam_fp.fam_fp_uttak_fp_kontoer
-         where upper(stoenadskontotype) = 'FEDREKVOTE'
-         group by trans_id
-        ) rett_til_fedrekvote
-        on rett_til_fedrekvote.trans_id = beregningsgrunnlag_agg.trans_id
-        left join
-        (select trans_id, max(max_dager) as flerbarnsdager
-         from dvh_fam_fp.fam_fp_uttak_fp_kontoer
-         where upper(stoenadskontotype) = 'FLERBARNSDAGER'
-         group by trans_id
-        ) flerbarnsdager
-        on flerbarnsdager.trans_id = beregningsgrunnlag_agg.trans_id
-        left join adopsjon
-        on beregningsgrunnlag_agg.fagsak_id = adopsjon.fagsak_id
-        left join eos
-        on beregningsgrunnlag_agg.trans_id = eos.trans_id
-      )
-      select /*+ PARALLEL(8) */ *
-      --from uttak_dager
-      from grunnlag
-      where fagsak_id not in (1679117)
-      --where fagsak_id in (1035184)
-      ;
-    v_tid_fom varchar2(8) := null;
-    v_tid_tom varchar2(8) := null;
-    v_commit number := 0;
-    v_error_melding varchar2(1000) := null;
-    v_dim_tid_antall number := 0;
-    v_utbetalingsprosent_kalkulert number := 0;
-  begin
-    v_tid_fom := substr(p_in_vedtak_tom,1,4) || '0101';
-    v_tid_tom := to_char(last_day(to_date(p_in_vedtak_tom,'yyyymm')),'yyyymmdd');
-
-    --dbms_output.put_line(v_tid_fom||v_tid_tom);--TEST!!!
-
-    for rec_periode in cur_periode(p_in_rapport_dato, p_in_forskyvninger, v_tid_fom, v_tid_tom) loop
-      v_dim_tid_antall := 0;
-      v_utbetalingsprosent_kalkulert := 0;
-      v_dim_tid_antall := dim_tid_antall(to_number(to_char(rec_periode.uttak_fom,'yyyymmdd'))
-                                        ,to_number(to_char(rec_periode.uttak_tom,'yyyymmdd')));
-      if v_dim_tid_antall != 0 then
-        v_utbetalingsprosent_kalkulert := round(rec_periode.trekkdager/v_dim_tid_antall*100,2);
-      else
-        v_utbetalingsprosent_kalkulert := 0;
-      end if;
-      begin
-        insert into dvh_fam_fp.fak_fam_fp_vedtak_utbetaling
-        (fagsak_id, trans_id, behandlingstema, trekkonto, stonadsdager_kvote
-        ,uttak_arbeid_type
-        ,aar--, halvaar, kvartal, aar_maaned
-        ,rapport_periode, uttak_fom, uttak_tom, dager_erst, beregningsgrunnlag_fom
-        ,beregningsgrunnlag_tom, dekningsgrad, dagsats_bruker, dagsats_arbeidsgiver, virksomhet
-        ,periode_resultat_aarsak, dagsats, graderingsprosent, status_og_andel_inntektskat
-        ,aktivitet_status, brutto_inntekt, avkortet_inntekt, status_og_andel_brutto, status_og_andel_avkortet
-        ,utbetalingsprosent, fk_dim_tid_dato_utbet_fom
-        ,fk_dim_tid_dato_utbet_tom, funksjonell_tid, forste_vedtaksdato, vedtaksdato, max_vedtaksdato, periode_type, tilfelle_erst
-        ,belop, dagsats_redusert, lastet_dato, max_trans_id, fk_person1_mottaker, fk_person1_annen_part
-        ,kjonn, fk_person1_barn, termindato, foedselsdato, antall_barn_termin, antall_barn_foedsel
-        ,foedselsdato_adopsjon, antall_barn_adopsjon, annenforelderfagsak_id, max_stonadsdager_konto
-        ,fk_dim_person, bosted_kommune_nr, fk_dim_geografi, bydel_kommune_nr, kommune_nr
-        ,kommune_navn, bydel_nr, bydel_navn, aleneomsorg, hovedkontonr, underkontonr
-        ,mottaker_fodsels_aar, mottaker_fodsels_mnd, mottaker_alder
-        ,rett_til_fedrekvote, rett_til_modrekvote, dagsats_erst, trekkdager
-        ,samtidig_uttak, gradering, gradering_innvilget, antall_dager_periode
-        ,flerbarnsdager, utbetalingsprosent_kalkulert, min_uttak_fom, max_uttak_tom
-        ,fk_fam_fp_trekkonto, fk_fam_fp_periode_resultat_aarsak
-        ,sivilstatus, fk_dim_sivilstatus, antall_beregningsgrunnlag, graderingsdager
-        ,fk_dim_tid_min_dato_kvote, fk_dim_tid_max_dato_kvote
-        ,adopsjonsdato, stebarnsadopsjon, eos_sak, mor_rettighet, statsborgerskap
-        ,arbeidstidsprosent, mors_aktivitet, gyldig_flagg
-        ,andel_av_refusjon, forste_soknadsdato, soknadsdato)
-        values
-        (rec_periode.fagsak_id, rec_periode.trans_id, rec_periode.behandlingstema, rec_periode.trekkonto
-        ,rec_periode.stonadsdager_kvote
-        ,rec_periode.uttak_arbeid_type, rec_periode.aar--, rec_periode.halvaar, rec_periode.kvartal, rec_periode.aar_maaned
-        ,p_in_rapport_dato, rec_periode.uttak_fom, rec_periode.uttak_tom
-        ,rec_periode.dager_erst, rec_periode.beregningsgrunnlag_fom, rec_periode.beregningsgrunnlag_tom
-        ,rec_periode.dekningsgrad, rec_periode.dagsats_bruker, rec_periode.dagsats_arbeidsgiver
-        ,rec_periode.virksomhet, rec_periode.periode_resultat_aarsak, rec_periode.dagsats
-        ,rec_periode.graderingsprosent, rec_periode.status_og_andel_inntektskat
-        ,rec_periode.aktivitet_status, rec_periode.brutto_inntekt, rec_periode.avkortet_inntekt
-        ,rec_periode.status_og_andel_brutto, rec_periode.status_og_andel_avkortet
-        ,rec_periode.utbetalingsprosent, rec_periode.pk_dim_tid_dato_utbet_fom, rec_periode.pk_dim_tid_dato_utbet_tom
-        ,rec_periode.funksjonell_tid, rec_periode.forste_vedtaksdato, rec_periode.siste_vedtaksdato, rec_periode.max_vedtaksdato, rec_periode.periode
-        ,rec_periode.tilfelle_erst, rec_periode.belop, rec_periode.dagsats_redusert, rec_periode.lastet_dato
-        ,rec_periode.max_trans_id, rec_periode.fk_person1_mottaker, rec_periode.fk_person1_annen_part
-        ,rec_periode.kjonn, rec_periode.fk_person1_barn
-        ,rec_periode.termindato, rec_periode.foedselsdato, rec_periode.antall_barn_termin
-        ,rec_periode.antall_barn_foedsel, rec_periode.foedselsdato_adopsjon
-        ,rec_periode.antall_barn_adopsjon, rec_periode.annenforelderfagsak_id, rec_periode.max_stonadsdager_konto
-        ,rec_periode.pk_dim_person, rec_periode.bosted_kommune_nr, rec_periode.pk_dim_geografi
-        ,rec_periode.bydel_kommune_nr, rec_periode.kommune_nr, rec_periode.kommune_navn
-        ,rec_periode.bydel_nr, rec_periode.bydel_navn, rec_periode.aleneomsorg, rec_periode.hovedkontonr
-        ,rec_periode.underkontonr
-        ,rec_periode.mottaker_fodsels_aar, rec_periode.mottaker_fodsels_mnd, rec_periode.mottaker_alder
-        ,rec_periode.rett_til_fedrekvote, rec_periode.rett_til_mødrekvote, rec_periode.dagsats_erst
-        ,rec_periode.trekkdager, rec_periode.samtidig_uttak, rec_periode.gradering, rec_periode.gradering_innvilget
-        ,v_dim_tid_antall, rec_periode.flerbarnsdager, v_utbetalingsprosent_kalkulert
-        ,rec_periode.min_uttak_fom, rec_periode.max_uttak_tom, rec_periode.pk_fam_fp_trekkonto
-        ,rec_periode.pk_fam_fp_periode_resultat_aarsak
-        ,rec_periode.sivilstand, rec_periode.fk_dim_sivilstatus
-        ,rec_periode.antall_beregningsgrunnlag, rec_periode.graderingsdager
-        ,rec_periode.fk_dim_tid_min_dato_kvote, rec_periode.fk_dim_tid_max_dato_kvote
-        ,rec_periode.adopsjonsdato, rec_periode.stebarnsadopsjon, rec_periode.eos_sak
-        ,rec_periode.mor_rettighet, rec_periode.statsborgerskap
-        ,rec_periode.arbeidstidsprosent, rec_periode.mors_aktivitet, p_in_gyldig_flagg
-        ,rec_periode.andel_av_refusjon, rec_periode.forste_soknadsdato, rec_periode.soknadsdato);
-
-        v_commit := v_commit + 1;
-      exception
-        when others then
-          rollback;
-          v_error_melding := substr(SQLCODE || ' ' || sqlerrm, 1, 1000);
-          insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
-          values(null, rec_periode.fagsak_id, v_error_melding, sysdate, 'FAM_FP_STATISTIKK_S:INSERT');
-          commit;
-          p_out_error := substr(p_out_error || v_error_melding, 1, 1000);
-      end;
-
-      if v_commit > 100000 then
-        commit;
-        v_commit := 0;
-      end if;
-   end loop;
-   commit;
-  exception
-    when others then
-      rollback;
-      v_error_melding := substr(SQLCODE || ' ' || sqlerrm, 1, 1000);
-      insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
-      values(null, null, v_error_melding, sysdate, 'FAM_FP_STATISTIKK_S');
-      commit;
-      p_out_error := substr(p_out_error || v_error_melding, 1, 1000);
-  end fam_fp_statistikk_s;
-
-  procedure fam_fp_statistikk_aar(p_in_vedtak_tom in varchar2, p_in_rapport_dato in varchar2, p_in_forskyvninger in number
-                                     ,p_in_gyldig_flagg in number default 0
-                                     ,p_in_periode_type in varchar2 default 'A'
-                                     ,p_out_error out varchar2) as
-    cursor cur_periode(p_rapport_dato in varchar2, p_forskyvninger in number, p_tid_fom in varchar2, p_tid_tom in varchar2) is
-      with fagsak as
-      (
-        select fagsak_id, max(behandlingstema) as behandlingstema, max(fagsakannenforelder_id) as annenforelderfagsak_id
-              ,max(trans_id) keep(dense_rank first order by funksjonell_tid desc) as max_trans_id
-              ,max(soeknadsdato) keep(dense_rank first order by funksjonell_tid desc) as soknadsdato
-              ,min(soeknadsdato) as forste_soknadsdato
-              ,min(vedtaksdato) as forste_vedtaksdato
-              ,max(funksjonell_tid) as funksjonell_tid, max(vedtaksdato) as siste_vedtaksdato
-              ,p_in_periode_type as periode, last_day(to_date(p_rapport_dato,'yyyymm')) + p_forskyvninger as max_vedtaksdato
-        from dvh_fam_fp.fam_fp_fagsak
-        where fam_fp_fagsak.funksjonell_tid <= last_day(to_date(p_rapport_dato,'yyyymm')) + p_forskyvninger
-        group by fagsak_id
-      ),
-      termin as
-      (
-        select fagsak_id, max(termindato) termindato, max(foedselsdato) foedselsdato
-              ,max(antall_barn_termin) antall_barn_termin, max(antall_barn_foedsel) antall_barn_foedsel
-              ,max(foedselsdato_adopsjon) foedselsdato_adopsjon, max(antall_barn_adopsjon) antall_barn_adopsjon
-        from
-        (
-          select fam_fp_fagsak.fagsak_id, max(fodsel.termindato) termindato
-                ,max(fodsel.foedselsdato) foedselsdato, max(fodsel.antall_barn_foedsel) antall_barn_foedsel
-                ,max(fodsel.antall_barn_termin) antall_barn_termin
-                ,max(adopsjon.foedselsdato_adopsjon) foedselsdato_adopsjon
-                ,count(adopsjon.trans_id) antall_barn_adopsjon
-          from dvh_fam_fp.fam_fp_fagsak
-          left join dvh_fam_fp.fam_fp_fodseltermin fodsel
-          on fodsel.fagsak_id = fam_fp_fagsak.fagsak_id
-          and upper(fam_fp_fagsak.behandlingstema) = 'FORP_FODS'
-          left join dvh_fam_fp.fam_fp_fodseltermin adopsjon
-          on adopsjon.fagsak_id = fam_fp_fagsak.fagsak_id
-          and adopsjon.trans_id = fam_fp_fagsak.trans_id
-          and upper(fam_fp_fagsak.behandlingstema) = 'FORP_ADOP'
-          group by fam_fp_fagsak.fagsak_id, fam_fp_fagsak.trans_id
-        )
-        group by fagsak_id
-      ),
-      fk_person1 as
-      (
-        select person.person, person.fagsak_id, max(person.behandlingstema) as behandlingstema, person.max_trans_id
-              ,max(person.annenforelderfagsak_id) as annenforelderfagsak_id
-              ,person.aktoer_id, max(person.kjonn) as kjonn
-              ,max(person_67_vasket.fk_person1) keep
-                (dense_rank first order by person_67_vasket.gyldig_fra_dato desc) as fk_person1
-              ,max(foedselsdato) as foedselsdato, max(sivilstand) as sivilstand
-              ,max(statsborgerskap) as statsborgerskap
-        from
-        (
-          select 'MOTTAKER' as person, fagsak.fagsak_id, fagsak.behandlingstema, fagsak.max_trans_id
-                ,fagsak.annenforelderfagsak_id
-                ,fam_fp_personopplysninger.aktoer_id, fam_fp_personopplysninger.kjonn
-                ,fam_fp_personopplysninger.foedselsdato, fam_fp_personopplysninger.sivilstand
-                ,fam_fp_personopplysninger.statsborgerskap
-          from dvh_fam_fp.fam_fp_personopplysninger
-          join fagsak
-          on fam_fp_personopplysninger.trans_id = fagsak.max_trans_id
-          union all
-          select 'BARN' as person, fagsak.fagsak_id, max(fagsak.behandlingstema) as behandlingstema, fagsak.max_trans_id
-                ,max(fagsak.annenforelderfagsak_id) annenforelderfagsak_id
-                ,max(fam_fp_familiehendelse.til_aktoer_id) as aktoer_id, max(fam_fp_familiehendelse.kjoenn) as kjonn
-                ,null as foedselsdato, null as sivilstand, null as statsborgerskap
-          from dvh_fam_fp.fam_fp_familiehendelse
-          join fagsak
-          on fam_fp_familiehendelse.fagsak_id = fagsak.fagsak_id
-          where upper(fam_fp_familiehendelse.relasjon) = 'BARN'
-          group by fagsak.fagsak_id, fagsak.max_trans_id
-        ) person
-        join dt_person.dvh_person_ident_aktor_ikke_skjermet person_67_vasket
-        on person_67_vasket.aktor_id = person.aktoer_id
-        and to_date(p_tid_tom,'yyyymmdd') between person_67_vasket.gyldig_fra_dato and person_67_vasket.gyldig_til_dato
-        group by person.person, person.fagsak_id, person.max_trans_id, person.aktoer_id
-      ),
-      barn as
-      (
-        select fagsak_id, listagg(fk_person1, ',') within group (order by fk_person1) as fk_person1_barn
-        from fk_person1
-        where person = 'BARN'
-        group by fagsak_id
-      ),
-      mottaker as
-      (
-        select fk_person1.fagsak_id, fk_person1.behandlingstema
-              ,fk_person1.max_trans_id, fk_person1.annenforelderfagsak_id, fk_person1.aktoer_id
-              ,fk_person1.kjonn, fk_person1.fk_person1 as fk_person1_mottaker
-              ,extract(year from fk_person1.foedselsdato) as mottaker_fodsels_aar
-              ,extract(month from fk_person1.foedselsdato) as mottaker_fodsels_mnd
-              ,fk_person1.sivilstand, fk_person1.statsborgerskap
-              ,barn.fk_person1_barn
-              ,termin.termindato, termin.foedselsdato, termin.antall_barn_termin, termin.antall_barn_foedsel
-              ,termin.foedselsdato_adopsjon, termin.antall_barn_adopsjon
-        from fk_person1
-        left join barn
-        on barn.fagsak_id = fk_person1.fagsak_id
-        left join termin
-        on fk_person1.fagsak_id = termin.fagsak_id
-        where fk_person1.person = 'MOTTAKER'
-      ),
-      adopsjon as
-      (
-        select fam_fp_vilkaar.fagsak_id
-              ,max(fam_fp_vilkaar.omsorgs_overtakelsesdato) as adopsjonsdato
-              ,max(fam_fp_vilkaar.ektefelles_barn) as stebarnsadopsjon
-        from fagsak
-        join dvh_fam_fp.fam_fp_vilkaar
-        on fagsak.fagsak_id = fam_fp_vilkaar.fagsak_id
-        where fagsak.behandlingstema = 'FORP_ADOP'
-        group by fam_fp_vilkaar.fagsak_id
-      ),
-      eos as
-      (
-       select a.trans_id
-             ,case when upper(er_borger_av_eu_eos) = 'TRUE' then 'J'
-                   when upper(er_borger_av_eu_eos) = 'FALSE' then 'N'
-				  		    else null
-              end	eos_sak
-       from
-       (select fam_fp_vilkaar.trans_id, max(fam_fp_vilkaar.er_borger_av_eu_eos) as er_borger_av_eu_eos
-        from fagsak
-        join dvh_fam_fp.fam_fp_vilkaar
-        on fagsak.max_trans_id = fam_fp_vilkaar.trans_id
-        and length(fam_fp_vilkaar.person_status) > 0
-        group by fam_fp_vilkaar.trans_id
-       ) a
-      ),
-      annenforelderfagsak as
-      (
-        select annenforelderfagsak.*, mottaker.fk_person1_mottaker as fk_person1_annen_part
-        from
-        (
-          select fagsak_id, max_trans_id, max(annenforelderfagsak_id) as annenforelderfagsak_id
-          from
+            SELECT
+              FAGSAK_ID,
+              MAX_TRANS_ID,
+              MAX(ANNENFORELDERFAGSAK_ID) AS ANNENFORELDERFAGSAK_ID
+            FROM
+              (
+                SELECT
+                  FORELDER1.FAGSAK_ID,
+                  FORELDER1.MAX_TRANS_ID,
+                  NVL(FORELDER1.ANNENFORELDERFAGSAK_ID, FORELDER2.FAGSAK_ID) AS ANNENFORELDERFAGSAK_ID
+                FROM
+                  MOTTAKER FORELDER1
+                  JOIN MOTTAKER FORELDER2
+                  ON FORELDER1.FK_PERSON1_BARN = FORELDER2.FK_PERSON1_BARN
+                  AND FORELDER1.FK_PERSON1_MOTTAKER != FORELDER2.FK_PERSON1_MOTTAKER
+              )
+            GROUP BY
+              FAGSAK_ID,
+              MAX_TRANS_ID
+          )        ANNENFORELDERFAGSAK
+          JOIN MOTTAKER
+          ON ANNENFORELDERFAGSAK.ANNENFORELDERFAGSAK_ID = MOTTAKER.FAGSAK_ID
+      ), TID AS (
+        SELECT
+          PK_DIM_TID,
+          DATO,
+          AAR,
+          HALVAAR,
+          KVARTAL,
+          AAR_MAANED
+        FROM
+          DT_KODEVERK.DIM_TID
+        WHERE
+          DAG_I_UKE < 6
+          AND DIM_NIVAA = 1
+          AND GYLDIG_FLAGG = 1
+          AND PK_DIM_TID BETWEEN P_TID_FOM AND P_TID_TOM
+          AND ((P_BUDSJETT = 'A'
+          AND PK_DIM_TID <= TO_CHAR(LAST_DAY(TO_DATE(P_RAPPORT_DATO, 'yyyymm')), 'yyyymmdd'))
+          OR P_BUDSJETT = 'B')
+      ), UTTAK AS (
+        SELECT
+          UTTAK.TRANS_ID,
+          UTTAK.TREKKONTO,
+          UTTAK.UTTAK_ARBEID_TYPE,
+          UTTAK.VIRKSOMHET,
+          UTTAK.UTBETALINGSPROSENT,
+          UTTAK.GRADERING_INNVILGET,
+          UTTAK.GRADERING,
+          UTTAK.ARBEIDSTIDSPROSENT,
+          UTTAK.SAMTIDIG_UTTAK,
+          UTTAK.PERIODE_RESULTAT_AARSAK,
+          UTTAK.FOM                                      AS UTTAK_FOM,
+          UTTAK.TOM                                      AS UTTAK_TOM,
+          UTTAK.TREKKDAGER,
+          FAGSAK.FAGSAK_ID,
+          FAGSAK.PERIODE,
+          FAGSAK.FUNKSJONELL_TID,
+          FAGSAK.FORSTE_VEDTAKSDATO,
+          FAGSAK.SISTE_VEDTAKSDATO,
+          FAGSAK.MAX_VEDTAKSDATO,
+          FAGSAK.FORSTE_SOKNADSDATO,
+          FAGSAK.SOKNADSDATO,
+          FAM_FP_TREKKONTO.PK_FAM_FP_TREKKONTO,
+          AARSAK_UTTAK.PK_FAM_FP_PERIODE_RESULTAT_AARSAK,
+          UTTAK.ARBEIDSFORHOLD_ID,
+          UTTAK.GRADERINGSDAGER,
+          FAM_FP_UTTAK_FORDELINGSPER.MORS_AKTIVITET
+        FROM
+          DVH_FAM_FP.FAM_FP_UTTAK_RES_PER_AKTIV UTTAK
+          JOIN FAGSAK
+          ON FAGSAK.MAX_TRANS_ID = UTTAK.TRANS_ID LEFT JOIN DVH_FAM_FP.FAM_FP_TREKKONTO
+          ON UPPER(UTTAK.TREKKONTO) = FAM_FP_TREKKONTO.TREKKONTO
+          LEFT JOIN (
+            SELECT
+              AARSAK_UTTAK,
+              MAX(PK_FAM_FP_PERIODE_RESULTAT_AARSAK) AS PK_FAM_FP_PERIODE_RESULTAT_AARSAK
+            FROM
+              DVH_FAM_FP.FAM_FP_PERIODE_RESULTAT_AARSAK
+            GROUP BY
+              AARSAK_UTTAK
+          ) AARSAK_UTTAK
+          ON UPPER(UTTAK.PERIODE_RESULTAT_AARSAK) = AARSAK_UTTAK.AARSAK_UTTAK
+          LEFT JOIN DVH_FAM_FP.FAM_FP_UTTAK_FORDELINGSPER
+          ON FAM_FP_UTTAK_FORDELINGSPER.TRANS_ID = UTTAK.TRANS_ID
+          AND UTTAK.FOM BETWEEN FAM_FP_UTTAK_FORDELINGSPER.FOM
+          AND FAM_FP_UTTAK_FORDELINGSPER.TOM
+          AND UPPER(UTTAK.TREKKONTO) = UPPER(FAM_FP_UTTAK_FORDELINGSPER.PERIODE_TYPE)
+          AND LENGTH(FAM_FP_UTTAK_FORDELINGSPER.MORS_AKTIVITET) > 1
+        WHERE
+          UTTAK.UTBETALINGSPROSENT > 0
+      ), STONADSDAGER_KVOTE AS (
+        SELECT
+          UTTAK.*,
+          TID1.PK_DIM_TID AS FK_DIM_TID_MIN_DATO_KVOTE,
+          TID2.PK_DIM_TID AS FK_DIM_TID_MAX_DATO_KVOTE
+        FROM
           (
-            select forelder1.fagsak_id, forelder1.max_trans_id
-                  ,nvl(forelder1.annenforelderfagsak_id, forelder2.fagsak_id) as annenforelderfagsak_id
-            from mottaker forelder1
-            join mottaker forelder2
-            on forelder1.fk_person1_barn = forelder2.fk_person1_barn
-            and forelder1.fk_person1_mottaker != forelder2.fk_person1_mottaker
-          )
-          group by fagsak_id, max_trans_id
-        ) annenforelderfagsak
-        join mottaker
-        on annenforelderfagsak.annenforelderfagsak_id = mottaker.fagsak_id
-      ),
-      tid as
-      (
-        select pk_dim_tid, dato, aar, halvaar, kvartal, aar_maaned
-        from dt_kodeverk.dim_tid
-        where dag_i_uke < 6
-        and dim_nivaa = 1
-        and gyldig_flagg = 1
-        and pk_dim_tid between p_tid_fom and p_tid_tom
-        and pk_dim_tid <= to_char(last_day(to_date(p_rapport_dato,'yyyymm')),'yyyymmdd')
-      ),
-      uttak as
-      (
-        select uttak.trans_id, uttak.trekkonto, uttak.uttak_arbeid_type, uttak.virksomhet, uttak.utbetalingsprosent
-              ,uttak.gradering_innvilget, uttak.gradering, uttak.arbeidstidsprosent, uttak.samtidig_uttak
-              ,uttak.periode_resultat_aarsak, uttak.fom as uttak_fom, uttak.tom as uttak_tom
-              ,uttak.trekkdager
-              ,fagsak.fagsak_id, fagsak.periode, fagsak.funksjonell_tid, fagsak.forste_vedtaksdato, fagsak.siste_vedtaksdato
-              ,fagsak.max_vedtaksdato, fagsak.forste_soknadsdato, fagsak.soknadsdato
-              ,fam_fp_trekkonto.pk_fam_fp_trekkonto
-              ,aarsak_uttak.pk_fam_fp_periode_resultat_aarsak
-              ,uttak.arbeidsforhold_id, uttak.graderingsdager
-              ,fam_fp_uttak_fordelingsper.mors_aktivitet
-         from dvh_fam_fp.fam_fp_uttak_res_per_aktiv uttak
-         join fagsak
-         on fagsak.max_trans_id = uttak.trans_id
-         left join dvh_fam_fp.fam_fp_trekkonto
-         on upper(uttak.trekkonto) = fam_fp_trekkonto.trekkonto
-         left join
-         (select aarsak_uttak, max(pk_fam_fp_periode_resultat_aarsak) as pk_fam_fp_periode_resultat_aarsak
-          from dvh_fam_fp.fam_fp_periode_resultat_aarsak
-          group by aarsak_uttak
-         ) aarsak_uttak
-         on upper(uttak.periode_resultat_aarsak) = aarsak_uttak.aarsak_uttak
-         left join dvh_fam_fp.fam_fp_uttak_fordelingsper
-         on fam_fp_uttak_fordelingsper.trans_id = uttak.trans_id
-         and uttak.fom between fam_fp_uttak_fordelingsper.fom and fam_fp_uttak_fordelingsper.tom
-         and upper(uttak.trekkonto) = upper(fam_fp_uttak_fordelingsper.periode_type)
-         and length(fam_fp_uttak_fordelingsper.mors_aktivitet) > 1
-         where uttak.utbetalingsprosent > 0
-      ),
-      stonadsdager_kvote as
-      (
-        select uttak.*, tid1.pk_dim_tid as fk_dim_tid_min_dato_kvote
-              ,tid2.pk_dim_tid as fk_dim_tid_max_dato_kvote
-        from
-        (select fagsak_id, trans_id, trekkonto, virksomhet, uttak_arbeid_type
-               ,sum(trekkdager) as stonadsdager_kvote, min(uttak_fom) as min_uttak_fom
-               ,max(uttak_tom) as max_uttak_tom
-         from
-         (select fagsak_id, trans_id, uttak_fom, uttak_tom, trekkonto, virksomhet, uttak_arbeid_type
-                ,max(trekkdager) as trekkdager
-          from uttak
-          group by fagsak_id, trans_id, uttak_fom, uttak_tom, trekkonto, virksomhet, uttak_arbeid_type
-         ) a
-         group by fagsak_id, trans_id, trekkonto, virksomhet, uttak_arbeid_type
-        ) uttak
-        join dt_kodeverk.dim_tid tid1
-        on tid1.dim_nivaa = 1
-        and tid1.dato = trunc(uttak.min_uttak_fom,'dd')
-        join dt_kodeverk.dim_tid tid2
-        on tid2.dim_nivaa = 1
-        and tid2.dato = trunc(uttak.max_uttak_tom,'dd')
-      ),
-      uttak_dager AS
-      (
-        select uttak.*
-              ,tid.pk_dim_tid, tid.dato, tid.aar, tid.halvaar, tid.kvartal, tid.aar_maaned
-        from uttak
-        join tid
-        on tid.dato between uttak.uttak_fom and uttak.uttak_tom
-      ),
-      aleneomsorg as
-      (
-        select uttak.fagsak_id, uttak.uttak_fom
-        from uttak
-        join dvh_fam_fp.fam_fp_dokumentasjonsperioder dok1
-        on dok1.fagsak_id = uttak.fagsak_id
-        and uttak.uttak_fom >= dok1.fom
-        and dok1.dokumentasjon_type = 'ALENEOMSORG'
-        left join dvh_fam_fp.fam_fp_dokumentasjonsperioder dok2
-        on dok1.fagsak_id = dok2.fagsak_id
-        and uttak.uttak_fom >= dok2.fom
-        and dok1.trans_id < dok2.trans_id
-        and dok2.dokumentasjon_type = 'ANNEN_FORELDER_HAR_RETT'
-        and dok2.fagsak_id is null
-        group by uttak.fagsak_id, uttak.uttak_fom
-      ),
-      beregningsgrunnlag as
-      (
-        select fagsak_id, trans_id, virksomhetsnummer, max(status_og_andel_brutto) as status_og_andel_brutto
-              ,max(status_og_andel_avkortet) as status_og_andel_avkortet
-              ,fom as beregningsgrunnlag_fom, tom as beregningsgrunnlag_tom
-              ,max(dekningsgrad) as dekningsgrad, max(dagsats) as dagsats, dagsats_bruker
-              ,dagsats_arbeidsgiver
-              ,dagsats_bruker+dagsats_arbeidsgiver dagsats_virksomhet
-              ,max(status_og_andel_inntektskat) as status_og_andel_inntektskat
-              ,aktivitet_status, max(brutto) as brutto_inntekt, max(avkortet) as avkortet_inntekt
-              ,count(1) as antall_beregningsgrunnlag
-        from dvh_fam_fp.fam_fp_beregningsgrunnlag
-        group by fagsak_id, trans_id, virksomhetsnummer, fom, tom, aktivitet_status, dagsats_bruker, dagsats_arbeidsgiver
-      ),
-      beregningsgrunnlag_detalj as
-      (
-        select uttak_dager.*
-              ,stonadsdager_kvote.stonadsdager_kvote, stonadsdager_kvote.min_uttak_fom, stonadsdager_kvote.max_uttak_tom
-              ,stonadsdager_kvote.fk_dim_tid_min_dato_kvote, stonadsdager_kvote.fk_dim_tid_max_dato_kvote
-              ,bereg.status_og_andel_brutto, bereg.status_og_andel_avkortet, bereg.beregningsgrunnlag_fom
-              ,bereg.dekningsgrad, bereg.beregningsgrunnlag_tom, bereg.dagsats, bereg.dagsats_bruker
-              ,bereg.dagsats_arbeidsgiver
-              ,bereg.dagsats_virksomhet, bereg.status_og_andel_inntektskat
-              ,bereg.aktivitet_status, bereg.brutto_inntekt, bereg.avkortet_inntekt
-              ,bereg.dagsats*uttak_dager.utbetalingsprosent/100 as dagsats_erst
-              ,bereg.antall_beregningsgrunnlag
-        from beregningsgrunnlag bereg
-        join uttak_dager
-        on uttak_dager.trans_id = bereg.trans_id
-        and nvl(uttak_dager.virksomhet,'X') = nvl(bereg.virksomhetsnummer,'X')
-        and bereg.beregningsgrunnlag_fom <= uttak_dager.dato
-        and nvl(bereg.beregningsgrunnlag_tom,to_date('20991201','YYYYMMDD')) >= uttak_dager.dato
-        left join stonadsdager_kvote
-        on uttak_dager.trans_id = stonadsdager_kvote.trans_id
-        and uttak_dager.trekkonto = stonadsdager_kvote.trekkonto
-        and nvl(uttak_dager.virksomhet,'X') = nvl(stonadsdager_kvote.virksomhet,'X')
-        and uttak_dager.uttak_arbeid_type = stonadsdager_kvote.uttak_arbeid_type
-        join dvh_fam_fp.fam_fp_uttak_aktivitet_mapping uttak_mapping
-        on uttak_dager.uttak_arbeid_type = uttak_mapping.uttak_arbeid
-        and bereg.aktivitet_status = uttak_mapping.aktivitet_status
-        where bereg.dagsats_bruker + bereg.dagsats_arbeidsgiver != 0
-      ),
-      beregningsgrunnlag_agg as
-      (
-        select a.*
-              ,dager_erst*dagsats_virksomhet/dagsats*antall_beregningsgrunnlag tilfelle_erst
-              ,dager_erst*round(utbetalingsprosent/100*dagsats_virksomhet) belop
-              ,round(utbetalingsprosent/100*dagsats_virksomhet-0.5) dagsats_redusert
-              ,case when periode_resultat_aarsak in (2004,2033) then 'N'
-			 	            when trekkonto in ('FEDREKVOTE','FELLESPERIODE','MØDREKVOTE') then 'J'
-				            when trekkonto = 'FORELDREPENGER' then 'N'
-			         end mor_rettighet
-        from
-        (
-          select fagsak_id, trans_id, trekkonto, trekkdager, stonadsdager_kvote, uttak_arbeid_type
-                ,aar--, halvaar--, kvartal, aar_maaned
-                ,uttak_fom, uttak_tom
-                ,sum(dagsats_virksomhet/dagsats* case when ((upper(gradering_innvilget) ='TRUE' and upper(gradering)='TRUE')
-                                       or upper(samtidig_uttak)='TRUE') then (100-arbeidstidsprosent)/100
-                               else 1.0
-                          end
-                     ) dager_erst2
-                ,max(arbeidstidsprosent) as arbeidstidsprosent
-                ,count(distinct pk_dim_tid) dager_erst
-                ,
-                 --count(distinct pk_dim_tid)*dagsats_virksomhet/dagsats tilfelle_erst,
-                 min(beregningsgrunnlag_fom) beregningsgrunnlag_fom, max(beregningsgrunnlag_tom) beregningsgrunnlag_tom
-                ,dekningsgrad
-                ,
-                 --count(distinct pk_dim_tid)*
-                 --      round(utbetalingsprosent/100*dagsats_virksomhet-0.5) belop,
-                 dagsats_bruker, dagsats_arbeidsgiver, dagsats_virksomhet
-                ,virksomhet, periode_resultat_aarsak, dagsats, dagsats_erst
-                , --dagsats_virksomhet,
-                 utbetalingsprosent graderingsprosent, status_og_andel_inntektskat
-                ,aktivitet_status, brutto_inntekt, avkortet_inntekt, status_og_andel_brutto, status_og_andel_avkortet
-                ,
-                 --round(utbetalingsprosent/100*dagsats_virksomhet-0.5) dagsats_redusert,
-                 utbetalingsprosent
-                ,min(pk_dim_tid) pk_dim_tid_dato_utbet_fom, max(pk_dim_tid) pk_dim_tid_dato_utbet_tom
-                ,funksjonell_tid, forste_vedtaksdato, siste_vedtaksdato, max_vedtaksdato, periode
-                ,max(forste_soknadsdato) as forste_soknadsdato, max(soknadsdato) as soknadsdato
-                ,samtidig_uttak, gradering, gradering_innvilget
-                ,min_uttak_fom, max_uttak_tom
-                ,fk_dim_tid_min_dato_kvote, fk_dim_tid_max_dato_kvote
-                ,max(pk_fam_fp_trekkonto) as pk_fam_fp_trekkonto
-                ,max(pk_fam_fp_periode_resultat_aarsak) as pk_fam_fp_periode_resultat_aarsak
-                ,antall_beregningsgrunnlag, max(graderingsdager) as graderingsdager
-                ,max(mors_aktivitet) as mors_aktivitet
-          from beregningsgrunnlag_detalj
-          group by fagsak_id, trans_id, trekkonto, trekkdager, stonadsdager_kvote, uttak_arbeid_type
-                  ,aar--, halvaar--, kvartal, aar_maaned
-                  ,uttak_fom, uttak_tom, dekningsgrad
-                  ,virksomhet, utbetalingsprosent, periode_resultat_aarsak
-                  ,dagsats, dagsats_erst, dagsats_bruker, dagsats_arbeidsgiver, dagsats_virksomhet
-                  ,utbetalingsprosent
-                  ,status_og_andel_inntektskat, aktivitet_status, brutto_inntekt, avkortet_inntekt
-                  ,status_og_andel_brutto, status_og_andel_avkortet
-                  ,funksjonell_tid, forste_vedtaksdato, siste_vedtaksdato, max_vedtaksdato, periode
-                  ,samtidig_uttak, gradering, gradering_innvilget, min_uttak_fom, max_uttak_tom
-                  ,fk_dim_tid_min_dato_kvote, fk_dim_tid_max_dato_kvote
-                  ,antall_beregningsgrunnlag
-        ) a
-      ),
-      grunnlag as
-      (
-        select beregningsgrunnlag_agg.*, sysdate as lastet_dato
-              ,mottaker.behandlingstema, mottaker.max_trans_id, mottaker.fk_person1_mottaker, mottaker.kjonn
-              ,mottaker.fk_person1_barn
-              ,mottaker.termindato, mottaker.foedselsdato, mottaker.antall_barn_termin
-              ,mottaker.antall_barn_foedsel, mottaker.foedselsdato_adopsjon
-              ,mottaker.antall_barn_adopsjon
-              ,mottaker.mottaker_fodsels_aar, mottaker.mottaker_fodsels_mnd
-              ,substr(p_tid_fom,1,4) - mottaker.mottaker_fodsels_aar as mottaker_alder
-              ,mottaker.sivilstand, mottaker.statsborgerskap
-              ,dim_person.pk_dim_person, dim_person.bosted_kommune_nr
-              ,dim_person.fk_dim_sivilstatus
-              ,dim_geografi.pk_dim_geografi, dim_geografi.bydel_kommune_nr, dim_geografi.kommune_nr
-              ,dim_geografi.kommune_navn, dim_geografi.bydel_nr, dim_geografi.bydel_navn
-              ,annenforelderfagsak.annenforelderfagsak_id, annenforelderfagsak.fk_person1_annen_part
-              ,fam_fp_uttak_fp_kontoer.max_dager max_stonadsdager_konto
-              ,case when aleneomsorg.fagsak_id is not null then 'J' else NULL end as aleneomsorg
-              ,case when behandlingstema = 'FORP_FODS' then '214'
-                    when behandlingstema = 'FORP_ADOP' then '216'
-               end as hovedkontonr
-              ,case when status_og_andel_inntektskat='ARBEIDSTAKER'
-                         and dagsats_arbeidsgiver/dagsats*100<=50 then '1000'
-               when status_og_andel_inntektskat='ARBEIDSTAKER'
-                         and dagsats_arbeidsgiver/dagsats*100>50 then '8020'
-               --when status_og_andel_inntektskat='ARBEIDSTAKER' then '1000'
-               when status_og_andel_inntektskat='JORDBRUKER' then '5210'
-               when status_og_andel_inntektskat='SJØMANN' then '1300'
-               when status_og_andel_inntektskat='SELVSTENDIG_NÆRINGSDRIVENDE' then '5010'
-               when status_og_andel_inntektskat='DAGPENGER' then '1200'
-               when status_og_andel_inntektskat='ARBEIDSTAKER_UTEN_FERIEPENGER' then '1000'
-               when status_og_andel_inntektskat='FISKER' then '5300'
-               when status_og_andel_inntektskat='DAGMAMMA' then '5110'
-               when status_og_andel_inntektskat='FRILANSER' then '1100'
-               end as underkontonr
-              ,round(dagsats_arbeidsgiver/dagsats*100,0) as andel_av_refusjon
-              ,case when rett_til_mødrekvote.trans_id is null then 'N' else 'J' end as rett_til_mødrekvote
-              ,case when rett_til_fedrekvote.trans_id is null then 'N' else 'J' end as rett_til_fedrekvote
-              ,flerbarnsdager.flerbarnsdager
-              ,adopsjon.adopsjonsdato, adopsjon.stebarnsadopsjon
-              ,eos.eos_sak
-        from beregningsgrunnlag_agg
-        left join mottaker
-        on beregningsgrunnlag_agg.fagsak_id = mottaker.fagsak_id
-        and beregningsgrunnlag_agg.trans_id = mottaker.max_trans_id
-        left join annenforelderfagsak
-        on beregningsgrunnlag_agg.fagsak_id = annenforelderfagsak.fagsak_id
-        and beregningsgrunnlag_agg.trans_id = annenforelderfagsak.max_trans_id
-        left join dvh_fam_fp.fam_fp_uttak_fp_kontoer
-        on beregningsgrunnlag_agg.fagsak_id = fam_fp_uttak_fp_kontoer.fagsak_id
-        and mottaker.max_trans_id = fam_fp_uttak_fp_kontoer.trans_id
-        --AND UPPER(REGEXP_REPLACE(grunnlag_drp1.TREKKONTO, '_|-|[[:space:]]', '')) = UPPER(REGEXP_REPLACE(FAM_FP_Uttak_FP_Kontoer.STOENADSKONTOTYPE, '_|-|[[:space:]]', ''))
-        and upper(replace(beregningsgrunnlag_agg.trekkonto,'_','')) = upper(replace(fam_fp_uttak_fp_kontoer.stoenadskontotype,' ',''))
-        left join dt_person.dim_person
-        on mottaker.fk_person1_mottaker = dim_person.fk_person1
-        and beregningsgrunnlag_agg.uttak_tom between dim_person.gyldig_fra_dato and dim_person.gyldig_til_dato
-        left join dt_kodeverk.dim_geografi
-        on dim_person.fk_dim_geografi_bosted = dim_geografi.pk_dim_geografi
-        left join aleneomsorg
-        on aleneomsorg.fagsak_id = beregningsgrunnlag_agg.fagsak_id
-        and aleneomsorg.uttak_fom = beregningsgrunnlag_agg.uttak_fom
-        left join
-        (select trans_id
-         from dvh_fam_fp.fam_fp_uttak_fp_kontoer
-         where upper(stoenadskontotype) = 'MØDREKVOTE'
-         group by trans_id
-        ) rett_til_mødrekvote
-        on rett_til_mødrekvote.trans_id = beregningsgrunnlag_agg.trans_id
-        left join
-        (select trans_id
-         from dvh_fam_fp.fam_fp_uttak_fp_kontoer
-         where upper(stoenadskontotype) = 'FEDREKVOTE'
-         group by trans_id
-        ) rett_til_fedrekvote
-        on rett_til_fedrekvote.trans_id = beregningsgrunnlag_agg.trans_id
-        left join
-        (select trans_id, max(max_dager) as flerbarnsdager
-         from dvh_fam_fp.fam_fp_uttak_fp_kontoer
-         where upper(stoenadskontotype) = 'FLERBARNSDAGER'
-         group by trans_id
-        ) flerbarnsdager
-        on flerbarnsdager.trans_id = beregningsgrunnlag_agg.trans_id
-        left join adopsjon
-        on beregningsgrunnlag_agg.fagsak_id = adopsjon.fagsak_id
-        left join eos
-        on beregningsgrunnlag_agg.trans_id = eos.trans_id
-      )
-      select /*+ PARALLEL(8) */ *
-      --from uttak_dager
-      from grunnlag
-      where fagsak_id not in (1679117)
-      --where fagsak_id in (1035184)
-      ;
-    v_tid_fom varchar2(8) := null;
-    v_tid_tom varchar2(8) := null;
-    v_commit number := 0;
-    v_error_melding varchar2(1000) := null;
-    v_dim_tid_antall number := 0;
-    v_utbetalingsprosent_kalkulert number := 0;
-  begin
-    v_tid_fom := substr(p_in_vedtak_tom,1,4) || '0101';
-    v_tid_tom := substr(p_in_vedtak_tom,1,4) || '1231';
-    --dbms_output.put_line(v_tid_fom||v_tid_tom);--TEST!!!
-
-    for rec_periode in cur_periode(p_in_rapport_dato, p_in_forskyvninger, v_tid_fom, v_tid_tom) loop
-      v_dim_tid_antall := 0;
-      v_utbetalingsprosent_kalkulert := 0;
-      v_dim_tid_antall := dim_tid_antall(to_number(to_char(rec_periode.uttak_fom,'yyyymmdd'))
-                                        ,to_number(to_char(rec_periode.uttak_tom,'yyyymmdd')));
-      if v_dim_tid_antall != 0 then
-        v_utbetalingsprosent_kalkulert := round(rec_periode.trekkdager/v_dim_tid_antall*100,2);
-      else
-        v_utbetalingsprosent_kalkulert := 0;
-      end if;
-      --dbms_output.put_line(v_dim_tid_antall);
-      begin
-        insert into dvh_fam_fp.fak_fam_fp_vedtak_utbetaling
-        (fagsak_id, trans_id, behandlingstema, trekkonto, stonadsdager_kvote
-        ,uttak_arbeid_type
-        ,aar--, halvaar, --AAR_MAANED,
-        ,rapport_periode, uttak_fom, uttak_tom, dager_erst, beregningsgrunnlag_fom
-        ,beregningsgrunnlag_tom, dekningsgrad, dagsats_bruker, dagsats_arbeidsgiver, virksomhet
-        ,periode_resultat_aarsak, dagsats, graderingsprosent, status_og_andel_inntektskat
-        ,aktivitet_status, brutto_inntekt, avkortet_inntekt, status_og_andel_brutto, status_og_andel_avkortet
-        ,utbetalingsprosent, fk_dim_tid_dato_utbet_fom
-        ,fk_dim_tid_dato_utbet_tom, funksjonell_tid, forste_vedtaksdato, vedtaksdato, max_vedtaksdato, periode_type, tilfelle_erst
-        ,belop, dagsats_redusert, lastet_dato, max_trans_id, fk_person1_mottaker, fk_person1_annen_part
-        ,kjonn, fk_person1_barn, termindato, foedselsdato, antall_barn_termin, antall_barn_foedsel
-        ,foedselsdato_adopsjon, antall_barn_adopsjon, annenforelderfagsak_id, max_stonadsdager_konto
-        ,fk_dim_person, bosted_kommune_nr, fk_dim_geografi, bydel_kommune_nr, kommune_nr
-        ,kommune_navn, bydel_nr, bydel_navn, aleneomsorg, hovedkontonr, underkontonr
-        ,mottaker_fodsels_aar, mottaker_fodsels_mnd, mottaker_alder
-        ,rett_til_fedrekvote, rett_til_modrekvote, dagsats_erst, trekkdager
-        ,samtidig_uttak, gradering, gradering_innvilget, antall_dager_periode
-        ,flerbarnsdager, utbetalingsprosent_kalkulert, min_uttak_fom, max_uttak_tom
-        ,fk_fam_fp_trekkonto, fk_fam_fp_periode_resultat_aarsak
-        ,sivilstatus, fk_dim_sivilstatus, antall_beregningsgrunnlag, graderingsdager
-        ,fk_dim_tid_min_dato_kvote, fk_dim_tid_max_dato_kvote
-        ,adopsjonsdato, stebarnsadopsjon, eos_sak, mor_rettighet, statsborgerskap
-        ,arbeidstidsprosent, mors_aktivitet, gyldig_flagg
-        ,andel_av_refusjon, forste_soknadsdato, soknadsdato)
-        values
-        (rec_periode.fagsak_id, rec_periode.trans_id, rec_periode.behandlingstema, rec_periode.trekkonto
-        ,rec_periode.stonadsdager_kvote
-        ,rec_periode.uttak_arbeid_type, rec_periode.aar--, rec_periode.halvaar--, AAR_MAANED
-        ,p_in_rapport_dato, rec_periode.uttak_fom, rec_periode.uttak_tom
-        ,rec_periode.dager_erst, rec_periode.beregningsgrunnlag_fom, rec_periode.beregningsgrunnlag_tom
-        ,rec_periode.dekningsgrad, rec_periode.dagsats_bruker, rec_periode.dagsats_arbeidsgiver
-        ,rec_periode.virksomhet, rec_periode.periode_resultat_aarsak, rec_periode.dagsats
-        ,rec_periode.graderingsprosent, rec_periode.status_og_andel_inntektskat
-        ,rec_periode.aktivitet_status, rec_periode.brutto_inntekt, rec_periode.avkortet_inntekt
-        ,rec_periode.status_og_andel_brutto, rec_periode.status_og_andel_avkortet
-        ,rec_periode.utbetalingsprosent, rec_periode.pk_dim_tid_dato_utbet_fom, rec_periode.pk_dim_tid_dato_utbet_tom
-        ,rec_periode.funksjonell_tid, rec_periode.forste_vedtaksdato, rec_periode.siste_vedtaksdato, rec_periode.max_vedtaksdato, rec_periode.periode
-        ,rec_periode.tilfelle_erst, rec_periode.belop, rec_periode.dagsats_redusert, rec_periode.lastet_dato
-        ,rec_periode.max_trans_id, rec_periode.fk_person1_mottaker, rec_periode.fk_person1_annen_part
-        ,rec_periode.kjonn, rec_periode.fk_person1_barn
-        ,rec_periode.termindato, rec_periode.foedselsdato, rec_periode.antall_barn_termin
-        ,rec_periode.antall_barn_foedsel, rec_periode.foedselsdato_adopsjon
-        ,rec_periode.antall_barn_adopsjon, rec_periode.annenforelderfagsak_id, rec_periode.max_stonadsdager_konto
-        ,rec_periode.pk_dim_person, rec_periode.bosted_kommune_nr, rec_periode.pk_dim_geografi
-        ,rec_periode.bydel_kommune_nr, rec_periode.kommune_nr, rec_periode.kommune_navn
-        ,rec_periode.bydel_nr, rec_periode.bydel_navn, rec_periode.aleneomsorg, rec_periode.hovedkontonr
-        ,rec_periode.underkontonr
-        ,rec_periode.mottaker_fodsels_aar, rec_periode.mottaker_fodsels_mnd, rec_periode.mottaker_alder
-        ,rec_periode.rett_til_fedrekvote, rec_periode.rett_til_mødrekvote, rec_periode.dagsats_erst
-        ,rec_periode.trekkdager, rec_periode.samtidig_uttak, rec_periode.gradering, rec_periode.gradering_innvilget
-        ,v_dim_tid_antall, rec_periode.flerbarnsdager, v_utbetalingsprosent_kalkulert
-        ,rec_periode.min_uttak_fom, rec_periode.max_uttak_tom, rec_periode.pk_fam_fp_trekkonto
-        ,rec_periode.pk_fam_fp_periode_resultat_aarsak
-        ,rec_periode.sivilstand, rec_periode.fk_dim_sivilstatus
-        ,rec_periode.antall_beregningsgrunnlag, rec_periode.graderingsdager
-        ,rec_periode.fk_dim_tid_min_dato_kvote, rec_periode.fk_dim_tid_max_dato_kvote
-        ,rec_periode.adopsjonsdato, rec_periode.stebarnsadopsjon, rec_periode.eos_sak
-        ,rec_periode.mor_rettighet, rec_periode.statsborgerskap
-        ,rec_periode.arbeidstidsprosent, rec_periode.mors_aktivitet, p_in_gyldig_flagg
-        ,rec_periode.andel_av_refusjon, rec_periode.forste_soknadsdato, rec_periode.soknadsdato);
-
-        v_commit := v_commit + 1;
-      exception
-        when others then
-          rollback;
-          v_error_melding := substr(SQLCODE || ' ' || sqlerrm, 1, 1000);
-          insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
-          values(null, rec_periode.fagsak_id, v_error_melding, sysdate, 'FAM_FP_STATISTIKK_AAR:INSERT');
-          commit;
-          p_out_error := substr(p_out_error || v_error_melding, 1, 1000);
-      end;
-
-      if v_commit > 100000 then
-        commit;
-        v_commit := 0;
-      end if;
-   end loop;
-   commit;
-  exception
-    when others then
-      rollback;
-      v_error_melding := substr(SQLCODE || ' ' || sqlerrm, 1, 1000);
-      insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
-      values(null, null, v_error_melding, sysdate, 'FAM_FP_STATISTIKK_AAR');
-      commit;
-      p_out_error := substr(p_out_error || v_error_melding, 1, 1000);
-  end fam_fp_statistikk_aar;
-
-  procedure fam_fp_statistikk_aar_mnd(p_in_vedtak_tom in varchar2, p_in_rapport_dato in varchar2, p_in_forskyvninger in number
-                                     ,p_in_gyldig_flagg in number default 0
-                                     ,p_in_periode_type in varchar2 default 'A'
-                                     ,p_out_error out varchar2) as
-    cursor cur_periode(p_rapport_dato in varchar2, p_forskyvninger in number, p_tid_fom in varchar2, p_tid_tom in varchar2) is
-      with fagsak as
-      (
-        select fagsak_id, max(behandlingstema) as behandlingstema, max(fagsakannenforelder_id) as annenforelderfagsak_id
-              ,max(trans_id) keep(dense_rank first order by funksjonell_tid desc) as max_trans_id
-              ,max(soeknadsdato) keep(dense_rank first order by funksjonell_tid desc) as soknadsdato
-              ,min(soeknadsdato) as forste_soknadsdato
-              ,min(vedtaksdato) as forste_vedtaksdato
-              ,max(funksjonell_tid) as funksjonell_tid, max(vedtaksdato) as siste_vedtaksdato
-              ,p_in_periode_type as periode, last_day(to_date(p_rapport_dato,'yyyymm')) + p_forskyvninger as max_vedtaksdato
-        from dvh_fam_fp.fam_fp_fagsak
-        where fam_fp_fagsak.funksjonell_tid <= last_day(to_date(p_rapport_dato,'yyyymm')) + p_forskyvninger
-        group by fagsak_id
-      ),
-      termin as
-      (
-        select fagsak_id, max(termindato) termindato, max(foedselsdato) foedselsdato
-              ,max(antall_barn_termin) antall_barn_termin, max(antall_barn_foedsel) antall_barn_foedsel
-              ,max(foedselsdato_adopsjon) foedselsdato_adopsjon, max(antall_barn_adopsjon) antall_barn_adopsjon
-        from
-        (
-          select fam_fp_fagsak.fagsak_id, max(fodsel.termindato) termindato
-                ,max(fodsel.foedselsdato) foedselsdato, max(fodsel.antall_barn_foedsel) antall_barn_foedsel
-                ,max(fodsel.antall_barn_termin) antall_barn_termin
-                ,max(adopsjon.foedselsdato_adopsjon) foedselsdato_adopsjon
-                ,count(adopsjon.trans_id) antall_barn_adopsjon
-          from dvh_fam_fp.fam_fp_fagsak
-          left join dvh_fam_fp.fam_fp_fodseltermin fodsel
-          on fodsel.fagsak_id = fam_fp_fagsak.fagsak_id
-          and upper(fam_fp_fagsak.behandlingstema) = 'FORP_FODS'
-          left join dvh_fam_fp.fam_fp_fodseltermin adopsjon
-          on adopsjon.fagsak_id = fam_fp_fagsak.fagsak_id
-          and adopsjon.trans_id = fam_fp_fagsak.trans_id
-          and upper(fam_fp_fagsak.behandlingstema) = 'FORP_ADOP'
-          group by fam_fp_fagsak.fagsak_id, fam_fp_fagsak.trans_id
-        )
-        group by fagsak_id
-      ),
-      fk_person1 as
-      (
-        select person.person, person.fagsak_id, max(person.behandlingstema) as behandlingstema, person.max_trans_id
-              ,max(person.annenforelderfagsak_id) as annenforelderfagsak_id
-              ,person.aktoer_id, max(person.kjonn) as kjonn
-              ,max(person_67_vasket.fk_person1) keep
-                (dense_rank first order by person_67_vasket.gyldig_fra_dato desc) as fk_person1
-              ,max(foedselsdato) as foedselsdato, max(sivilstand) as sivilstand
-              ,max(statsborgerskap) as statsborgerskap
-        from
-        (
-          select 'MOTTAKER' as person, fagsak.fagsak_id, fagsak.behandlingstema, fagsak.max_trans_id
-                ,fagsak.annenforelderfagsak_id
-                ,fam_fp_personopplysninger.aktoer_id, fam_fp_personopplysninger.kjonn
-                ,fam_fp_personopplysninger.foedselsdato, fam_fp_personopplysninger.sivilstand
-                ,fam_fp_personopplysninger.statsborgerskap
-          from dvh_fam_fp.fam_fp_personopplysninger
-          join fagsak
-          on fam_fp_personopplysninger.trans_id = fagsak.max_trans_id
-          union all
-          select 'BARN' as person, fagsak.fagsak_id, max(fagsak.behandlingstema) as behandlingstema, fagsak.max_trans_id
-                ,max(fagsak.annenforelderfagsak_id) annenforelderfagsak_id
-                ,max(fam_fp_familiehendelse.til_aktoer_id) as aktoer_id, max(fam_fp_familiehendelse.kjoenn) as kjonn
-                ,null as foedselsdato, null as sivilstand, null as statsborgerskap
-          from dvh_fam_fp.fam_fp_familiehendelse
-          join fagsak
-          on fam_fp_familiehendelse.fagsak_id = fagsak.fagsak_id
-          where upper(fam_fp_familiehendelse.relasjon) = 'BARN'
-          group by fagsak.fagsak_id, fagsak.max_trans_id
-        ) person
-        join dt_person.dvh_person_ident_aktor_ikke_skjermet person_67_vasket
-        on person_67_vasket.aktor_id = person.aktoer_id
-        and to_date(p_tid_tom,'yyyymmdd') between person_67_vasket.gyldig_fra_dato and person_67_vasket.gyldig_til_dato
-        group by person.person, person.fagsak_id, person.max_trans_id, person.aktoer_id
-      ),
-      barn as
-      (
-        select fagsak_id, listagg(fk_person1, ',') within group (order by fk_person1) as fk_person1_barn
-        from fk_person1
-        where person = 'BARN'
-        group by fagsak_id
-      ),
-      mottaker as
-      (
-        select fk_person1.fagsak_id, fk_person1.behandlingstema
-              ,fk_person1.max_trans_id, fk_person1.annenforelderfagsak_id, fk_person1.aktoer_id
-              ,fk_person1.kjonn, fk_person1.fk_person1 as fk_person1_mottaker
-              ,extract(year from fk_person1.foedselsdato) as mottaker_fodsels_aar
-              ,extract(month from fk_person1.foedselsdato) as mottaker_fodsels_mnd
-              ,fk_person1.sivilstand, fk_person1.statsborgerskap
-              ,barn.fk_person1_barn
-              ,termin.termindato, termin.foedselsdato, termin.antall_barn_termin, termin.antall_barn_foedsel
-              ,termin.foedselsdato_adopsjon, termin.antall_barn_adopsjon
-        from fk_person1
-        left join barn
-        on barn.fagsak_id = fk_person1.fagsak_id
-        left join termin
-        on fk_person1.fagsak_id = termin.fagsak_id
-        where fk_person1.person = 'MOTTAKER'
-      ),
-      adopsjon as
-      (
-        select fam_fp_vilkaar.fagsak_id
-              ,max(fam_fp_vilkaar.omsorgs_overtakelsesdato) as adopsjonsdato
-              ,max(fam_fp_vilkaar.ektefelles_barn) as stebarnsadopsjon
-        from fagsak
-        join dvh_fam_fp.fam_fp_vilkaar
-        on fagsak.fagsak_id = fam_fp_vilkaar.fagsak_id
-        where fagsak.behandlingstema = 'FORP_ADOP'
-        group by fam_fp_vilkaar.fagsak_id
-      ),
-      eos as
-      (
-       select a.trans_id
-             ,case when upper(er_borger_av_eu_eos) = 'TRUE' then 'J'
-                   when upper(er_borger_av_eu_eos) = 'FALSE' then 'N'
-				  		    else null
-              end	eos_sak
-       from
-       (select fam_fp_vilkaar.trans_id, max(fam_fp_vilkaar.er_borger_av_eu_eos) as er_borger_av_eu_eos
-        from fagsak
-        join dvh_fam_fp.fam_fp_vilkaar
-        on fagsak.max_trans_id = fam_fp_vilkaar.trans_id
-        and length(fam_fp_vilkaar.person_status) > 0
-        group by fam_fp_vilkaar.trans_id
-       ) a
-      ),
-      annenforelderfagsak as
-      (
-        select annenforelderfagsak.*, mottaker.fk_person1_mottaker as fk_person1_annen_part
-        from
-        (
-          select fagsak_id, max_trans_id, max(annenforelderfagsak_id) as annenforelderfagsak_id
-          from
+            SELECT
+              FAGSAK_ID,
+              TRANS_ID,
+              TREKKONTO,
+              VIRKSOMHET,
+              UTTAK_ARBEID_TYPE,
+              SUM(TREKKDAGER)   AS STONADSDAGER_KVOTE,
+              MIN(UTTAK_FOM)    AS MIN_UTTAK_FOM,
+              MAX(UTTAK_TOM)    AS MAX_UTTAK_TOM
+            FROM
+              (
+                SELECT
+                  FAGSAK_ID,
+                  TRANS_ID,
+                  UTTAK_FOM,
+                  UTTAK_TOM,
+                  TREKKONTO,
+                  VIRKSOMHET,
+                  UTTAK_ARBEID_TYPE,
+                  MAX(TREKKDAGER)   AS TREKKDAGER
+                FROM
+                  UTTAK
+                GROUP BY
+                  FAGSAK_ID,
+                  TRANS_ID,
+                  UTTAK_FOM,
+                  UTTAK_TOM,
+                  TREKKONTO,
+                  VIRKSOMHET,
+                  UTTAK_ARBEID_TYPE
+              ) A
+            GROUP BY
+              FAGSAK_ID,
+              TRANS_ID,
+              TREKKONTO,
+              VIRKSOMHET,
+              UTTAK_ARBEID_TYPE
+          )                   UTTAK
+          JOIN DT_KODEVERK.DIM_TID TID1
+          ON TID1.DIM_NIVAA = 1
+          AND TID1.DATO = TRUNC(UTTAK.MIN_UTTAK_FOM, 'dd') JOIN DT_KODEVERK.DIM_TID TID2
+          ON TID2.DIM_NIVAA = 1
+          AND TID2.DATO = TRUNC(UTTAK.MAX_UTTAK_TOM,
+          'dd')
+      ), UTTAK_DAGER AS (
+        SELECT
+          UTTAK.*,
+          TID.PK_DIM_TID,
+          TID.DATO,
+          TID.AAR,
+          TID.HALVAAR,
+          TID.KVARTAL,
+          TID.AAR_MAANED
+        FROM
+          UTTAK
+          JOIN TID
+          ON TID.DATO BETWEEN UTTAK.UTTAK_FOM
+          AND UTTAK.UTTAK_TOM
+      ), ALENEOMSORG AS (
+        SELECT
+          UTTAK.FAGSAK_ID,
+          UTTAK.UTTAK_FOM
+        FROM
+          UTTAK
+          JOIN DVH_FAM_FP.FAM_FP_DOKUMENTASJONSPERIODER DOK1
+          ON DOK1.FAGSAK_ID = UTTAK.FAGSAK_ID
+          AND UTTAK.UTTAK_FOM >= DOK1.FOM
+          AND DOK1.DOKUMENTASJON_TYPE IN ('ALENEOMSORG', 'ALENEOMSORG_OVERFÃ˜RING') LEFT JOIN DVH_FAM_FP.FAM_FP_DOKUMENTASJONSPERIODER DOK2
+          ON DOK1.FAGSAK_ID = DOK2.FAGSAK_ID
+          AND UTTAK.UTTAK_FOM >= DOK2.FOM
+          AND DOK1.TRANS_ID < DOK2.TRANS_ID
+          AND DOK2.DOKUMENTASJON_TYPE = 'ANNEN_FORELDER_HAR_RETT'
+          AND DOK2.FAGSAK_ID IS NULL
+        GROUP BY
+          UTTAK.FAGSAK_ID,
+          UTTAK.UTTAK_FOM
+      ), BEREGNINGSGRUNNLAG AS (
+        SELECT
+          FAGSAK_ID,
+          TRANS_ID,
+          VIRKSOMHETSNUMMER,
+          MAX(STATUS_OG_ANDEL_BRUTTO)         AS STATUS_OG_ANDEL_BRUTTO,
+          MAX(STATUS_OG_ANDEL_AVKORTET)       AS STATUS_OG_ANDEL_AVKORTET,
+          FOM                                 AS BEREGNINGSGRUNNLAG_FOM,
+          TOM                                 AS BEREGNINGSGRUNNLAG_TOM,
+          MAX(DEKNINGSGRAD)                   AS DEKNINGSGRAD,
+          MAX(DAGSATS)                        AS DAGSATS,
+          DAGSATS_BRUKER,
+          DAGSATS_ARBEIDSGIVER,
+          DAGSATS_BRUKER+DAGSATS_ARBEIDSGIVER DAGSATS_VIRKSOMHET,
+          MAX(STATUS_OG_ANDEL_INNTEKTSKAT)    AS STATUS_OG_ANDEL_INNTEKTSKAT,
+          AKTIVITET_STATUS,
+          MAX(BRUTTO)                         AS BRUTTO_INNTEKT,
+          MAX(AVKORTET)                       AS AVKORTET_INNTEKT,
+          COUNT(1)                            AS ANTALL_BEREGNINGSGRUNNLAG
+        FROM
+          DVH_FAM_FP.FAM_FP_BEREGNINGSGRUNNLAG
+        GROUP BY
+          FAGSAK_ID,
+          TRANS_ID,
+          VIRKSOMHETSNUMMER,
+          FOM,
+          TOM,
+          AKTIVITET_STATUS,
+          DAGSATS_BRUKER,
+          DAGSATS_ARBEIDSGIVER
+      ), BEREGNINGSGRUNNLAG_DETALJ AS (
+        SELECT
+          UTTAK_DAGER.*,
+          STONADSDAGER_KVOTE.STONADSDAGER_KVOTE,
+          STONADSDAGER_KVOTE.MIN_UTTAK_FOM,
+          STONADSDAGER_KVOTE.MAX_UTTAK_TOM,
+          STONADSDAGER_KVOTE.FK_DIM_TID_MIN_DATO_KVOTE,
+          STONADSDAGER_KVOTE.FK_DIM_TID_MAX_DATO_KVOTE,
+          BEREG.STATUS_OG_ANDEL_BRUTTO,
+          BEREG.STATUS_OG_ANDEL_AVKORTET,
+          BEREG.BEREGNINGSGRUNNLAG_FOM,
+          BEREG.DEKNINGSGRAD,
+          BEREG.BEREGNINGSGRUNNLAG_TOM,
+          BEREG.DAGSATS,
+          BEREG.DAGSATS_BRUKER,
+          BEREG.DAGSATS_ARBEIDSGIVER,
+          BEREG.DAGSATS_VIRKSOMHET,
+          BEREG.STATUS_OG_ANDEL_INNTEKTSKAT,
+          BEREG.AKTIVITET_STATUS,
+          BEREG.BRUTTO_INNTEKT,
+          BEREG.AVKORTET_INNTEKT,
+          BEREG.DAGSATS*UTTAK_DAGER.UTBETALINGSPROSENT/100 AS DAGSATS_ERST,
+          BEREG.ANTALL_BEREGNINGSGRUNNLAG
+        FROM
+          BEREGNINGSGRUNNLAG                        BEREG
+          JOIN UTTAK_DAGER
+          ON UTTAK_DAGER.TRANS_ID = BEREG.TRANS_ID
+          AND NVL(UTTAK_DAGER.VIRKSOMHET, 'X') = NVL(BEREG.VIRKSOMHETSNUMMER, 'X')
+          AND BEREG.BEREGNINGSGRUNNLAG_FOM <= UTTAK_DAGER.DATO
+          AND NVL(BEREG.BEREGNINGSGRUNNLAG_TOM, TO_DATE('20991201', 'YYYYMMDD')) >= UTTAK_DAGER.DATO LEFT JOIN STONADSDAGER_KVOTE
+          ON UTTAK_DAGER.TRANS_ID = STONADSDAGER_KVOTE.TRANS_ID
+          AND UTTAK_DAGER.TREKKONTO = STONADSDAGER_KVOTE.TREKKONTO
+          AND NVL(UTTAK_DAGER.VIRKSOMHET,
+          'X') = NVL(STONADSDAGER_KVOTE.VIRKSOMHET,
+          'X')
+          AND UTTAK_DAGER.UTTAK_ARBEID_TYPE = STONADSDAGER_KVOTE.UTTAK_ARBEID_TYPE
+          JOIN DVH_FAM_FP.FAM_FP_UTTAK_AKTIVITET_MAPPING UTTAK_MAPPING
+          ON UTTAK_DAGER.UTTAK_ARBEID_TYPE = UTTAK_MAPPING.UTTAK_ARBEID
+          AND BEREG.AKTIVITET_STATUS = UTTAK_MAPPING.AKTIVITET_STATUS
+        WHERE
+          BEREG.DAGSATS_BRUKER + BEREG.DAGSATS_ARBEIDSGIVER != 0
+      ), BEREGNINGSGRUNNLAG_AGG AS (
+        SELECT
+          A.*,
+          DAGER_ERST*DAGSATS_VIRKSOMHET/DAGSATS*ANTALL_BEREGNINGSGRUNNLAG                                                                                                                    TILFELLE_ERST,
+          DAGER_ERST*ROUND(UTBETALINGSPROSENT/100*DAGSATS_VIRKSOMHET)                                                                                                                        BELOP,
+          ROUND(UTBETALINGSPROSENT/100*DAGSATS_VIRKSOMHET-0.5)                                                                                                                               DAGSATS_REDUSERT,
+          CASE
+            WHEN PERIODE_RESULTAT_AARSAK IN (2004, 2033) THEN
+              'N'
+            WHEN TREKKONTO IN ('FEDREKVOTE', 'FELLESPERIODE', 'MÃ˜DREKVOTE') THEN
+              'J'
+            WHEN TREKKONTO = 'FORELDREPENGER' THEN
+              'N'
+          END MOR_RETTIGHET
+        FROM
           (
-            select forelder1.fagsak_id, forelder1.max_trans_id
-                  ,nvl(forelder1.annenforelderfagsak_id, forelder2.fagsak_id) as annenforelderfagsak_id
-            from mottaker forelder1
-            join mottaker forelder2
-            on forelder1.fk_person1_barn = forelder2.fk_person1_barn
-            and forelder1.fk_person1_mottaker != forelder2.fk_person1_mottaker
-          )
-          group by fagsak_id, max_trans_id
-        ) annenforelderfagsak
-        join mottaker
-        on annenforelderfagsak.annenforelderfagsak_id = mottaker.fagsak_id
-      ),
-      tid as
-      (
-        select pk_dim_tid, dato, aar, halvaar, kvartal, aar_maaned
-        from dt_kodeverk.dim_tid
-        where dag_i_uke < 6
-        and dim_nivaa = 1
-        and gyldig_flagg = 1
-        and pk_dim_tid between p_tid_fom and p_tid_tom
-        --and pk_dim_tid <= to_char(last_day(to_date(p_rapport_dato,'yyyymm')),'yyyymmdd')
-      ),
-      uttak as
-      (
-        select uttak.trans_id, uttak.trekkonto, uttak.uttak_arbeid_type, uttak.virksomhet, uttak.utbetalingsprosent
-              ,uttak.gradering_innvilget, uttak.gradering, uttak.arbeidstidsprosent, uttak.samtidig_uttak
-              ,uttak.periode_resultat_aarsak, uttak.fom as uttak_fom, uttak.tom as uttak_tom
-              ,uttak.trekkdager
-              ,fagsak.fagsak_id, fagsak.periode, fagsak.funksjonell_tid, fagsak.forste_vedtaksdato, fagsak.siste_vedtaksdato
-              ,fagsak.max_vedtaksdato, fagsak.forste_soknadsdato, fagsak.soknadsdato
-              ,fam_fp_trekkonto.pk_fam_fp_trekkonto
-              ,aarsak_uttak.pk_fam_fp_periode_resultat_aarsak
-              ,uttak.arbeidsforhold_id, uttak.graderingsdager
-              ,fam_fp_uttak_fordelingsper.mors_aktivitet
-         from dvh_fam_fp.fam_fp_uttak_res_per_aktiv uttak
-         join fagsak
-         on fagsak.max_trans_id = uttak.trans_id
-         left join dvh_fam_fp.fam_fp_trekkonto
-         on upper(uttak.trekkonto) = fam_fp_trekkonto.trekkonto
-         left join
-         (select aarsak_uttak, max(pk_fam_fp_periode_resultat_aarsak) as pk_fam_fp_periode_resultat_aarsak
-          from dvh_fam_fp.fam_fp_periode_resultat_aarsak
-          group by aarsak_uttak
-         ) aarsak_uttak
-         on upper(uttak.periode_resultat_aarsak) = aarsak_uttak.aarsak_uttak
-         left join dvh_fam_fp.fam_fp_uttak_fordelingsper
-         on fam_fp_uttak_fordelingsper.trans_id = uttak.trans_id
-         and uttak.fom between fam_fp_uttak_fordelingsper.fom and fam_fp_uttak_fordelingsper.tom
-         and upper(uttak.trekkonto) = upper(fam_fp_uttak_fordelingsper.periode_type)
-         and length(fam_fp_uttak_fordelingsper.mors_aktivitet) > 1
-         where uttak.utbetalingsprosent > 0
-      ),
-      stonadsdager_kvote as
-      (
-        select uttak.*, tid1.pk_dim_tid as fk_dim_tid_min_dato_kvote
-              ,tid2.pk_dim_tid as fk_dim_tid_max_dato_kvote
-        from
-        (select fagsak_id, trans_id, trekkonto, virksomhet, uttak_arbeid_type
-               ,sum(trekkdager) as stonadsdager_kvote, min(uttak_fom) as min_uttak_fom
-               ,max(uttak_tom) as max_uttak_tom
-         from
-         (select fagsak_id, trans_id, uttak_fom, uttak_tom, trekkonto, virksomhet, uttak_arbeid_type
-                ,max(trekkdager) as trekkdager
-          from uttak
-          group by fagsak_id, trans_id, uttak_fom, uttak_tom, trekkonto, virksomhet, uttak_arbeid_type
-         ) a
-         group by fagsak_id, trans_id, trekkonto, virksomhet, uttak_arbeid_type
-        ) uttak
-        join dt_kodeverk.dim_tid tid1
-        on tid1.dim_nivaa = 1
-        and tid1.dato = trunc(uttak.min_uttak_fom,'dd')
-        join dt_kodeverk.dim_tid tid2
-        on tid2.dim_nivaa = 1
-        and tid2.dato = trunc(uttak.max_uttak_tom,'dd')
-      ),
-      uttak_dager AS
-      (
-        select uttak.*
-              ,tid.pk_dim_tid, tid.dato, tid.aar, tid.halvaar, tid.kvartal, tid.aar_maaned
-        from uttak
-        join tid
-        on tid.dato between uttak.uttak_fom and uttak.uttak_tom
-      ),
-      aleneomsorg as
-      (
-        select uttak.fagsak_id, uttak.uttak_fom
-        from uttak
-        join dvh_fam_fp.fam_fp_dokumentasjonsperioder dok1
-        on dok1.fagsak_id = uttak.fagsak_id
-        and uttak.uttak_fom >= dok1.fom
-        and dok1.dokumentasjon_type = 'ALENEOMSORG'
-        left join dvh_fam_fp.fam_fp_dokumentasjonsperioder dok2
-        on dok1.fagsak_id = dok2.fagsak_id
-        and uttak.uttak_fom >= dok2.fom
-        and dok1.trans_id < dok2.trans_id
-        and dok2.dokumentasjon_type = 'ANNEN_FORELDER_HAR_RETT'
-        and dok2.fagsak_id is null
-        group by uttak.fagsak_id, uttak.uttak_fom
-      ),
-      beregningsgrunnlag as
-      (
-        select fagsak_id, trans_id, virksomhetsnummer, max(status_og_andel_brutto) as status_og_andel_brutto
-              ,max(status_og_andel_avkortet) as status_og_andel_avkortet
-              ,fom as beregningsgrunnlag_fom, tom as beregningsgrunnlag_tom
-              ,max(dekningsgrad) as dekningsgrad, max(dagsats) as dagsats, dagsats_bruker
-              ,dagsats_arbeidsgiver
-              ,dagsats_bruker+dagsats_arbeidsgiver dagsats_virksomhet
-              ,max(status_og_andel_inntektskat) as status_og_andel_inntektskat
-              ,aktivitet_status, max(brutto) as brutto_inntekt, max(avkortet) as avkortet_inntekt
-              ,count(1) as antall_beregningsgrunnlag
-        from dvh_fam_fp.fam_fp_beregningsgrunnlag
-        group by fagsak_id, trans_id, virksomhetsnummer, fom, tom, aktivitet_status, dagsats_bruker, dagsats_arbeidsgiver
-      ),
-      beregningsgrunnlag_detalj as
-      (
-        select uttak_dager.*
-              ,stonadsdager_kvote.stonadsdager_kvote, stonadsdager_kvote.min_uttak_fom, stonadsdager_kvote.max_uttak_tom
-              ,stonadsdager_kvote.fk_dim_tid_min_dato_kvote, stonadsdager_kvote.fk_dim_tid_max_dato_kvote
-              ,bereg.status_og_andel_brutto, bereg.status_og_andel_avkortet, bereg.beregningsgrunnlag_fom
-              ,bereg.dekningsgrad, bereg.beregningsgrunnlag_tom, bereg.dagsats, bereg.dagsats_bruker
-              ,bereg.dagsats_arbeidsgiver
-              ,bereg.dagsats_virksomhet, bereg.status_og_andel_inntektskat
-              ,bereg.aktivitet_status, bereg.brutto_inntekt, bereg.avkortet_inntekt
-              ,bereg.dagsats*uttak_dager.utbetalingsprosent/100 as dagsats_erst
-              ,bereg.antall_beregningsgrunnlag
-        from beregningsgrunnlag bereg
-        join uttak_dager
-        on uttak_dager.trans_id = bereg.trans_id
-        and nvl(uttak_dager.virksomhet,'X') = nvl(bereg.virksomhetsnummer,'X')
-        and bereg.beregningsgrunnlag_fom <= uttak_dager.dato
-        and nvl(bereg.beregningsgrunnlag_tom,to_date('20991201','YYYYMMDD')) >= uttak_dager.dato
-        left join stonadsdager_kvote
-        on uttak_dager.trans_id = stonadsdager_kvote.trans_id
-        and uttak_dager.trekkonto = stonadsdager_kvote.trekkonto
-        and nvl(uttak_dager.virksomhet,'X') = nvl(stonadsdager_kvote.virksomhet,'X')
-        and uttak_dager.uttak_arbeid_type = stonadsdager_kvote.uttak_arbeid_type
-        join dvh_fam_fp.fam_fp_uttak_aktivitet_mapping uttak_mapping
-        on uttak_dager.uttak_arbeid_type = uttak_mapping.uttak_arbeid
-        and bereg.aktivitet_status = uttak_mapping.aktivitet_status
-        where bereg.dagsats_bruker + bereg.dagsats_arbeidsgiver != 0
-      ),
-      beregningsgrunnlag_agg as
-      (
-        select a.*
-              ,dager_erst*dagsats_virksomhet/dagsats*antall_beregningsgrunnlag tilfelle_erst
-              ,dager_erst*round(utbetalingsprosent/100*dagsats_virksomhet) belop
-              ,round(utbetalingsprosent/100*dagsats_virksomhet-0.5) dagsats_redusert
-              ,case when periode_resultat_aarsak in (2004,2033) then 'N'
-			 	            when trekkonto in ('FEDREKVOTE','FELLESPERIODE','MØDREKVOTE') then 'J'
-				            when trekkonto = 'FORELDREPENGER' then 'N'
-			         end mor_rettighet
-        from
-        (
-          select fagsak_id, trans_id, trekkonto, trekkdager, stonadsdager_kvote, uttak_arbeid_type
-                ,aar, halvaar, kvartal, aar_maaned
-                ,uttak_fom, uttak_tom
-                ,sum(dagsats_virksomhet/dagsats* case when ((upper(gradering_innvilget) ='TRUE' and upper(gradering)='TRUE')
-                                       or upper(samtidig_uttak)='TRUE') then (100-arbeidstidsprosent)/100
-                               else 1.0
-                          end
-                     ) dager_erst2
-                ,max(arbeidstidsprosent) as arbeidstidsprosent
-                ,count(distinct pk_dim_tid) dager_erst
-                ,
-                 --count(distinct pk_dim_tid)*dagsats_virksomhet/dagsats tilfelle_erst,
-                 min(beregningsgrunnlag_fom) beregningsgrunnlag_fom, max(beregningsgrunnlag_tom) beregningsgrunnlag_tom
-                ,dekningsgrad
-                ,
-                 --count(distinct pk_dim_tid)*
-                 --      round(utbetalingsprosent/100*dagsats_virksomhet-0.5) belop,
-                 dagsats_bruker, dagsats_arbeidsgiver, dagsats_virksomhet
-                ,virksomhet, periode_resultat_aarsak, dagsats, dagsats_erst
-                , --dagsats_virksomhet,
-                 utbetalingsprosent graderingsprosent, status_og_andel_inntektskat
-                ,aktivitet_status, brutto_inntekt, avkortet_inntekt, status_og_andel_brutto, status_og_andel_avkortet
-                ,
-                 --round(utbetalingsprosent/100*dagsats_virksomhet-0.5) dagsats_redusert,
-                 utbetalingsprosent
-                ,min(pk_dim_tid) pk_dim_tid_dato_utbet_fom, max(pk_dim_tid) pk_dim_tid_dato_utbet_tom
-                ,funksjonell_tid, forste_vedtaksdato, siste_vedtaksdato, max_vedtaksdato, periode
-                ,max(forste_soknadsdato) as forste_soknadsdato, max(soknadsdato) as soknadsdato
-                ,samtidig_uttak, gradering, gradering_innvilget
-                ,min_uttak_fom, max_uttak_tom
-                ,fk_dim_tid_min_dato_kvote, fk_dim_tid_max_dato_kvote
-                ,max(pk_fam_fp_trekkonto) as pk_fam_fp_trekkonto
-                ,max(pk_fam_fp_periode_resultat_aarsak) as pk_fam_fp_periode_resultat_aarsak
-                ,antall_beregningsgrunnlag, max(graderingsdager) as graderingsdager
-                ,max(mors_aktivitet) as mors_aktivitet
-          from beregningsgrunnlag_detalj
-          group by fagsak_id, trans_id, trekkonto, trekkdager, stonadsdager_kvote, uttak_arbeid_type
-                  ,aar, halvaar, kvartal, aar_maaned
-                  ,uttak_fom, uttak_tom, dekningsgrad
-                  ,virksomhet, utbetalingsprosent, periode_resultat_aarsak
-                  ,dagsats, dagsats_erst, dagsats_bruker, dagsats_arbeidsgiver, dagsats_virksomhet
-                  ,utbetalingsprosent
-                  ,status_og_andel_inntektskat, aktivitet_status, brutto_inntekt, avkortet_inntekt
-                  ,status_og_andel_brutto, status_og_andel_avkortet
-                  ,funksjonell_tid, forste_vedtaksdato, siste_vedtaksdato, max_vedtaksdato, periode
-                  ,samtidig_uttak, gradering, gradering_innvilget, min_uttak_fom, max_uttak_tom
-                  ,fk_dim_tid_min_dato_kvote, fk_dim_tid_max_dato_kvote
-                  ,antall_beregningsgrunnlag
-        ) a
-      ),
-      grunnlag as
-      (
-        select beregningsgrunnlag_agg.*, sysdate as lastet_dato
-              ,case when beregningsgrunnlag_agg.aar_maaned > to_number(p_rapport_dato) then 'B'
-                    else 'A'
-               end budsjett
-              ,mottaker.behandlingstema, mottaker.max_trans_id, mottaker.fk_person1_mottaker, mottaker.kjonn
-              ,mottaker.fk_person1_barn
-              ,mottaker.termindato, mottaker.foedselsdato, mottaker.antall_barn_termin
-              ,mottaker.antall_barn_foedsel, mottaker.foedselsdato_adopsjon
-              ,mottaker.antall_barn_adopsjon
-              ,mottaker.mottaker_fodsels_aar, mottaker.mottaker_fodsels_mnd
-              ,substr(p_tid_fom,1,4) - mottaker.mottaker_fodsels_aar as mottaker_alder
-              ,mottaker.sivilstand, mottaker.statsborgerskap
-              ,dim_person.pk_dim_person, dim_person.bosted_kommune_nr
-              ,dim_person.fk_dim_sivilstatus
-              ,dim_geografi.pk_dim_geografi, dim_geografi.bydel_kommune_nr, dim_geografi.kommune_nr
-              ,dim_geografi.kommune_navn, dim_geografi.bydel_nr, dim_geografi.bydel_navn
-              ,annenforelderfagsak.annenforelderfagsak_id, annenforelderfagsak.fk_person1_annen_part
-              ,fam_fp_uttak_fp_kontoer.max_dager max_stonadsdager_konto
-              ,case when aleneomsorg.fagsak_id is not null then 'J' else NULL end as aleneomsorg
-              ,case when behandlingstema = 'FORP_FODS' then '214'
-                    when behandlingstema = 'FORP_ADOP' then '216'
-               end as hovedkontonr
-              ,case when status_og_andel_inntektskat='ARBEIDSTAKER'
-                         and dagsats_arbeidsgiver/dagsats*100<=50 then '1000'
-               when status_og_andel_inntektskat='ARBEIDSTAKER'
-                         and dagsats_arbeidsgiver/dagsats*100>50 then '8020'
-               --when status_og_andel_inntektskat='ARBEIDSTAKER' then '1000'
-               when status_og_andel_inntektskat='JORDBRUKER' then '5210'
-               when status_og_andel_inntektskat='SJØMANN' then '1300'
-               when status_og_andel_inntektskat='SELVSTENDIG_NÆRINGSDRIVENDE' then '5010'
-               when status_og_andel_inntektskat='DAGPENGER' then '1200'
-               when status_og_andel_inntektskat='ARBEIDSTAKER_UTEN_FERIEPENGER' then '1000'
-               when status_og_andel_inntektskat='FISKER' then '5300'
-               when status_og_andel_inntektskat='DAGMAMMA' then '5110'
-               when status_og_andel_inntektskat='FRILANSER' then '1100'
-               end as underkontonr
-              ,round(dagsats_arbeidsgiver/dagsats*100,0) as andel_av_refusjon
-              ,case when rett_til_mødrekvote.trans_id is null then 'N' else 'J' end as rett_til_mødrekvote
-              ,case when rett_til_fedrekvote.trans_id is null then 'N' else 'J' end as rett_til_fedrekvote
-              ,flerbarnsdager.flerbarnsdager
-              ,adopsjon.adopsjonsdato, adopsjon.stebarnsadopsjon
-              ,eos.eos_sak
-        from beregningsgrunnlag_agg
-        left join mottaker
-        on beregningsgrunnlag_agg.fagsak_id = mottaker.fagsak_id
-        and beregningsgrunnlag_agg.trans_id = mottaker.max_trans_id
-        left join annenforelderfagsak
-        on beregningsgrunnlag_agg.fagsak_id = annenforelderfagsak.fagsak_id
-        and beregningsgrunnlag_agg.trans_id = annenforelderfagsak.max_trans_id
-        left join dvh_fam_fp.fam_fp_uttak_fp_kontoer
-        on beregningsgrunnlag_agg.fagsak_id = fam_fp_uttak_fp_kontoer.fagsak_id
-        and mottaker.max_trans_id = fam_fp_uttak_fp_kontoer.trans_id
-        --AND UPPER(REGEXP_REPLACE(grunnlag_drp1.TREKKONTO, '_|-|[[:space:]]', '')) = UPPER(REGEXP_REPLACE(FAM_FP_Uttak_FP_Kontoer.STOENADSKONTOTYPE, '_|-|[[:space:]]', ''))
-        and upper(replace(beregningsgrunnlag_agg.trekkonto,'_','')) = upper(replace(fam_fp_uttak_fp_kontoer.stoenadskontotype,' ',''))
-        left join dt_person.dim_person
-        on mottaker.fk_person1_mottaker = dim_person.fk_person1
-        and beregningsgrunnlag_agg.uttak_tom between dim_person.gyldig_fra_dato and dim_person.gyldig_til_dato
-        left join dt_kodeverk.dim_geografi
-        on dim_person.fk_dim_geografi_bosted = dim_geografi.pk_dim_geografi
-        left join aleneomsorg
-        on aleneomsorg.fagsak_id = beregningsgrunnlag_agg.fagsak_id
-        and aleneomsorg.uttak_fom = beregningsgrunnlag_agg.uttak_fom
-        left join
-        (select trans_id
-         from dvh_fam_fp.fam_fp_uttak_fp_kontoer
-         where upper(stoenadskontotype) = 'MØDREKVOTE'
-         group by trans_id
-        ) rett_til_mødrekvote
-        on rett_til_mødrekvote.trans_id = beregningsgrunnlag_agg.trans_id
-        left join
-        (select trans_id
-         from dvh_fam_fp.fam_fp_uttak_fp_kontoer
-         where upper(stoenadskontotype) = 'FEDREKVOTE'
-         group by trans_id
-        ) rett_til_fedrekvote
-        on rett_til_fedrekvote.trans_id = beregningsgrunnlag_agg.trans_id
-        left join
-        (select trans_id, max(max_dager) as flerbarnsdager
-         from dvh_fam_fp.fam_fp_uttak_fp_kontoer
-         where upper(stoenadskontotype) = 'FLERBARNSDAGER'
-         group by trans_id
-        ) flerbarnsdager
-        on flerbarnsdager.trans_id = beregningsgrunnlag_agg.trans_id
-        left join adopsjon
-        on beregningsgrunnlag_agg.fagsak_id = adopsjon.fagsak_id
-        left join eos
-        on beregningsgrunnlag_agg.trans_id = eos.trans_id
+            SELECT
+              FAGSAK_ID,
+              TRANS_ID,
+              TREKKONTO,
+              TREKKDAGER,
+              STONADSDAGER_KVOTE,
+              UTTAK_ARBEID_TYPE,
+              AAR,
+              HALVAAR,
+              KVARTAL,
+              AAR_MAANED,
+              UTTAK_FOM,
+              UTTAK_TOM,
+              SUM(DAGSATS_VIRKSOMHET/DAGSATS*
+                CASE
+                  WHEN ((UPPER(GRADERING_INNVILGET) ='TRUE'
+                  AND UPPER(GRADERING)='TRUE')
+                  OR UPPER(SAMTIDIG_UTTAK)='TRUE') THEN
+                    (100-ARBEIDSTIDSPROSENT)/100
+                  ELSE
+                    1.0
+                END )                                DAGER_ERST2,
+              MAX(ARBEIDSTIDSPROSENT)                AS ARBEIDSTIDSPROSENT,
+              COUNT(DISTINCT PK_DIM_TID)             DAGER_ERST,
+ --count(distinct pk_dim_tid)*dagsats_virksomhet/dagsats tilfelle_erst,
+              MIN(BEREGNINGSGRUNNLAG_FOM)            BEREGNINGSGRUNNLAG_FOM,
+              MAX(BEREGNINGSGRUNNLAG_TOM)            BEREGNINGSGRUNNLAG_TOM,
+              DEKNINGSGRAD,
+ --count(distinct pk_dim_tid)*
+ --      round(utbetalingsprosent/100*dagsats_virksomhet-0.5) belop,
+              DAGSATS_BRUKER,
+              DAGSATS_ARBEIDSGIVER,
+              DAGSATS_VIRKSOMHET,
+              VIRKSOMHET,
+              PERIODE_RESULTAT_AARSAK,
+              DAGSATS,
+              DAGSATS_ERST, --dagsats_virksomhet,
+              UTBETALINGSPROSENT                     GRADERINGSPROSENT,
+              STATUS_OG_ANDEL_INNTEKTSKAT,
+              AKTIVITET_STATUS,
+              BRUTTO_INNTEKT,
+              AVKORTET_INNTEKT,
+              STATUS_OG_ANDEL_BRUTTO,
+              STATUS_OG_ANDEL_AVKORTET,
+ --round(utbetalingsprosent/100*dagsats_virksomhet-0.5) dagsats_redusert,
+              UTBETALINGSPROSENT,
+              MIN(PK_DIM_TID)                        PK_DIM_TID_DATO_UTBET_FOM,
+              MAX(PK_DIM_TID)                        PK_DIM_TID_DATO_UTBET_TOM,
+              FUNKSJONELL_TID,
+              FORSTE_VEDTAKSDATO,
+              SISTE_VEDTAKSDATO,
+              MAX_VEDTAKSDATO,
+              PERIODE,
+              MAX(FORSTE_SOKNADSDATO)                AS FORSTE_SOKNADSDATO,
+              MAX(SOKNADSDATO)                       AS SOKNADSDATO,
+              SAMTIDIG_UTTAK,
+              GRADERING,
+              GRADERING_INNVILGET,
+              MIN_UTTAK_FOM,
+              MAX_UTTAK_TOM,
+              FK_DIM_TID_MIN_DATO_KVOTE,
+              FK_DIM_TID_MAX_DATO_KVOTE,
+              MAX(PK_FAM_FP_TREKKONTO)               AS PK_FAM_FP_TREKKONTO,
+              MAX(PK_FAM_FP_PERIODE_RESULTAT_AARSAK) AS PK_FAM_FP_PERIODE_RESULTAT_AARSAK,
+              ANTALL_BEREGNINGSGRUNNLAG,
+              MAX(GRADERINGSDAGER)                   AS GRADERINGSDAGER,
+              MAX(MORS_AKTIVITET)                    AS MORS_AKTIVITET
+            FROM
+              BEREGNINGSGRUNNLAG_DETALJ
+            GROUP BY
+              FAGSAK_ID,
+              TRANS_ID,
+              TREKKONTO,
+              TREKKDAGER,
+              STONADSDAGER_KVOTE,
+              UTTAK_ARBEID_TYPE,
+              AAR,
+              HALVAAR,
+              KVARTAL,
+              AAR_MAANED,
+              UTTAK_FOM,
+              UTTAK_TOM,
+              DEKNINGSGRAD,
+              VIRKSOMHET,
+              UTBETALINGSPROSENT,
+              PERIODE_RESULTAT_AARSAK,
+              DAGSATS,
+              DAGSATS_ERST,
+              DAGSATS_BRUKER,
+              DAGSATS_ARBEIDSGIVER,
+              DAGSATS_VIRKSOMHET,
+              UTBETALINGSPROSENT,
+              STATUS_OG_ANDEL_INNTEKTSKAT,
+              AKTIVITET_STATUS,
+              BRUTTO_INNTEKT,
+              AVKORTET_INNTEKT,
+              STATUS_OG_ANDEL_BRUTTO,
+              STATUS_OG_ANDEL_AVKORTET,
+              FUNKSJONELL_TID,
+              FORSTE_VEDTAKSDATO,
+              SISTE_VEDTAKSDATO,
+              MAX_VEDTAKSDATO,
+              PERIODE,
+              SAMTIDIG_UTTAK,
+              GRADERING,
+              GRADERING_INNVILGET,
+              MIN_UTTAK_FOM,
+              MAX_UTTAK_TOM,
+              FK_DIM_TID_MIN_DATO_KVOTE,
+              FK_DIM_TID_MAX_DATO_KVOTE,
+              ANTALL_BEREGNINGSGRUNNLAG
+          ) A
+      ), GRUNNLAG AS (
+        SELECT
+          BEREGNINGSGRUNNLAG_AGG.*,
+          SYSDATE                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      AS LASTET_DATO,
+          MOTTAKER.BEHANDLINGSTEMA,
+          MOTTAKER.MAX_TRANS_ID,
+          MOTTAKER.FK_PERSON1_MOTTAKER,
+          MOTTAKER.KJONN,
+          MOTTAKER.FK_PERSON1_BARN,
+          MOTTAKER.TERMINDATO,
+          MOTTAKER.FOEDSELSDATO,
+          MOTTAKER.ANTALL_BARN_TERMIN,
+          MOTTAKER.ANTALL_BARN_FOEDSEL,
+          MOTTAKER.FOEDSELSDATO_ADOPSJON,
+          MOTTAKER.ANTALL_BARN_ADOPSJON,
+          MOTTAKER.MOTTAKER_FODSELS_AAR,
+          MOTTAKER.MOTTAKER_FODSELS_MND,
+          SUBSTR(P_TID_FOM, 1, 4) - MOTTAKER.MOTTAKER_FODSELS_AAR                                                                                                                                                                                                                                                                                                                                                                                                                                                      AS MOTTAKER_ALDER,
+          MOTTAKER.SIVILSTAND,
+          MOTTAKER.STATSBORGERSKAP,
+          DIM_PERSON.PK_DIM_PERSON,
+          DIM_PERSON.BOSTED_KOMMUNE_NR,
+          DIM_PERSON.FK_DIM_SIVILSTATUS,
+          DIM_GEOGRAFI.PK_DIM_GEOGRAFI,
+          DIM_GEOGRAFI.BYDEL_KOMMUNE_NR,
+          DIM_GEOGRAFI.KOMMUNE_NR,
+          DIM_GEOGRAFI.KOMMUNE_NAVN,
+          DIM_GEOGRAFI.BYDEL_NR,
+          DIM_GEOGRAFI.BYDEL_NAVN,
+          ANNENFORELDERFAGSAK.ANNENFORELDERFAGSAK_ID,
+          ANNENFORELDERFAGSAK.FK_PERSON1_ANNEN_PART,
+          FAM_FP_UTTAK_FP_KONTOER.MAX_DAGER                                                                                                                                                                                                                                                                                                                                                                                                                                                                            MAX_STONADSDAGER_KONTO,
+          CASE
+            WHEN ALENEOMSORG.FAGSAK_ID IS NOT NULL THEN
+              'J'
+            ELSE
+              NULL
+          END AS                                                                                                                                                                                                                                                                                                                                                                                                                                           ALENEOMSORG,
+          CASE
+            WHEN BEHANDLINGSTEMA = 'FORP_FODS' THEN
+              '214'
+            WHEN BEHANDLINGSTEMA = 'FORP_ADOP' THEN
+              '216'
+          END AS                                                                                                                                                                                                                                                                                                                                                                                                         HOVEDKONTONR,
+          CASE
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='ARBEIDSTAKER' AND DAGSATS_ARBEIDSGIVER/DAGSATS*100<=50 THEN
+              '1000'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='ARBEIDSTAKER' AND DAGSATS_ARBEIDSGIVER/DAGSATS*100>50 THEN
+              '8020'
+ --when status_og_andel_inntektskat='ARBEIDSTAKER' then '1000'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='JORDBRUKER' THEN
+              '5210'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='SJÃ˜MANN' THEN
+              '1300'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='SELVSTENDIG_NÃ†RINGSDRIVENDE' THEN
+              '5010'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='DAGPENGER' THEN
+              '1200'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='ARBEIDSTAKER_UTEN_FERIEPENGER' THEN
+              '1000'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='FISKER' THEN
+              '5300'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='DAGMAMMA' THEN
+              '5110'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='FRILANSER' THEN
+              '1100'
+          END AS UNDERKONTONR,
+          CASE
+            WHEN RETT_TIL_MÃ˜DREKVOTE.TRANS_ID IS NULL THEN
+              'N'
+            ELSE
+              'J'
+          END AS                                                                                                                                                                                                                                                                                                                                                                                                                                         RETT_TIL_MÃ˜DREKVOTE,
+          CASE
+            WHEN RETT_TIL_FEDREKVOTE.TRANS_ID IS NULL THEN
+              'N'
+            ELSE
+              'J'
+          END AS                                                                                                                                                                                                                                                                                                                                                                                                                                         RETT_TIL_FEDREKVOTE,
+          FLERBARNSDAGER.FLERBARNSDAGER,
+          ROUND(DAGSATS_ARBEIDSGIVER/DAGSATS*100, 0)                                                                                                                                                                                                                                                                                                                                                                                                                                                                   AS ANDEL_AV_REFUSJON,
+          ADOPSJON.ADOPSJONSDATO,
+          ADOPSJON.STEBARNSADOPSJON,
+          EOS.EOS_SAK
+        FROM
+          BEREGNINGSGRUNNLAG_AGG
+          LEFT JOIN MOTTAKER
+          ON BEREGNINGSGRUNNLAG_AGG.FAGSAK_ID = MOTTAKER.FAGSAK_ID
+          AND BEREGNINGSGRUNNLAG_AGG.TRANS_ID = MOTTAKER.MAX_TRANS_ID
+          LEFT JOIN ANNENFORELDERFAGSAK
+          ON BEREGNINGSGRUNNLAG_AGG.FAGSAK_ID = ANNENFORELDERFAGSAK.FAGSAK_ID
+          AND BEREGNINGSGRUNNLAG_AGG.TRANS_ID = ANNENFORELDERFAGSAK.MAX_TRANS_ID
+          LEFT JOIN DVH_FAM_FP.FAM_FP_UTTAK_FP_KONTOER
+          ON BEREGNINGSGRUNNLAG_AGG.FAGSAK_ID = FAM_FP_UTTAK_FP_KONTOER.FAGSAK_ID
+          AND MOTTAKER.MAX_TRANS_ID = FAM_FP_UTTAK_FP_KONTOER.TRANS_ID
+ --AND UPPER(REGEXP_REPLACE(grunnlag_drp1.TREKKONTO, '_|-|[[:space:]]', '')) = UPPER(REGEXP_REPLACE(FAM_FP_Uttak_FP_Kontoer.STOENADSKONTOTYPE, '_|-|[[:space:]]', ''))
+          AND UPPER(REPLACE(BEREGNINGSGRUNNLAG_AGG.TREKKONTO,
+          '_',
+          '')) = UPPER(REPLACE(FAM_FP_UTTAK_FP_KONTOER.STOENADSKONTOTYPE,
+          ' ',
+          ''))
+          LEFT JOIN DT_PERSON.DIM_PERSON
+          ON MOTTAKER.FK_PERSON1_MOTTAKER = DIM_PERSON.FK_PERSON1
+ --and beregningsgrunnlag_agg.uttak_tom between dim_person.gyldig_fra_dato and dim_person.gyldig_til_dato
+          AND TO_DATE(BEREGNINGSGRUNNLAG_AGG.PK_DIM_TID_DATO_UTBET_TOM,
+          'yyyymmdd') BETWEEN DIM_PERSON.GYLDIG_FRA_DATO
+          AND DIM_PERSON.GYLDIG_TIL_DATO
+          LEFT JOIN DT_KODEVERK.DIM_GEOGRAFI
+          ON DIM_PERSON.FK_DIM_GEOGRAFI_BOSTED = DIM_GEOGRAFI.PK_DIM_GEOGRAFI
+          LEFT JOIN ALENEOMSORG
+          ON ALENEOMSORG.FAGSAK_ID = BEREGNINGSGRUNNLAG_AGG.FAGSAK_ID
+          AND ALENEOMSORG.UTTAK_FOM = BEREGNINGSGRUNNLAG_AGG.UTTAK_FOM
+          LEFT JOIN (
+            SELECT
+              TRANS_ID
+            FROM
+              DVH_FAM_FP.FAM_FP_UTTAK_FP_KONTOER
+            WHERE
+              UPPER(STOENADSKONTOTYPE) = 'MÃ˜DREKVOTE'
+            GROUP BY
+              TRANS_ID
+          ) RETT_TIL_MÃ˜DREKVOTE
+          ON RETT_TIL_MÃ˜DREKVOTE.TRANS_ID = BEREGNINGSGRUNNLAG_AGG.TRANS_ID
+          LEFT JOIN (
+            SELECT
+              TRANS_ID
+            FROM
+              DVH_FAM_FP.FAM_FP_UTTAK_FP_KONTOER
+            WHERE
+              UPPER(STOENADSKONTOTYPE) = 'FEDREKVOTE'
+            GROUP BY
+              TRANS_ID
+          ) RETT_TIL_FEDREKVOTE
+          ON RETT_TIL_FEDREKVOTE.TRANS_ID = BEREGNINGSGRUNNLAG_AGG.TRANS_ID
+          LEFT JOIN (
+            SELECT
+              TRANS_ID,
+              MAX(MAX_DAGER) AS FLERBARNSDAGER
+            FROM
+              DVH_FAM_FP.FAM_FP_UTTAK_FP_KONTOER
+            WHERE
+              UPPER(STOENADSKONTOTYPE) = 'FLERBARNSDAGER'
+            GROUP BY
+              TRANS_ID
+          ) FLERBARNSDAGER
+          ON FLERBARNSDAGER.TRANS_ID = BEREGNINGSGRUNNLAG_AGG.TRANS_ID
+          LEFT JOIN ADOPSJON
+          ON BEREGNINGSGRUNNLAG_AGG.FAGSAK_ID = ADOPSJON.FAGSAK_ID
+          LEFT JOIN EOS
+          ON BEREGNINGSGRUNNLAG_AGG.TRANS_ID = EOS.TRANS_ID
       )
-      select /*+ PARALLEL(8) */ * --Fjern parallel hint hvis man får feilmelding ved kjøring
-      --from uttak_dager
-      from grunnlag--grunnlag
-      where fagsak_id not in (1679117)
-      --where fagsak_id in (1035184)
-      ;
-    v_tid_fom varchar2(8) := null;
-    v_tid_tom varchar2(8) := null;
-    v_commit number := 0;
-    v_error_melding varchar2(1000) := null;
-    v_dim_tid_antall number := 0;
-    v_utbetalingsprosent_kalkulert number := 0;
-  begin
-    v_tid_fom := substr(p_in_vedtak_tom,1,4) || '0101';
-    v_tid_tom := substr(p_in_vedtak_tom,1,4) || '1231';
-    --dbms_output.put_line(v_tid_fom||v_tid_tom);--TEST!!!
+      SELECT /*+ PARALLEL(8) */
+        *
+ --from uttak_dager
+      FROM
+        GRUNNLAG
+      ORDER BY
+        FAGSAK_ID
+ --where fagsak_id in (1035184)
+;
+    V_TID_FOM                      VARCHAR2(8) := NULL;
+    V_TID_TOM                      VARCHAR2(8) := NULL;
+    V_COMMIT                       NUMBER := 0;
+    V_ERROR_MELDING                VARCHAR2(1000) := NULL;
+    V_DIM_TID_ANTALL               NUMBER := 0;
+    V_UTBETALINGSPROSENT_KALKULERT NUMBER := 0;
+    V_BUDSJETT                     VARCHAR2(5);
+  BEGIN
+    V_TID_FOM := P_IN_VEDTAK_TOM
+                 || '01';
+    V_TID_TOM := TO_CHAR(LAST_DAY(TO_DATE(P_IN_VEDTAK_TOM, 'yyyymm')), 'yyyymmdd');
+    IF TO_DATE(P_IN_VEDTAK_TOM, 'yyyymm') <= TO_DATE(P_IN_RAPPORT_DATO, 'yyyymm') THEN
+      V_BUDSJETT := 'A';
+    ELSE
+      V_BUDSJETT := 'B';
+    END IF;
+ --dbms_output.put_line(v_tid_fom||v_tid_tom);--TEST!!!
+    FOR REC_PERIODE IN CUR_PERIODE(P_IN_RAPPORT_DATO, P_IN_FORSKYVNINGER, V_TID_FOM, V_TID_TOM, V_BUDSJETT) LOOP
+      V_DIM_TID_ANTALL := 0;
+      V_UTBETALINGSPROSENT_KALKULERT := 0;
+      V_DIM_TID_ANTALL := DIM_TID_ANTALL(TO_NUMBER(TO_CHAR(REC_PERIODE.UTTAK_FOM, 'yyyymmdd')), TO_NUMBER(TO_CHAR(REC_PERIODE.UTTAK_TOM, 'yyyymmdd')));
+      IF V_DIM_TID_ANTALL != 0 THEN
+        V_UTBETALINGSPROSENT_KALKULERT := ROUND(REC_PERIODE.TREKKDAGER/V_DIM_TID_ANTALL*100, 2);
+      ELSE
+        V_UTBETALINGSPROSENT_KALKULERT := 0;
+      END IF;
+      BEGIN
+        INSERT INTO DVH_FAM_FP.FAK_FAM_FP_VEDTAK_UTBETALING (
+          FAGSAK_ID,
+          TRANS_ID,
+          BEHANDLINGSTEMA,
+          TREKKONTO,
+          STONADSDAGER_KVOTE,
+          UTTAK_ARBEID_TYPE,
+          AAR,
+          HALVAAR,
+          KVARTAL,
+          AAR_MAANED,
+          RAPPORT_PERIODE,
+          UTTAK_FOM,
+          UTTAK_TOM,
+          DAGER_ERST,
+          BEREGNINGSGRUNNLAG_FOM,
+          BEREGNINGSGRUNNLAG_TOM,
+          DEKNINGSGRAD,
+          DAGSATS_BRUKER,
+          DAGSATS_ARBEIDSGIVER,
+          VIRKSOMHET,
+          PERIODE_RESULTAT_AARSAK,
+          DAGSATS,
+          GRADERINGSPROSENT,
+          STATUS_OG_ANDEL_INNTEKTSKAT,
+          AKTIVITET_STATUS,
+          BRUTTO_INNTEKT,
+          AVKORTET_INNTEKT,
+          STATUS_OG_ANDEL_BRUTTO,
+          STATUS_OG_ANDEL_AVKORTET,
+          UTBETALINGSPROSENT,
+          FK_DIM_TID_DATO_UTBET_FOM,
+          FK_DIM_TID_DATO_UTBET_TOM,
+          FUNKSJONELL_TID,
+          FORSTE_VEDTAKSDATO,
+          VEDTAKSDATO,
+          MAX_VEDTAKSDATO,
+          PERIODE_TYPE,
+          TILFELLE_ERST,
+          BELOP,
+          DAGSATS_REDUSERT,
+          LASTET_DATO,
+          MAX_TRANS_ID,
+          FK_PERSON1_MOTTAKER,
+          FK_PERSON1_ANNEN_PART,
+          KJONN,
+          FK_PERSON1_BARN,
+          TERMINDATO,
+          FOEDSELSDATO,
+          ANTALL_BARN_TERMIN,
+          ANTALL_BARN_FOEDSEL,
+          FOEDSELSDATO_ADOPSJON,
+          ANTALL_BARN_ADOPSJON,
+          ANNENFORELDERFAGSAK_ID,
+          MAX_STONADSDAGER_KONTO,
+          FK_DIM_PERSON,
+          BOSTED_KOMMUNE_NR,
+          FK_DIM_GEOGRAFI,
+          BYDEL_KOMMUNE_NR,
+          KOMMUNE_NR,
+          KOMMUNE_NAVN,
+          BYDEL_NR,
+          BYDEL_NAVN,
+          ALENEOMSORG,
+          HOVEDKONTONR,
+          UNDERKONTONR,
+          MOTTAKER_FODSELS_AAR,
+          MOTTAKER_FODSELS_MND,
+          MOTTAKER_ALDER,
+          RETT_TIL_FEDREKVOTE,
+          RETT_TIL_MODREKVOTE,
+          DAGSATS_ERST,
+          TREKKDAGER,
+          SAMTIDIG_UTTAK,
+          GRADERING,
+          GRADERING_INNVILGET,
+          ANTALL_DAGER_PERIODE,
+          FLERBARNSDAGER,
+          UTBETALINGSPROSENT_KALKULERT,
+          MIN_UTTAK_FOM,
+          MAX_UTTAK_TOM,
+          FK_FAM_FP_TREKKONTO,
+          FK_FAM_FP_PERIODE_RESULTAT_AARSAK,
+          SIVILSTATUS,
+          FK_DIM_SIVILSTATUS,
+          ANTALL_BEREGNINGSGRUNNLAG,
+          GRADERINGSDAGER,
+          FK_DIM_TID_MIN_DATO_KVOTE,
+          FK_DIM_TID_MAX_DATO_KVOTE,
+          ADOPSJONSDATO,
+          STEBARNSADOPSJON,
+          EOS_SAK,
+          MOR_RETTIGHET,
+          STATSBORGERSKAP,
+          ARBEIDSTIDSPROSENT,
+          MORS_AKTIVITET,
+          GYLDIG_FLAGG,
+          ANDEL_AV_REFUSJON,
+          FORSTE_SOKNADSDATO,
+          SOKNADSDATO,
+          BUDSJETT
+        ) VALUES (
+          REC_PERIODE.FAGSAK_ID,
+          REC_PERIODE.TRANS_ID,
+          REC_PERIODE.BEHANDLINGSTEMA,
+          REC_PERIODE.TREKKONTO,
+          REC_PERIODE.STONADSDAGER_KVOTE,
+          REC_PERIODE.UTTAK_ARBEID_TYPE,
+          REC_PERIODE.AAR,
+          REC_PERIODE.HALVAAR,
+          REC_PERIODE.KVARTAL,
+          REC_PERIODE.AAR_MAANED,
+          P_IN_RAPPORT_DATO,
+          REC_PERIODE.UTTAK_FOM,
+          REC_PERIODE.UTTAK_TOM,
+          REC_PERIODE.DAGER_ERST,
+          REC_PERIODE.BEREGNINGSGRUNNLAG_FOM,
+          REC_PERIODE.BEREGNINGSGRUNNLAG_TOM,
+          REC_PERIODE.DEKNINGSGRAD,
+          REC_PERIODE.DAGSATS_BRUKER,
+          REC_PERIODE.DAGSATS_ARBEIDSGIVER,
+          REC_PERIODE.VIRKSOMHET,
+          REC_PERIODE.PERIODE_RESULTAT_AARSAK,
+          REC_PERIODE.DAGSATS,
+          REC_PERIODE.GRADERINGSPROSENT,
+          REC_PERIODE.STATUS_OG_ANDEL_INNTEKTSKAT,
+          REC_PERIODE.AKTIVITET_STATUS,
+          REC_PERIODE.BRUTTO_INNTEKT,
+          REC_PERIODE.AVKORTET_INNTEKT,
+          REC_PERIODE.STATUS_OG_ANDEL_BRUTTO,
+          REC_PERIODE.STATUS_OG_ANDEL_AVKORTET,
+          REC_PERIODE.UTBETALINGSPROSENT,
+          REC_PERIODE.PK_DIM_TID_DATO_UTBET_FOM,
+          REC_PERIODE.PK_DIM_TID_DATO_UTBET_TOM,
+          REC_PERIODE.FUNKSJONELL_TID,
+          REC_PERIODE.FORSTE_VEDTAKSDATO,
+          REC_PERIODE.SISTE_VEDTAKSDATO,
+          REC_PERIODE.MAX_VEDTAKSDATO,
+          REC_PERIODE.PERIODE,
+          REC_PERIODE.TILFELLE_ERST,
+          REC_PERIODE.BELOP,
+          REC_PERIODE.DAGSATS_REDUSERT,
+          REC_PERIODE.LASTET_DATO,
+          REC_PERIODE.MAX_TRANS_ID,
+          REC_PERIODE.FK_PERSON1_MOTTAKER,
+          REC_PERIODE.FK_PERSON1_ANNEN_PART,
+          REC_PERIODE.KJONN,
+          REC_PERIODE.FK_PERSON1_BARN,
+          REC_PERIODE.TERMINDATO,
+          REC_PERIODE.FOEDSELSDATO,
+          REC_PERIODE.ANTALL_BARN_TERMIN,
+          REC_PERIODE.ANTALL_BARN_FOEDSEL,
+          REC_PERIODE.FOEDSELSDATO_ADOPSJON,
+          REC_PERIODE.ANTALL_BARN_ADOPSJON,
+          REC_PERIODE.ANNENFORELDERFAGSAK_ID,
+          REC_PERIODE.MAX_STONADSDAGER_KONTO,
+          REC_PERIODE.PK_DIM_PERSON,
+          REC_PERIODE.BOSTED_KOMMUNE_NR,
+          REC_PERIODE.PK_DIM_GEOGRAFI,
+          REC_PERIODE.BYDEL_KOMMUNE_NR,
+          REC_PERIODE.KOMMUNE_NR,
+          REC_PERIODE.KOMMUNE_NAVN,
+          REC_PERIODE.BYDEL_NR,
+          REC_PERIODE.BYDEL_NAVN,
+          REC_PERIODE.ALENEOMSORG,
+          REC_PERIODE.HOVEDKONTONR,
+          REC_PERIODE.UNDERKONTONR,
+          REC_PERIODE.MOTTAKER_FODSELS_AAR,
+          REC_PERIODE.MOTTAKER_FODSELS_MND,
+          REC_PERIODE.MOTTAKER_ALDER,
+          REC_PERIODE.RETT_TIL_FEDREKVOTE,
+          REC_PERIODE.RETT_TIL_MÃ˜DREKVOTE,
+          REC_PERIODE.DAGSATS_ERST,
+          REC_PERIODE.TREKKDAGER,
+          REC_PERIODE.SAMTIDIG_UTTAK,
+          REC_PERIODE.GRADERING,
+          REC_PERIODE.GRADERING_INNVILGET,
+          V_DIM_TID_ANTALL,
+          REC_PERIODE.FLERBARNSDAGER,
+          V_UTBETALINGSPROSENT_KALKULERT,
+          REC_PERIODE.MIN_UTTAK_FOM,
+          REC_PERIODE.MAX_UTTAK_TOM,
+          REC_PERIODE.PK_FAM_FP_TREKKONTO,
+          REC_PERIODE.PK_FAM_FP_PERIODE_RESULTAT_AARSAK,
+          REC_PERIODE.SIVILSTAND,
+          REC_PERIODE.FK_DIM_SIVILSTATUS,
+          REC_PERIODE.ANTALL_BEREGNINGSGRUNNLAG,
+          REC_PERIODE.GRADERINGSDAGER,
+          REC_PERIODE.FK_DIM_TID_MIN_DATO_KVOTE,
+          REC_PERIODE.FK_DIM_TID_MAX_DATO_KVOTE,
+          REC_PERIODE.ADOPSJONSDATO,
+          REC_PERIODE.STEBARNSADOPSJON,
+          REC_PERIODE.EOS_SAK,
+          REC_PERIODE.MOR_RETTIGHET,
+          REC_PERIODE.STATSBORGERSKAP,
+          REC_PERIODE.ARBEIDSTIDSPROSENT,
+          REC_PERIODE.MORS_AKTIVITET,
+          P_IN_GYLDIG_FLAGG,
+          REC_PERIODE.ANDEL_AV_REFUSJON,
+          REC_PERIODE.FORSTE_SOKNADSDATO,
+          REC_PERIODE.SOKNADSDATO,
+          V_BUDSJETT
+        );
+        V_COMMIT := V_COMMIT + 1;
+      EXCEPTION
+        WHEN OTHERS THEN
+          ROLLBACK;
+          V_ERROR_MELDING := SUBSTR(SQLCODE
+                                    || ' '
+                                    || SQLERRM, 1, 1000);
+          INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
+            MIN_LASTET_DATO,
+            ID,
+            ERROR_MSG,
+            OPPRETTET_TID,
+            KILDE
+          ) VALUES(
+            NULL,
+            REC_PERIODE.FAGSAK_ID,
+            V_ERROR_MELDING,
+            SYSDATE,
+            'FAM_FP_STATISTIKK_MAANED:INSERT'
+          );
+          COMMIT;
+          P_OUT_ERROR := SUBSTR(P_OUT_ERROR
+                                || V_ERROR_MELDING, 1, 1000);
+      END;
+      IF V_COMMIT > 100000 THEN
+        COMMIT;
+        V_COMMIT := 0;
+      END IF;
+    END LOOP;
+    COMMIT;
+  EXCEPTION
+    WHEN OTHERS THEN
+      ROLLBACK;
+      V_ERROR_MELDING := SUBSTR(SQLCODE
+                                || ' '
+                                || SQLERRM, 1, 1000);
+      INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
+        MIN_LASTET_DATO,
+        ID,
+        ERROR_MSG,
+        OPPRETTET_TID,
+        KILDE
+      ) VALUES(
+        NULL,
+        NULL,
+        V_ERROR_MELDING,
+        SYSDATE,
+        'FAM_FP_STATISTIKK_MAANED'
+      );
+      COMMIT;
+      P_OUT_ERROR := SUBSTR(P_OUT_ERROR
+                            || V_ERROR_MELDING, 1, 1000);
+  END FAM_FP_STATISTIKK_MAANED;
 
-    for rec_periode in cur_periode(p_in_rapport_dato, p_in_forskyvninger, v_tid_fom, v_tid_tom) loop
-      v_dim_tid_antall := 0;
-      v_utbetalingsprosent_kalkulert := 0;
-      v_dim_tid_antall := dim_tid_antall(to_number(to_char(rec_periode.uttak_fom,'yyyymmdd'))
-                                        ,to_number(to_char(rec_periode.uttak_tom,'yyyymmdd')));
-      if v_dim_tid_antall != 0 then
-        v_utbetalingsprosent_kalkulert := round(rec_periode.trekkdager/v_dim_tid_antall*100,2);
-      else
-        v_utbetalingsprosent_kalkulert := 0;
-      end if;
-      --dbms_output.put_line(v_dim_tid_antall);
+  PROCEDURE FAM_FP_STATISTIKK_KVARTAL(
+    P_IN_VEDTAK_TOM IN VARCHAR2,
+    P_IN_RAPPORT_DATO IN VARCHAR2,
+    P_IN_FORSKYVNINGER IN NUMBER,
+    P_IN_GYLDIG_FLAGG IN NUMBER DEFAULT 0,
+    P_IN_PERIODE_TYPE IN VARCHAR2 DEFAULT 'K',
+    P_OUT_ERROR OUT VARCHAR2
+  ) AS
+    CURSOR CUR_PERIODE(P_RAPPORT_DATO IN VARCHAR2, P_FORSKYVNINGER IN NUMBER, P_TID_FOM IN VARCHAR2, P_TID_TOM IN VARCHAR2) IS
+      WITH FAGSAK AS (
+        SELECT
+          FAGSAK_ID,
+          MAX(BEHANDLINGSTEMA)                                                   AS BEHANDLINGSTEMA,
+          MAX(FAGSAKANNENFORELDER_ID)                                            AS ANNENFORELDERFAGSAK_ID,
+          MAX(TRANS_ID) KEEP(DENSE_RANK FIRST ORDER BY FUNKSJONELL_TID DESC)     AS MAX_TRANS_ID,
+          MAX(SOEKNADSDATO) KEEP(DENSE_RANK FIRST ORDER BY FUNKSJONELL_TID DESC) AS SOKNADSDATO,
+          MIN(SOEKNADSDATO)                                                      AS FORSTE_SOKNADSDATO,
+          MIN(VEDTAKSDATO)                                                       AS FORSTE_VEDTAKSDATO,
+          MAX(FUNKSJONELL_TID)                                                   AS FUNKSJONELL_TID,
+          MAX(VEDTAKSDATO)                                                       AS SISTE_VEDTAKSDATO,
+          P_IN_PERIODE_TYPE                                                      AS PERIODE,
+          LAST_DAY(TO_DATE(P_RAPPORT_DATO, 'yyyymm')) + P_FORSKYVNINGER          AS MAX_VEDTAKSDATO
+        FROM
+          DVH_FAM_FP.FAM_FP_FAGSAK
+        WHERE
+          FAM_FP_FAGSAK.FUNKSJONELL_TID <= LAST_DAY(TO_DATE(P_RAPPORT_DATO, 'yyyymm')) + P_FORSKYVNINGER
+        GROUP BY
+          FAGSAK_ID
+      ), TERMIN AS (
+        SELECT
+          FAGSAK_ID,
+          MAX(TERMINDATO)            TERMINDATO,
+          MAX(FOEDSELSDATO)          FOEDSELSDATO,
+          MAX(ANTALL_BARN_TERMIN)    ANTALL_BARN_TERMIN,
+          MAX(ANTALL_BARN_FOEDSEL)   ANTALL_BARN_FOEDSEL,
+          MAX(FOEDSELSDATO_ADOPSJON) FOEDSELSDATO_ADOPSJON,
+          MAX(ANTALL_BARN_ADOPSJON) ANTALL_BARN_ADOPSJON
+        FROM
+          (
+            SELECT
+              FAM_FP_FAGSAK.FAGSAK_ID,
+              MAX(FODSEL.TERMINDATO)              TERMINDATO,
+              MAX(FODSEL.FOEDSELSDATO)            FOEDSELSDATO,
+              MAX(FODSEL.ANTALL_BARN_FOEDSEL)     ANTALL_BARN_FOEDSEL,
+              MAX(FODSEL.ANTALL_BARN_TERMIN)      ANTALL_BARN_TERMIN,
+              MAX(ADOPSJON.FOEDSELSDATO_ADOPSJON) FOEDSELSDATO_ADOPSJON,
+              COUNT(ADOPSJON.TRANS_ID)            ANTALL_BARN_ADOPSJON
+            FROM
+              DVH_FAM_FP.FAM_FP_FAGSAK
+              LEFT JOIN DVH_FAM_FP.FAM_FP_FODSELTERMIN FODSEL
+              ON FODSEL.FAGSAK_ID = FAM_FP_FAGSAK.FAGSAK_ID
+              AND UPPER(FAM_FP_FAGSAK.BEHANDLINGSTEMA) = 'FORP_FODS'
+              LEFT JOIN DVH_FAM_FP.FAM_FP_FODSELTERMIN ADOPSJON
+              ON ADOPSJON.FAGSAK_ID = FAM_FP_FAGSAK.FAGSAK_ID
+              AND ADOPSJON.TRANS_ID = FAM_FP_FAGSAK.TRANS_ID
+              AND UPPER(FAM_FP_FAGSAK.BEHANDLINGSTEMA) = 'FORP_ADOP'
+            GROUP BY
+              FAM_FP_FAGSAK.FAGSAK_ID,
+              FAM_FP_FAGSAK.TRANS_ID
+          )
+        GROUP BY
+          FAGSAK_ID
+      ), FK_PERSON1 AS (
+        SELECT
+          PERSON.PERSON,
+          PERSON.FAGSAK_ID,
+          MAX(PERSON.BEHANDLINGSTEMA)                                                                             AS BEHANDLINGSTEMA,
+          PERSON.MAX_TRANS_ID,
+          MAX(PERSON.ANNENFORELDERFAGSAK_ID)                                                                      AS ANNENFORELDERFAGSAK_ID,
+          PERSON.AKTOER_ID,
+          MAX(PERSON.KJONN)                                                                                       AS KJONN,
+          MAX(PERSON_67_VASKET.FK_PERSON1) KEEP (DENSE_RANK FIRST ORDER BY PERSON_67_VASKET.GYLDIG_FRA_DATO DESC) AS FK_PERSON1,
+          MAX(FOEDSELSDATO)                                                                                       AS FOEDSELSDATO,
+          MAX(SIVILSTAND)                                                                                         AS SIVILSTAND,
+          MAX(STATSBORGERSKAP)                                                                                    AS STATSBORGERSKAP
+        FROM
+          (
+            SELECT
+              'MOTTAKER'                                AS PERSON,
+              FAGSAK.FAGSAK_ID,
+              FAGSAK.BEHANDLINGSTEMA,
+              FAGSAK.MAX_TRANS_ID,
+              FAGSAK.ANNENFORELDERFAGSAK_ID,
+              FAM_FP_PERSONOPPLYSNINGER.AKTOER_ID,
+              FAM_FP_PERSONOPPLYSNINGER.KJONN,
+              FAM_FP_PERSONOPPLYSNINGER.FOEDSELSDATO,
+              FAM_FP_PERSONOPPLYSNINGER.SIVILSTAND,
+              FAM_FP_PERSONOPPLYSNINGER.STATSBORGERSKAP
+            FROM
+              DVH_FAM_FP.FAM_FP_PERSONOPPLYSNINGER
+              JOIN FAGSAK
+              ON FAM_FP_PERSONOPPLYSNINGER.TRANS_ID = FAGSAK.MAX_TRANS_ID UNION ALL
+              SELECT
+                'BARN'                                    AS PERSON,
+                FAGSAK.FAGSAK_ID,
+                MAX(FAGSAK.BEHANDLINGSTEMA)               AS BEHANDLINGSTEMA,
+                FAGSAK.MAX_TRANS_ID,
+                MAX(FAGSAK.ANNENFORELDERFAGSAK_ID)        ANNENFORELDERFAGSAK_ID,
+                MAX(FAM_FP_FAMILIEHENDELSE.TIL_AKTOER_ID) AS AKTOER_ID,
+                MAX(FAM_FP_FAMILIEHENDELSE.KJOENN)        AS KJONN,
+                NULL                                      AS FOEDSELSDATO,
+                NULL                                      AS SIVILSTAND,
+                NULL                                      AS STATSBORGERSKAP
+              FROM
+                DVH_FAM_FP.FAM_FP_FAMILIEHENDELSE
+                JOIN FAGSAK
+                ON FAM_FP_FAMILIEHENDELSE.FAGSAK_ID = FAGSAK.FAGSAK_ID
+              WHERE
+                UPPER(FAM_FP_FAMILIEHENDELSE.RELASJON) = 'BARN'
+              GROUP BY
+                FAGSAK.FAGSAK_ID, FAGSAK.MAX_TRANS_ID
+          )                                    PERSON
+          JOIN DT_PERSON.DVH_PERSON_IDENT_AKTOR_IKKE_SKJERMET PERSON_67_VASKET
+          ON PERSON_67_VASKET.AKTOR_ID = PERSON.AKTOER_ID
+          AND TO_DATE(P_TID_TOM, 'yyyymmdd') BETWEEN PERSON_67_VASKET.GYLDIG_FRA_DATO
+          AND PERSON_67_VASKET.GYLDIG_TIL_DATO
+        GROUP BY
+          PERSON.PERSON, PERSON.FAGSAK_ID, PERSON.MAX_TRANS_ID, PERSON.AKTOER_ID
+      ), BARN AS (
+        SELECT
+          FAGSAK_ID,
+          LISTAGG(FK_PERSON1, ',') WITHIN GROUP (ORDER BY FK_PERSON1) AS FK_PERSON1_BARN
+        FROM
+          FK_PERSON1
+        WHERE
+          PERSON = 'BARN'
+        GROUP BY
+          FAGSAK_ID
+      ), MOTTAKER AS (
+        SELECT
+          FK_PERSON1.FAGSAK_ID,
+          FK_PERSON1.BEHANDLINGSTEMA,
+          FK_PERSON1.MAX_TRANS_ID,
+          FK_PERSON1.ANNENFORELDERFAGSAK_ID,
+          FK_PERSON1.AKTOER_ID,
+          FK_PERSON1.KJONN,
+          FK_PERSON1.FK_PERSON1                       AS FK_PERSON1_MOTTAKER,
+          EXTRACT(YEAR FROM FK_PERSON1.FOEDSELSDATO) AS MOTTAKER_FODSELS_AAR,
+          EXTRACT(MONTH FROM FK_PERSON1.FOEDSELSDATO) AS MOTTAKER_FODSELS_MND,
+          FK_PERSON1.SIVILSTAND,
+          FK_PERSON1.STATSBORGERSKAP,
+          BARN.FK_PERSON1_BARN,
+          TERMIN.TERMINDATO,
+          TERMIN.FOEDSELSDATO,
+          TERMIN.ANTALL_BARN_TERMIN,
+          TERMIN.ANTALL_BARN_FOEDSEL,
+          TERMIN.FOEDSELSDATO_ADOPSJON,
+          TERMIN.ANTALL_BARN_ADOPSJON
+        FROM
+          FK_PERSON1
+          LEFT JOIN BARN
+          ON BARN.FAGSAK_ID = FK_PERSON1.FAGSAK_ID
+          LEFT JOIN TERMIN
+          ON FK_PERSON1.FAGSAK_ID = TERMIN.FAGSAK_ID
+        WHERE
+          FK_PERSON1.PERSON = 'MOTTAKER'
+      ), ADOPSJON AS (
+        SELECT
+          FAM_FP_VILKAAR.FAGSAK_ID,
+          MAX(FAM_FP_VILKAAR.OMSORGS_OVERTAKELSESDATO) AS ADOPSJONSDATO,
+          MAX(FAM_FP_VILKAAR.EKTEFELLES_BARN)          AS STEBARNSADOPSJON
+        FROM
+          FAGSAK
+          JOIN DVH_FAM_FP.FAM_FP_VILKAAR
+          ON FAGSAK.FAGSAK_ID = FAM_FP_VILKAAR.FAGSAK_ID
+        WHERE
+          FAGSAK.BEHANDLINGSTEMA = 'FORP_ADOP'
+        GROUP BY
+          FAM_FP_VILKAAR.FAGSAK_ID
+      ), EOS AS (
+        SELECT
+          A.TRANS_ID,
+          CASE
+            WHEN UPPER(ER_BORGER_AV_EU_EOS) = 'TRUE' THEN
+              'J'
+            WHEN UPPER(ER_BORGER_AV_EU_EOS) = 'FALSE' THEN
+              'N'
+            ELSE
+              NULL
+          END EOS_SAK
+        FROM
+          (
+            SELECT
+              FAM_FP_VILKAAR.TRANS_ID,
+              MAX(FAM_FP_VILKAAR.ER_BORGER_AV_EU_EOS) AS ER_BORGER_AV_EU_EOS
+            FROM
+              FAGSAK
+              JOIN DVH_FAM_FP.FAM_FP_VILKAAR
+              ON FAGSAK.MAX_TRANS_ID = FAM_FP_VILKAAR.TRANS_ID
+              AND LENGTH(FAM_FP_VILKAAR.PERSON_STATUS) > 0
+            GROUP BY
+              FAM_FP_VILKAAR.TRANS_ID
+          ) A
+      ), ANNENFORELDERFAGSAK AS (
+        SELECT
+          ANNENFORELDERFAGSAK.*,
+          MOTTAKER.FK_PERSON1_MOTTAKER AS FK_PERSON1_ANNEN_PART
+        FROM
+          (
+            SELECT
+              FAGSAK_ID,
+              MAX_TRANS_ID,
+              MAX(ANNENFORELDERFAGSAK_ID) AS ANNENFORELDERFAGSAK_ID
+            FROM
+              (
+                SELECT
+                  FORELDER1.FAGSAK_ID,
+                  FORELDER1.MAX_TRANS_ID,
+                  NVL(FORELDER1.ANNENFORELDERFAGSAK_ID, FORELDER2.FAGSAK_ID) AS ANNENFORELDERFAGSAK_ID
+                FROM
+                  MOTTAKER FORELDER1
+                  JOIN MOTTAKER FORELDER2
+                  ON FORELDER1.FK_PERSON1_BARN = FORELDER2.FK_PERSON1_BARN
+                  AND FORELDER1.FK_PERSON1_MOTTAKER != FORELDER2.FK_PERSON1_MOTTAKER
+              )
+            GROUP BY
+              FAGSAK_ID,
+              MAX_TRANS_ID
+          )        ANNENFORELDERFAGSAK
+          JOIN MOTTAKER
+          ON ANNENFORELDERFAGSAK.ANNENFORELDERFAGSAK_ID = MOTTAKER.FAGSAK_ID
+      ), TID AS (
+        SELECT
+          PK_DIM_TID,
+          DATO,
+          AAR,
+          HALVAAR,
+          KVARTAL,
+          AAR_MAANED
+        FROM
+          DT_KODEVERK.DIM_TID
+        WHERE
+          DAG_I_UKE < 6
+          AND DIM_NIVAA = 1
+          AND GYLDIG_FLAGG = 1
+          AND PK_DIM_TID BETWEEN P_TID_FOM AND P_TID_TOM
+          AND PK_DIM_TID <= TO_CHAR(LAST_DAY(TO_DATE(P_RAPPORT_DATO, 'yyyymm')), 'yyyymmdd')
+      ), UTTAK AS (
+        SELECT
+          UTTAK.TRANS_ID,
+          UTTAK.TREKKONTO,
+          UTTAK.UTTAK_ARBEID_TYPE,
+          UTTAK.VIRKSOMHET,
+          UTTAK.UTBETALINGSPROSENT,
+          UTTAK.GRADERING_INNVILGET,
+          UTTAK.GRADERING,
+          UTTAK.ARBEIDSTIDSPROSENT,
+          UTTAK.SAMTIDIG_UTTAK,
+          UTTAK.PERIODE_RESULTAT_AARSAK,
+          UTTAK.FOM                                      AS UTTAK_FOM,
+          UTTAK.TOM                                      AS UTTAK_TOM,
+          UTTAK.TREKKDAGER,
+          FAGSAK.FAGSAK_ID,
+          FAGSAK.PERIODE,
+          FAGSAK.FUNKSJONELL_TID,
+          FAGSAK.FORSTE_VEDTAKSDATO,
+          FAGSAK.SISTE_VEDTAKSDATO,
+          FAGSAK.MAX_VEDTAKSDATO,
+          FAGSAK.FORSTE_SOKNADSDATO,
+          FAGSAK.SOKNADSDATO,
+          FAM_FP_TREKKONTO.PK_FAM_FP_TREKKONTO,
+          AARSAK_UTTAK.PK_FAM_FP_PERIODE_RESULTAT_AARSAK,
+          UTTAK.ARBEIDSFORHOLD_ID,
+          UTTAK.GRADERINGSDAGER,
+          FAM_FP_UTTAK_FORDELINGSPER.MORS_AKTIVITET
+        FROM
+          DVH_FAM_FP.FAM_FP_UTTAK_RES_PER_AKTIV UTTAK
+          JOIN FAGSAK
+          ON FAGSAK.MAX_TRANS_ID = UTTAK.TRANS_ID LEFT JOIN DVH_FAM_FP.FAM_FP_TREKKONTO
+          ON UPPER(UTTAK.TREKKONTO) = FAM_FP_TREKKONTO.TREKKONTO
+          LEFT JOIN (
+            SELECT
+              AARSAK_UTTAK,
+              MAX(PK_FAM_FP_PERIODE_RESULTAT_AARSAK) AS PK_FAM_FP_PERIODE_RESULTAT_AARSAK
+            FROM
+              DVH_FAM_FP.FAM_FP_PERIODE_RESULTAT_AARSAK
+            GROUP BY
+              AARSAK_UTTAK
+          ) AARSAK_UTTAK
+          ON UPPER(UTTAK.PERIODE_RESULTAT_AARSAK) = AARSAK_UTTAK.AARSAK_UTTAK
+          LEFT JOIN DVH_FAM_FP.FAM_FP_UTTAK_FORDELINGSPER
+          ON FAM_FP_UTTAK_FORDELINGSPER.TRANS_ID = UTTAK.TRANS_ID
+          AND UTTAK.FOM BETWEEN FAM_FP_UTTAK_FORDELINGSPER.FOM
+          AND FAM_FP_UTTAK_FORDELINGSPER.TOM
+          AND UPPER(UTTAK.TREKKONTO) = UPPER(FAM_FP_UTTAK_FORDELINGSPER.PERIODE_TYPE)
+          AND LENGTH(FAM_FP_UTTAK_FORDELINGSPER.MORS_AKTIVITET) > 1
+        WHERE
+          UTTAK.UTBETALINGSPROSENT > 0
+      ), STONADSDAGER_KVOTE AS (
+        SELECT
+          UTTAK.*,
+          TID1.PK_DIM_TID AS FK_DIM_TID_MIN_DATO_KVOTE,
+          TID2.PK_DIM_TID AS FK_DIM_TID_MAX_DATO_KVOTE
+        FROM
+          (
+            SELECT
+              FAGSAK_ID,
+              TRANS_ID,
+              TREKKONTO,
+              VIRKSOMHET,
+              UTTAK_ARBEID_TYPE,
+              SUM(TREKKDAGER)   AS STONADSDAGER_KVOTE,
+              MIN(UTTAK_FOM)    AS MIN_UTTAK_FOM,
+              MAX(UTTAK_TOM)    AS MAX_UTTAK_TOM
+            FROM
+              (
+                SELECT
+                  FAGSAK_ID,
+                  TRANS_ID,
+                  UTTAK_FOM,
+                  UTTAK_TOM,
+                  TREKKONTO,
+                  VIRKSOMHET,
+                  UTTAK_ARBEID_TYPE,
+                  MAX(TREKKDAGER)   AS TREKKDAGER
+                FROM
+                  UTTAK
+                GROUP BY
+                  FAGSAK_ID,
+                  TRANS_ID,
+                  UTTAK_FOM,
+                  UTTAK_TOM,
+                  TREKKONTO,
+                  VIRKSOMHET,
+                  UTTAK_ARBEID_TYPE
+              ) A
+            GROUP BY
+              FAGSAK_ID,
+              TRANS_ID,
+              TREKKONTO,
+              VIRKSOMHET,
+              UTTAK_ARBEID_TYPE
+          )                   UTTAK
+          JOIN DT_KODEVERK.DIM_TID TID1
+          ON TID1.DIM_NIVAA = 1
+          AND TID1.DATO = TRUNC(UTTAK.MIN_UTTAK_FOM, 'dd') JOIN DT_KODEVERK.DIM_TID TID2
+          ON TID2.DIM_NIVAA = 1
+          AND TID2.DATO = TRUNC(UTTAK.MAX_UTTAK_TOM,
+          'dd')
+      ), UTTAK_DAGER AS (
+        SELECT
+          UTTAK.*,
+          TID.PK_DIM_TID,
+          TID.DATO,
+          TID.AAR,
+          TID.HALVAAR,
+          TID.KVARTAL,
+          TID.AAR_MAANED
+        FROM
+          UTTAK
+          JOIN TID
+          ON TID.DATO BETWEEN UTTAK.UTTAK_FOM
+          AND UTTAK.UTTAK_TOM
+      ), ALENEOMSORG AS (
+        SELECT
+          UTTAK.FAGSAK_ID,
+          UTTAK.UTTAK_FOM
+        FROM
+          UTTAK
+          JOIN DVH_FAM_FP.FAM_FP_DOKUMENTASJONSPERIODER DOK1
+          ON DOK1.FAGSAK_ID = UTTAK.FAGSAK_ID
+          AND UTTAK.UTTAK_FOM >= DOK1.FOM
+          AND DOK1.DOKUMENTASJON_TYPE IN ('ALENEOMSORG', 'ALENEOMSORG_OVERFÃ˜RING') LEFT JOIN DVH_FAM_FP.FAM_FP_DOKUMENTASJONSPERIODER DOK2
+          ON DOK1.FAGSAK_ID = DOK2.FAGSAK_ID
+          AND UTTAK.UTTAK_FOM >= DOK2.FOM
+          AND DOK1.TRANS_ID < DOK2.TRANS_ID
+          AND DOK2.DOKUMENTASJON_TYPE = 'ANNEN_FORELDER_HAR_RETT'
+          AND DOK2.FAGSAK_ID IS NULL
+        GROUP BY
+          UTTAK.FAGSAK_ID,
+          UTTAK.UTTAK_FOM
+      ), BEREGNINGSGRUNNLAG AS (
+        SELECT
+          FAGSAK_ID,
+          TRANS_ID,
+          VIRKSOMHETSNUMMER,
+          MAX(STATUS_OG_ANDEL_BRUTTO)         AS STATUS_OG_ANDEL_BRUTTO,
+          MAX(STATUS_OG_ANDEL_AVKORTET)       AS STATUS_OG_ANDEL_AVKORTET,
+          FOM                                 AS BEREGNINGSGRUNNLAG_FOM,
+          TOM                                 AS BEREGNINGSGRUNNLAG_TOM,
+          MAX(DEKNINGSGRAD)                   AS DEKNINGSGRAD,
+          MAX(DAGSATS)                        AS DAGSATS,
+          DAGSATS_BRUKER,
+          DAGSATS_ARBEIDSGIVER,
+          DAGSATS_BRUKER+DAGSATS_ARBEIDSGIVER DAGSATS_VIRKSOMHET,
+          MAX(STATUS_OG_ANDEL_INNTEKTSKAT)    AS STATUS_OG_ANDEL_INNTEKTSKAT,
+          AKTIVITET_STATUS,
+          MAX(BRUTTO)                         AS BRUTTO_INNTEKT,
+          MAX(AVKORTET)                       AS AVKORTET_INNTEKT,
+          COUNT(1)                            AS ANTALL_BEREGNINGSGRUNNLAG
+        FROM
+          DVH_FAM_FP.FAM_FP_BEREGNINGSGRUNNLAG
+        GROUP BY
+          FAGSAK_ID,
+          TRANS_ID,
+          VIRKSOMHETSNUMMER,
+          FOM,
+          TOM,
+          AKTIVITET_STATUS,
+          DAGSATS_BRUKER,
+          DAGSATS_ARBEIDSGIVER
+      ), BEREGNINGSGRUNNLAG_DETALJ AS (
+        SELECT
+          UTTAK_DAGER.*,
+          STONADSDAGER_KVOTE.STONADSDAGER_KVOTE,
+          STONADSDAGER_KVOTE.MIN_UTTAK_FOM,
+          STONADSDAGER_KVOTE.MAX_UTTAK_TOM,
+          STONADSDAGER_KVOTE.FK_DIM_TID_MIN_DATO_KVOTE,
+          STONADSDAGER_KVOTE.FK_DIM_TID_MAX_DATO_KVOTE,
+          BEREG.STATUS_OG_ANDEL_BRUTTO,
+          BEREG.STATUS_OG_ANDEL_AVKORTET,
+          BEREG.BEREGNINGSGRUNNLAG_FOM,
+          BEREG.DEKNINGSGRAD,
+          BEREG.BEREGNINGSGRUNNLAG_TOM,
+          BEREG.DAGSATS,
+          BEREG.DAGSATS_BRUKER,
+          BEREG.DAGSATS_ARBEIDSGIVER,
+          BEREG.DAGSATS_VIRKSOMHET,
+          BEREG.STATUS_OG_ANDEL_INNTEKTSKAT,
+          BEREG.AKTIVITET_STATUS,
+          BEREG.BRUTTO_INNTEKT,
+          BEREG.AVKORTET_INNTEKT,
+          BEREG.DAGSATS*UTTAK_DAGER.UTBETALINGSPROSENT/100 AS DAGSATS_ERST,
+          BEREG.ANTALL_BEREGNINGSGRUNNLAG
+        FROM
+          BEREGNINGSGRUNNLAG                        BEREG
+          JOIN UTTAK_DAGER
+          ON UTTAK_DAGER.TRANS_ID = BEREG.TRANS_ID
+          AND NVL(UTTAK_DAGER.VIRKSOMHET, 'X') = NVL(BEREG.VIRKSOMHETSNUMMER, 'X')
+          AND BEREG.BEREGNINGSGRUNNLAG_FOM <= UTTAK_DAGER.DATO
+          AND NVL(BEREG.BEREGNINGSGRUNNLAG_TOM, TO_DATE('20991201', 'YYYYMMDD')) >= UTTAK_DAGER.DATO LEFT JOIN STONADSDAGER_KVOTE
+          ON UTTAK_DAGER.TRANS_ID = STONADSDAGER_KVOTE.TRANS_ID
+          AND UTTAK_DAGER.TREKKONTO = STONADSDAGER_KVOTE.TREKKONTO
+          AND NVL(UTTAK_DAGER.VIRKSOMHET,
+          'X') = NVL(STONADSDAGER_KVOTE.VIRKSOMHET,
+          'X')
+          AND UTTAK_DAGER.UTTAK_ARBEID_TYPE = STONADSDAGER_KVOTE.UTTAK_ARBEID_TYPE
+          JOIN DVH_FAM_FP.FAM_FP_UTTAK_AKTIVITET_MAPPING UTTAK_MAPPING
+          ON UTTAK_DAGER.UTTAK_ARBEID_TYPE = UTTAK_MAPPING.UTTAK_ARBEID
+          AND BEREG.AKTIVITET_STATUS = UTTAK_MAPPING.AKTIVITET_STATUS
+        WHERE
+          BEREG.DAGSATS_BRUKER + BEREG.DAGSATS_ARBEIDSGIVER != 0
+      ), BEREGNINGSGRUNNLAG_AGG AS (
+        SELECT
+          A.*,
+          DAGER_ERST*DAGSATS_VIRKSOMHET/DAGSATS*ANTALL_BEREGNINGSGRUNNLAG                                                                                                                    TILFELLE_ERST,
+          DAGER_ERST*ROUND(UTBETALINGSPROSENT/100*DAGSATS_VIRKSOMHET)                                                                                                                        BELOP,
+          ROUND(UTBETALINGSPROSENT/100*DAGSATS_VIRKSOMHET-0.5)                                                                                                                               DAGSATS_REDUSERT,
+          CASE
+            WHEN PERIODE_RESULTAT_AARSAK IN (2004, 2033) THEN
+              'N'
+            WHEN TREKKONTO IN ('FEDREKVOTE', 'FELLESPERIODE', 'MÃ˜DREKVOTE') THEN
+              'J'
+            WHEN TREKKONTO = 'FORELDREPENGER' THEN
+              'N'
+          END MOR_RETTIGHET
+        FROM
+          (
+            SELECT
+              FAGSAK_ID,
+              TRANS_ID,
+              TREKKONTO,
+              TREKKDAGER,
+              STONADSDAGER_KVOTE,
+              UTTAK_ARBEID_TYPE,
+              AAR,
+              HALVAAR,
+              KVARTAL --, aar_maaned
+,
+              UTTAK_FOM,
+              UTTAK_TOM,
+              SUM(DAGSATS_VIRKSOMHET/DAGSATS*
+                CASE
+                  WHEN ((UPPER(GRADERING_INNVILGET) ='TRUE'
+                  AND UPPER(GRADERING)='TRUE')
+                  OR UPPER(SAMTIDIG_UTTAK)='TRUE') THEN
+                    (100-ARBEIDSTIDSPROSENT)/100
+                  ELSE
+                    1.0
+                END )                                DAGER_ERST2,
+              MAX(ARBEIDSTIDSPROSENT)                AS ARBEIDSTIDSPROSENT,
+              COUNT(DISTINCT PK_DIM_TID)             DAGER_ERST,
+ --count(distinct pk_dim_tid)*dagsats_virksomhet/dagsats tilfelle_erst,
+              MIN(BEREGNINGSGRUNNLAG_FOM)            BEREGNINGSGRUNNLAG_FOM,
+              MAX(BEREGNINGSGRUNNLAG_TOM)            BEREGNINGSGRUNNLAG_TOM,
+              DEKNINGSGRAD,
+ --count(distinct pk_dim_tid)*
+ --      round(utbetalingsprosent/100*dagsats_virksomhet-0.5) belop,
+              DAGSATS_BRUKER,
+              DAGSATS_ARBEIDSGIVER,
+              DAGSATS_VIRKSOMHET,
+              VIRKSOMHET,
+              PERIODE_RESULTAT_AARSAK,
+              DAGSATS,
+              DAGSATS_ERST, --dagsats_virksomhet,
+              UTBETALINGSPROSENT                     GRADERINGSPROSENT,
+              STATUS_OG_ANDEL_INNTEKTSKAT,
+              AKTIVITET_STATUS,
+              BRUTTO_INNTEKT,
+              AVKORTET_INNTEKT,
+              STATUS_OG_ANDEL_BRUTTO,
+              STATUS_OG_ANDEL_AVKORTET,
+ --round(utbetalingsprosent/100*dagsats_virksomhet-0.5) dagsats_redusert,
+              UTBETALINGSPROSENT,
+              MIN(PK_DIM_TID)                        PK_DIM_TID_DATO_UTBET_FOM,
+              MAX(PK_DIM_TID)                        PK_DIM_TID_DATO_UTBET_TOM,
+              FUNKSJONELL_TID,
+              FORSTE_VEDTAKSDATO,
+              SISTE_VEDTAKSDATO,
+              MAX_VEDTAKSDATO,
+              PERIODE,
+              MAX(FORSTE_SOKNADSDATO)                AS FORSTE_SOKNADSDATO,
+              MAX(SOKNADSDATO)                       AS SOKNADSDATO,
+              SAMTIDIG_UTTAK,
+              GRADERING,
+              GRADERING_INNVILGET,
+              MIN_UTTAK_FOM,
+              MAX_UTTAK_TOM,
+              FK_DIM_TID_MIN_DATO_KVOTE,
+              FK_DIM_TID_MAX_DATO_KVOTE,
+              MAX(PK_FAM_FP_TREKKONTO)               AS PK_FAM_FP_TREKKONTO,
+              MAX(PK_FAM_FP_PERIODE_RESULTAT_AARSAK) AS PK_FAM_FP_PERIODE_RESULTAT_AARSAK,
+              ANTALL_BEREGNINGSGRUNNLAG,
+              MAX(GRADERINGSDAGER)                   AS GRADERINGSDAGER,
+              MAX(MORS_AKTIVITET)                    AS MORS_AKTIVITET
+            FROM
+              BEREGNINGSGRUNNLAG_DETALJ
+            GROUP BY
+              FAGSAK_ID,
+              TRANS_ID,
+              TREKKONTO,
+              TREKKDAGER,
+              STONADSDAGER_KVOTE,
+              UTTAK_ARBEID_TYPE,
+              AAR,
+              HALVAAR,
+              KVARTAL --, aar_maaned
+,
+              UTTAK_FOM,
+              UTTAK_TOM,
+              DEKNINGSGRAD,
+              VIRKSOMHET,
+              UTBETALINGSPROSENT,
+              PERIODE_RESULTAT_AARSAK,
+              DAGSATS,
+              DAGSATS_ERST,
+              DAGSATS_BRUKER,
+              DAGSATS_ARBEIDSGIVER,
+              DAGSATS_VIRKSOMHET,
+              UTBETALINGSPROSENT,
+              STATUS_OG_ANDEL_INNTEKTSKAT,
+              AKTIVITET_STATUS,
+              BRUTTO_INNTEKT,
+              AVKORTET_INNTEKT,
+              STATUS_OG_ANDEL_BRUTTO,
+              STATUS_OG_ANDEL_AVKORTET,
+              FUNKSJONELL_TID,
+              FORSTE_VEDTAKSDATO,
+              SISTE_VEDTAKSDATO,
+              MAX_VEDTAKSDATO,
+              PERIODE,
+              SAMTIDIG_UTTAK,
+              GRADERING,
+              GRADERING_INNVILGET,
+              MIN_UTTAK_FOM,
+              MAX_UTTAK_TOM,
+              FK_DIM_TID_MIN_DATO_KVOTE,
+              FK_DIM_TID_MAX_DATO_KVOTE,
+              ANTALL_BEREGNINGSGRUNNLAG
+          ) A
+      ), GRUNNLAG AS (
+        SELECT
+          BEREGNINGSGRUNNLAG_AGG.*,
+          SYSDATE                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      AS LASTET_DATO,
+          MOTTAKER.BEHANDLINGSTEMA,
+          MOTTAKER.MAX_TRANS_ID,
+          MOTTAKER.FK_PERSON1_MOTTAKER,
+          MOTTAKER.KJONN,
+          MOTTAKER.FK_PERSON1_BARN,
+          MOTTAKER.TERMINDATO,
+          MOTTAKER.FOEDSELSDATO,
+          MOTTAKER.ANTALL_BARN_TERMIN,
+          MOTTAKER.ANTALL_BARN_FOEDSEL,
+          MOTTAKER.FOEDSELSDATO_ADOPSJON,
+          MOTTAKER.ANTALL_BARN_ADOPSJON,
+          MOTTAKER.MOTTAKER_FODSELS_AAR,
+          MOTTAKER.MOTTAKER_FODSELS_MND,
+          SUBSTR(P_TID_FOM, 1, 4) - MOTTAKER.MOTTAKER_FODSELS_AAR                                                                                                                                                                                                                                                                                                                                                                                                                                                      AS MOTTAKER_ALDER,
+          MOTTAKER.SIVILSTAND,
+          MOTTAKER.STATSBORGERSKAP,
+          DIM_PERSON.PK_DIM_PERSON,
+          DIM_PERSON.BOSTED_KOMMUNE_NR,
+          DIM_PERSON.FK_DIM_SIVILSTATUS,
+          DIM_GEOGRAFI.PK_DIM_GEOGRAFI,
+          DIM_GEOGRAFI.BYDEL_KOMMUNE_NR,
+          DIM_GEOGRAFI.KOMMUNE_NR,
+          DIM_GEOGRAFI.KOMMUNE_NAVN,
+          DIM_GEOGRAFI.BYDEL_NR,
+          DIM_GEOGRAFI.BYDEL_NAVN,
+          ANNENFORELDERFAGSAK.ANNENFORELDERFAGSAK_ID,
+          ANNENFORELDERFAGSAK.FK_PERSON1_ANNEN_PART,
+          FAM_FP_UTTAK_FP_KONTOER.MAX_DAGER                                                                                                                                                                                                                                                                                                                                                                                                                                                                            MAX_STONADSDAGER_KONTO,
+          CASE
+            WHEN ALENEOMSORG.FAGSAK_ID IS NOT NULL THEN
+              'J'
+            ELSE
+              NULL
+          END AS                                                                                                                                                                                                                                                                                                                                                                                                                                           ALENEOMSORG,
+          CASE
+            WHEN BEHANDLINGSTEMA = 'FORP_FODS' THEN
+              '214'
+            WHEN BEHANDLINGSTEMA = 'FORP_ADOP' THEN
+              '216'
+          END AS                                                                                                                                                                                                                                                                                                                                                                                                         HOVEDKONTONR,
+          CASE
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='ARBEIDSTAKER' AND DAGSATS_ARBEIDSGIVER/DAGSATS*100<=50 THEN
+              '1000'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='ARBEIDSTAKER' AND DAGSATS_ARBEIDSGIVER/DAGSATS*100>50 THEN
+              '8020'
+ --when status_og_andel_inntektskat='ARBEIDSTAKER' then '1000'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='JORDBRUKER' THEN
+              '5210'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='SJÃ˜MANN' THEN
+              '1300'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='SELVSTENDIG_NÃ†RINGSDRIVENDE' THEN
+              '5010'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='DAGPENGER' THEN
+              '1200'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='ARBEIDSTAKER_UTEN_FERIEPENGER' THEN
+              '1000'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='FISKER' THEN
+              '5300'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='DAGMAMMA' THEN
+              '5110'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='FRILANSER' THEN
+              '1100'
+          END AS UNDERKONTONR,
+          ROUND(DAGSATS_ARBEIDSGIVER/DAGSATS*100, 0)                                                                                                                                                                                                                                                                                                                                                                                                                                                                   AS ANDEL_AV_REFUSJON,
+          CASE
+            WHEN RETT_TIL_MÃ˜DREKVOTE.TRANS_ID IS NULL THEN
+              'N'
+            ELSE
+              'J'
+          END AS                                                                                                                                                                                                                                                                                                                                                                                                                                         RETT_TIL_MÃ˜DREKVOTE,
+          CASE
+            WHEN RETT_TIL_FEDREKVOTE.TRANS_ID IS NULL THEN
+              'N'
+            ELSE
+              'J'
+          END AS                                                                                                                                                                                                                                                                                                                                                                                                                                         RETT_TIL_FEDREKVOTE,
+          FLERBARNSDAGER.FLERBARNSDAGER,
+          ADOPSJON.ADOPSJONSDATO,
+          ADOPSJON.STEBARNSADOPSJON,
+          EOS.EOS_SAK
+        FROM
+          BEREGNINGSGRUNNLAG_AGG
+          LEFT JOIN MOTTAKER
+          ON BEREGNINGSGRUNNLAG_AGG.FAGSAK_ID = MOTTAKER.FAGSAK_ID
+          AND BEREGNINGSGRUNNLAG_AGG.TRANS_ID = MOTTAKER.MAX_TRANS_ID
+          LEFT JOIN ANNENFORELDERFAGSAK
+          ON BEREGNINGSGRUNNLAG_AGG.FAGSAK_ID = ANNENFORELDERFAGSAK.FAGSAK_ID
+          AND BEREGNINGSGRUNNLAG_AGG.TRANS_ID = ANNENFORELDERFAGSAK.MAX_TRANS_ID
+          LEFT JOIN DVH_FAM_FP.FAM_FP_UTTAK_FP_KONTOER
+          ON BEREGNINGSGRUNNLAG_AGG.FAGSAK_ID = FAM_FP_UTTAK_FP_KONTOER.FAGSAK_ID
+          AND MOTTAKER.MAX_TRANS_ID = FAM_FP_UTTAK_FP_KONTOER.TRANS_ID
+ --AND UPPER(REGEXP_REPLACE(grunnlag_drp1.TREKKONTO, '_|-|[[:space:]]', '')) = UPPER(REGEXP_REPLACE(FAM_FP_Uttak_FP_Kontoer.STOENADSKONTOTYPE, '_|-|[[:space:]]', ''))
+          AND UPPER(REPLACE(BEREGNINGSGRUNNLAG_AGG.TREKKONTO,
+          '_',
+          '')) = UPPER(REPLACE(FAM_FP_UTTAK_FP_KONTOER.STOENADSKONTOTYPE,
+          ' ',
+          ''))
+          LEFT JOIN DT_PERSON.DIM_PERSON
+          ON MOTTAKER.FK_PERSON1_MOTTAKER = DIM_PERSON.FK_PERSON1
+ --and beregningsgrunnlag_agg.uttak_tom between dim_person.gyldig_fra_dato and dim_person.gyldig_til_dato
+          AND TO_DATE(BEREGNINGSGRUNNLAG_AGG.PK_DIM_TID_DATO_UTBET_TOM,
+          'yyyymmdd') BETWEEN DIM_PERSON.GYLDIG_FRA_DATO
+          AND DIM_PERSON.GYLDIG_TIL_DATO
+          LEFT JOIN DT_KODEVERK.DIM_GEOGRAFI
+          ON DIM_PERSON.FK_DIM_GEOGRAFI_BOSTED = DIM_GEOGRAFI.PK_DIM_GEOGRAFI
+          LEFT JOIN ALENEOMSORG
+          ON ALENEOMSORG.FAGSAK_ID = BEREGNINGSGRUNNLAG_AGG.FAGSAK_ID
+          AND ALENEOMSORG.UTTAK_FOM = BEREGNINGSGRUNNLAG_AGG.UTTAK_FOM
+          LEFT JOIN (
+            SELECT
+              TRANS_ID
+            FROM
+              DVH_FAM_FP.FAM_FP_UTTAK_FP_KONTOER
+            WHERE
+              UPPER(STOENADSKONTOTYPE) = 'MÃ˜DREKVOTE'
+            GROUP BY
+              TRANS_ID
+          ) RETT_TIL_MÃ˜DREKVOTE
+          ON RETT_TIL_MÃ˜DREKVOTE.TRANS_ID = BEREGNINGSGRUNNLAG_AGG.TRANS_ID
+          LEFT JOIN (
+            SELECT
+              TRANS_ID
+            FROM
+              DVH_FAM_FP.FAM_FP_UTTAK_FP_KONTOER
+            WHERE
+              UPPER(STOENADSKONTOTYPE) = 'FEDREKVOTE'
+            GROUP BY
+              TRANS_ID
+          ) RETT_TIL_FEDREKVOTE
+          ON RETT_TIL_FEDREKVOTE.TRANS_ID = BEREGNINGSGRUNNLAG_AGG.TRANS_ID
+          LEFT JOIN (
+            SELECT
+              TRANS_ID,
+              MAX(MAX_DAGER) AS FLERBARNSDAGER
+            FROM
+              DVH_FAM_FP.FAM_FP_UTTAK_FP_KONTOER
+            WHERE
+              UPPER(STOENADSKONTOTYPE) = 'FLERBARNSDAGER'
+            GROUP BY
+              TRANS_ID
+          ) FLERBARNSDAGER
+          ON FLERBARNSDAGER.TRANS_ID = BEREGNINGSGRUNNLAG_AGG.TRANS_ID
+          LEFT JOIN ADOPSJON
+          ON BEREGNINGSGRUNNLAG_AGG.FAGSAK_ID = ADOPSJON.FAGSAK_ID
+          LEFT JOIN EOS
+          ON BEREGNINGSGRUNNLAG_AGG.TRANS_ID = EOS.TRANS_ID
+      )
+      SELECT /*+ PARALLEL(8) */
+        *
+ --from uttak_dager
+      FROM
+        GRUNNLAG
+      WHERE
+        FAGSAK_ID NOT IN (1679117)
+ --where fagsak_id in (1035184)
+;
+    V_TID_FOM                      VARCHAR2(8) := NULL;
+    V_TID_TOM                      VARCHAR2(8) := NULL;
+    V_COMMIT                       NUMBER := 0;
+    V_ERROR_MELDING                VARCHAR2(1000) := NULL;
+    V_DIM_TID_ANTALL               NUMBER := 0;
+    V_UTBETALINGSPROSENT_KALKULERT NUMBER := 0;
+  BEGIN
+    V_TID_FOM := SUBSTR(P_IN_VEDTAK_TOM, 1, 4)
+                 || SUBSTR(P_IN_VEDTAK_TOM, 5, 6)-2
+                                                  || '01';
+    V_TID_TOM := TO_CHAR(LAST_DAY(TO_DATE(P_IN_VEDTAK_TOM, 'yyyymm')), 'yyyymmdd');
+ --dbms_output.put_line(v_tid_fom||v_tid_tom);--TEST!!!
+    FOR REC_PERIODE IN CUR_PERIODE(P_IN_RAPPORT_DATO, P_IN_FORSKYVNINGER, V_TID_FOM, V_TID_TOM) LOOP
+      V_DIM_TID_ANTALL := 0;
+      V_UTBETALINGSPROSENT_KALKULERT := 0;
+      V_DIM_TID_ANTALL := DIM_TID_ANTALL(TO_NUMBER(TO_CHAR(REC_PERIODE.UTTAK_FOM, 'yyyymmdd')), TO_NUMBER(TO_CHAR(REC_PERIODE.UTTAK_TOM, 'yyyymmdd')));
+      IF V_DIM_TID_ANTALL != 0 THEN
+        V_UTBETALINGSPROSENT_KALKULERT := ROUND(REC_PERIODE.TREKKDAGER/V_DIM_TID_ANTALL*100, 2);
+      ELSE
+        V_UTBETALINGSPROSENT_KALKULERT := 0;
+      END IF;
+      BEGIN
+        INSERT INTO DVH_FAM_FP.FAK_FAM_FP_VEDTAK_UTBETALING (
+          FAGSAK_ID,
+          TRANS_ID,
+          BEHANDLINGSTEMA,
+          TREKKONTO,
+          STONADSDAGER_KVOTE,
+          UTTAK_ARBEID_TYPE,
+          AAR,
+          HALVAAR,
+          KVARTAL --, aar_maaned
+,
+          RAPPORT_PERIODE,
+          UTTAK_FOM,
+          UTTAK_TOM,
+          DAGER_ERST,
+          BEREGNINGSGRUNNLAG_FOM,
+          BEREGNINGSGRUNNLAG_TOM,
+          DEKNINGSGRAD,
+          DAGSATS_BRUKER,
+          DAGSATS_ARBEIDSGIVER,
+          VIRKSOMHET,
+          PERIODE_RESULTAT_AARSAK,
+          DAGSATS,
+          GRADERINGSPROSENT,
+          STATUS_OG_ANDEL_INNTEKTSKAT,
+          AKTIVITET_STATUS,
+          BRUTTO_INNTEKT,
+          AVKORTET_INNTEKT,
+          STATUS_OG_ANDEL_BRUTTO,
+          STATUS_OG_ANDEL_AVKORTET,
+          UTBETALINGSPROSENT,
+          FK_DIM_TID_DATO_UTBET_FOM,
+          FK_DIM_TID_DATO_UTBET_TOM,
+          FUNKSJONELL_TID,
+          FORSTE_VEDTAKSDATO,
+          VEDTAKSDATO,
+          MAX_VEDTAKSDATO,
+          PERIODE_TYPE,
+          TILFELLE_ERST,
+          BELOP,
+          DAGSATS_REDUSERT,
+          LASTET_DATO,
+          MAX_TRANS_ID,
+          FK_PERSON1_MOTTAKER,
+          FK_PERSON1_ANNEN_PART,
+          KJONN,
+          FK_PERSON1_BARN,
+          TERMINDATO,
+          FOEDSELSDATO,
+          ANTALL_BARN_TERMIN,
+          ANTALL_BARN_FOEDSEL,
+          FOEDSELSDATO_ADOPSJON,
+          ANTALL_BARN_ADOPSJON,
+          ANNENFORELDERFAGSAK_ID,
+          MAX_STONADSDAGER_KONTO,
+          FK_DIM_PERSON,
+          BOSTED_KOMMUNE_NR,
+          FK_DIM_GEOGRAFI,
+          BYDEL_KOMMUNE_NR,
+          KOMMUNE_NR,
+          KOMMUNE_NAVN,
+          BYDEL_NR,
+          BYDEL_NAVN,
+          ALENEOMSORG,
+          HOVEDKONTONR,
+          UNDERKONTONR,
+          MOTTAKER_FODSELS_AAR,
+          MOTTAKER_FODSELS_MND,
+          MOTTAKER_ALDER,
+          RETT_TIL_FEDREKVOTE,
+          RETT_TIL_MODREKVOTE,
+          DAGSATS_ERST,
+          TREKKDAGER,
+          SAMTIDIG_UTTAK,
+          GRADERING,
+          GRADERING_INNVILGET,
+          ANTALL_DAGER_PERIODE,
+          FLERBARNSDAGER,
+          UTBETALINGSPROSENT_KALKULERT,
+          MIN_UTTAK_FOM,
+          MAX_UTTAK_TOM,
+          FK_FAM_FP_TREKKONTO,
+          FK_FAM_FP_PERIODE_RESULTAT_AARSAK,
+          SIVILSTATUS,
+          FK_DIM_SIVILSTATUS,
+          ANTALL_BEREGNINGSGRUNNLAG,
+          GRADERINGSDAGER,
+          FK_DIM_TID_MIN_DATO_KVOTE,
+          FK_DIM_TID_MAX_DATO_KVOTE,
+          ADOPSJONSDATO,
+          STEBARNSADOPSJON,
+          EOS_SAK,
+          MOR_RETTIGHET,
+          STATSBORGERSKAP,
+          ARBEIDSTIDSPROSENT,
+          MORS_AKTIVITET,
+          GYLDIG_FLAGG,
+          ANDEL_AV_REFUSJON,
+          FORSTE_SOKNADSDATO,
+          SOKNADSDATO
+        ) VALUES (
+          REC_PERIODE.FAGSAK_ID,
+          REC_PERIODE.TRANS_ID,
+          REC_PERIODE.BEHANDLINGSTEMA,
+          REC_PERIODE.TREKKONTO,
+          REC_PERIODE.STONADSDAGER_KVOTE,
+          REC_PERIODE.UTTAK_ARBEID_TYPE,
+          REC_PERIODE.AAR,
+          REC_PERIODE.HALVAAR,
+          REC_PERIODE.KVARTAL --, rec_periode.aar_maaned
+,
+          P_IN_RAPPORT_DATO,
+          REC_PERIODE.UTTAK_FOM,
+          REC_PERIODE.UTTAK_TOM,
+          REC_PERIODE.DAGER_ERST,
+          REC_PERIODE.BEREGNINGSGRUNNLAG_FOM,
+          REC_PERIODE.BEREGNINGSGRUNNLAG_TOM,
+          REC_PERIODE.DEKNINGSGRAD,
+          REC_PERIODE.DAGSATS_BRUKER,
+          REC_PERIODE.DAGSATS_ARBEIDSGIVER,
+          REC_PERIODE.VIRKSOMHET,
+          REC_PERIODE.PERIODE_RESULTAT_AARSAK,
+          REC_PERIODE.DAGSATS,
+          REC_PERIODE.GRADERINGSPROSENT,
+          REC_PERIODE.STATUS_OG_ANDEL_INNTEKTSKAT,
+          REC_PERIODE.AKTIVITET_STATUS,
+          REC_PERIODE.BRUTTO_INNTEKT,
+          REC_PERIODE.AVKORTET_INNTEKT,
+          REC_PERIODE.STATUS_OG_ANDEL_BRUTTO,
+          REC_PERIODE.STATUS_OG_ANDEL_AVKORTET,
+          REC_PERIODE.UTBETALINGSPROSENT,
+          REC_PERIODE.PK_DIM_TID_DATO_UTBET_FOM,
+          REC_PERIODE.PK_DIM_TID_DATO_UTBET_TOM,
+          REC_PERIODE.FUNKSJONELL_TID,
+          REC_PERIODE.FORSTE_VEDTAKSDATO,
+          REC_PERIODE.SISTE_VEDTAKSDATO,
+          REC_PERIODE.MAX_VEDTAKSDATO,
+          REC_PERIODE.PERIODE,
+          REC_PERIODE.TILFELLE_ERST,
+          REC_PERIODE.BELOP,
+          REC_PERIODE.DAGSATS_REDUSERT,
+          REC_PERIODE.LASTET_DATO,
+          REC_PERIODE.MAX_TRANS_ID,
+          REC_PERIODE.FK_PERSON1_MOTTAKER,
+          REC_PERIODE.FK_PERSON1_ANNEN_PART,
+          REC_PERIODE.KJONN,
+          REC_PERIODE.FK_PERSON1_BARN,
+          REC_PERIODE.TERMINDATO,
+          REC_PERIODE.FOEDSELSDATO,
+          REC_PERIODE.ANTALL_BARN_TERMIN,
+          REC_PERIODE.ANTALL_BARN_FOEDSEL,
+          REC_PERIODE.FOEDSELSDATO_ADOPSJON,
+          REC_PERIODE.ANTALL_BARN_ADOPSJON,
+          REC_PERIODE.ANNENFORELDERFAGSAK_ID,
+          REC_PERIODE.MAX_STONADSDAGER_KONTO,
+          REC_PERIODE.PK_DIM_PERSON,
+          REC_PERIODE.BOSTED_KOMMUNE_NR,
+          REC_PERIODE.PK_DIM_GEOGRAFI,
+          REC_PERIODE.BYDEL_KOMMUNE_NR,
+          REC_PERIODE.KOMMUNE_NR,
+          REC_PERIODE.KOMMUNE_NAVN,
+          REC_PERIODE.BYDEL_NR,
+          REC_PERIODE.BYDEL_NAVN,
+          REC_PERIODE.ALENEOMSORG,
+          REC_PERIODE.HOVEDKONTONR,
+          REC_PERIODE.UNDERKONTONR,
+          REC_PERIODE.MOTTAKER_FODSELS_AAR,
+          REC_PERIODE.MOTTAKER_FODSELS_MND,
+          REC_PERIODE.MOTTAKER_ALDER,
+          REC_PERIODE.RETT_TIL_FEDREKVOTE,
+          REC_PERIODE.RETT_TIL_MÃ˜DREKVOTE,
+          REC_PERIODE.DAGSATS_ERST,
+          REC_PERIODE.TREKKDAGER,
+          REC_PERIODE.SAMTIDIG_UTTAK,
+          REC_PERIODE.GRADERING,
+          REC_PERIODE.GRADERING_INNVILGET,
+          V_DIM_TID_ANTALL,
+          REC_PERIODE.FLERBARNSDAGER,
+          V_UTBETALINGSPROSENT_KALKULERT,
+          REC_PERIODE.MIN_UTTAK_FOM,
+          REC_PERIODE.MAX_UTTAK_TOM,
+          REC_PERIODE.PK_FAM_FP_TREKKONTO,
+          REC_PERIODE.PK_FAM_FP_PERIODE_RESULTAT_AARSAK,
+          REC_PERIODE.SIVILSTAND,
+          REC_PERIODE.FK_DIM_SIVILSTATUS,
+          REC_PERIODE.ANTALL_BEREGNINGSGRUNNLAG,
+          REC_PERIODE.GRADERINGSDAGER,
+          REC_PERIODE.FK_DIM_TID_MIN_DATO_KVOTE,
+          REC_PERIODE.FK_DIM_TID_MAX_DATO_KVOTE,
+          REC_PERIODE.ADOPSJONSDATO,
+          REC_PERIODE.STEBARNSADOPSJON,
+          REC_PERIODE.EOS_SAK,
+          REC_PERIODE.MOR_RETTIGHET,
+          REC_PERIODE.STATSBORGERSKAP,
+          REC_PERIODE.ARBEIDSTIDSPROSENT,
+          REC_PERIODE.MORS_AKTIVITET,
+          P_IN_GYLDIG_FLAGG,
+          REC_PERIODE.ANDEL_AV_REFUSJON,
+          REC_PERIODE.FORSTE_SOKNADSDATO,
+          REC_PERIODE.SOKNADSDATO
+        );
+        V_COMMIT := V_COMMIT + 1;
+      EXCEPTION
+        WHEN OTHERS THEN
+          ROLLBACK;
+          V_ERROR_MELDING := SUBSTR(SQLCODE
+                                    || ' '
+                                    || SQLERRM, 1, 1000);
+          INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
+            MIN_LASTET_DATO,
+            ID,
+            ERROR_MSG,
+            OPPRETTET_TID,
+            KILDE
+          ) VALUES(
+            NULL,
+            REC_PERIODE.FAGSAK_ID,
+            V_ERROR_MELDING,
+            SYSDATE,
+            'FAM_FP_STATISTIKK_KVARTAL:INSERT'
+          );
+          COMMIT;
+          P_OUT_ERROR := SUBSTR(P_OUT_ERROR
+                                || V_ERROR_MELDING, 1, 1000);
+      END;
+      IF V_COMMIT > 100000 THEN
+        COMMIT;
+        V_COMMIT := 0;
+      END IF;
+    END LOOP;
+    COMMIT;
+  EXCEPTION
+    WHEN OTHERS THEN
+      ROLLBACK;
+      V_ERROR_MELDING := SUBSTR(SQLCODE
+                                || ' '
+                                || SQLERRM, 1, 1000);
+      INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
+        MIN_LASTET_DATO,
+        ID,
+        ERROR_MSG,
+        OPPRETTET_TID,
+        KILDE
+      ) VALUES(
+        NULL,
+        NULL,
+        V_ERROR_MELDING,
+        SYSDATE,
+        'FAM_FP_STATISTIKK_KVARTAL'
+      );
+      COMMIT;
+      P_OUT_ERROR := SUBSTR(P_OUT_ERROR
+                            || V_ERROR_MELDING, 1, 1000);
+  END FAM_FP_STATISTIKK_KVARTAL;
 
-      begin
-        insert into dvh_fam_fp.fak_fam_fp_vedtak_utbetaling
-        (fagsak_id, trans_id, behandlingstema, trekkonto, stonadsdager_kvote
-        ,uttak_arbeid_type
-        ,aar ,halvaar, aar_maaned
-        ,rapport_periode, uttak_fom, uttak_tom, dager_erst, beregningsgrunnlag_fom
-        ,beregningsgrunnlag_tom, dekningsgrad, dagsats_bruker, dagsats_arbeidsgiver, virksomhet
-        ,periode_resultat_aarsak, dagsats, graderingsprosent, status_og_andel_inntektskat
-        ,aktivitet_status, brutto_inntekt, avkortet_inntekt, status_og_andel_brutto, status_og_andel_avkortet
-        ,utbetalingsprosent, fk_dim_tid_dato_utbet_fom
-        ,fk_dim_tid_dato_utbet_tom, funksjonell_tid, forste_vedtaksdato, vedtaksdato, max_vedtaksdato, periode_type, tilfelle_erst
-        ,belop, dagsats_redusert, lastet_dato, max_trans_id, fk_person1_mottaker, fk_person1_annen_part
-        ,kjonn, fk_person1_barn, termindato, foedselsdato, antall_barn_termin, antall_barn_foedsel
-        ,foedselsdato_adopsjon, antall_barn_adopsjon, annenforelderfagsak_id, max_stonadsdager_konto
-        ,fk_dim_person, bosted_kommune_nr, fk_dim_geografi, bydel_kommune_nr, kommune_nr
-        ,kommune_navn, bydel_nr, bydel_navn, aleneomsorg, hovedkontonr, underkontonr
-        ,mottaker_fodsels_aar, mottaker_fodsels_mnd, mottaker_alder
-        ,rett_til_fedrekvote, rett_til_modrekvote, dagsats_erst, trekkdager
-        ,samtidig_uttak, gradering, gradering_innvilget, antall_dager_periode
-        ,flerbarnsdager, utbetalingsprosent_kalkulert, min_uttak_fom, max_uttak_tom
-        ,fk_fam_fp_trekkonto, fk_fam_fp_periode_resultat_aarsak
-        ,sivilstatus, fk_dim_sivilstatus, antall_beregningsgrunnlag, graderingsdager
-        ,fk_dim_tid_min_dato_kvote, fk_dim_tid_max_dato_kvote
-        ,adopsjonsdato, stebarnsadopsjon, eos_sak, mor_rettighet, statsborgerskap
-        ,arbeidstidsprosent, mors_aktivitet, gyldig_flagg
-        ,andel_av_refusjon, forste_soknadsdato, soknadsdato
-        ,budsjett)
-        values
-        (rec_periode.fagsak_id, rec_periode.trans_id, rec_periode.behandlingstema, rec_periode.trekkonto
-        ,rec_periode.stonadsdager_kvote
-        ,rec_periode.uttak_arbeid_type, rec_periode.aar, rec_periode.halvaar, rec_periode.aar_maaned
-        ,p_in_rapport_dato, rec_periode.uttak_fom, rec_periode.uttak_tom
-        ,rec_periode.dager_erst, rec_periode.beregningsgrunnlag_fom, rec_periode.beregningsgrunnlag_tom
-        ,rec_periode.dekningsgrad, rec_periode.dagsats_bruker, rec_periode.dagsats_arbeidsgiver
-        ,rec_periode.virksomhet, rec_periode.periode_resultat_aarsak, rec_periode.dagsats
-        ,rec_periode.graderingsprosent, rec_periode.status_og_andel_inntektskat
-        ,rec_periode.aktivitet_status, rec_periode.brutto_inntekt, rec_periode.avkortet_inntekt
-        ,rec_periode.status_og_andel_brutto, rec_periode.status_og_andel_avkortet
-        ,rec_periode.utbetalingsprosent, rec_periode.pk_dim_tid_dato_utbet_fom, rec_periode.pk_dim_tid_dato_utbet_tom
-        ,rec_periode.funksjonell_tid, rec_periode.forste_vedtaksdato, rec_periode.siste_vedtaksdato, rec_periode.max_vedtaksdato, rec_periode.periode
-        ,rec_periode.tilfelle_erst, rec_periode.belop, rec_periode.dagsats_redusert, sysdate--rec_periode.lastet_dato
-        ,rec_periode.max_trans_id, rec_periode.fk_person1_mottaker, rec_periode.fk_person1_annen_part
-        ,rec_periode.kjonn, rec_periode.fk_person1_barn
-        ,rec_periode.termindato, rec_periode.foedselsdato, rec_periode.antall_barn_termin
-        ,rec_periode.antall_barn_foedsel, rec_periode.foedselsdato_adopsjon
-        ,rec_periode.antall_barn_adopsjon, rec_periode.annenforelderfagsak_id, rec_periode.max_stonadsdager_konto
-        ,rec_periode.pk_dim_person, rec_periode.bosted_kommune_nr, rec_periode.pk_dim_geografi
-        ,rec_periode.bydel_kommune_nr, rec_periode.kommune_nr, rec_periode.kommune_navn
-        ,rec_periode.bydel_nr, rec_periode.bydel_navn, rec_periode.aleneomsorg, rec_periode.hovedkontonr
-        ,rec_periode.underkontonr
-        ,rec_periode.mottaker_fodsels_aar, rec_periode.mottaker_fodsels_mnd, rec_periode.mottaker_alder
-        ,rec_periode.rett_til_fedrekvote, rec_periode.rett_til_mødrekvote, rec_periode.dagsats_erst
-        ,rec_periode.trekkdager, rec_periode.samtidig_uttak, rec_periode.gradering, rec_periode.gradering_innvilget
-        ,v_dim_tid_antall, rec_periode.flerbarnsdager, v_utbetalingsprosent_kalkulert
-        ,rec_periode.min_uttak_fom, rec_periode.max_uttak_tom, rec_periode.pk_fam_fp_trekkonto
-        ,rec_periode.pk_fam_fp_periode_resultat_aarsak
-        ,rec_periode.sivilstand, rec_periode.fk_dim_sivilstatus
-        ,rec_periode.antall_beregningsgrunnlag, rec_periode.graderingsdager
-        ,rec_periode.fk_dim_tid_min_dato_kvote, rec_periode.fk_dim_tid_max_dato_kvote
-        ,rec_periode.adopsjonsdato, rec_periode.stebarnsadopsjon, rec_periode.eos_sak
-        ,rec_periode.mor_rettighet, rec_periode.statsborgerskap
-        ,rec_periode.arbeidstidsprosent, rec_periode.mors_aktivitet, p_in_gyldig_flagg
-        ,rec_periode.andel_av_refusjon, rec_periode.forste_soknadsdato, rec_periode.soknadsdato
-        ,rec_periode.budsjett);
+  PROCEDURE FAM_FP_STATISTIKK_HALVAAR(
+    P_IN_VEDTAK_TOM IN VARCHAR2,
+    P_IN_RAPPORT_DATO IN VARCHAR2,
+    P_IN_FORSKYVNINGER IN NUMBER,
+    P_IN_GYLDIG_FLAGG IN NUMBER DEFAULT 0,
+    P_IN_PERIODE_TYPE IN VARCHAR2 DEFAULT 'H',
+    P_OUT_ERROR OUT VARCHAR2
+  ) AS
+    CURSOR CUR_PERIODE(P_RAPPORT_DATO IN VARCHAR2, P_FORSKYVNINGER IN NUMBER, P_TID_FOM IN VARCHAR2, P_TID_TOM IN VARCHAR2) IS
+      WITH FAGSAK AS (
+        SELECT
+          FAGSAK_ID,
+          MAX(BEHANDLINGSTEMA)                                                   AS BEHANDLINGSTEMA,
+          MAX(FAGSAKANNENFORELDER_ID)                                            AS ANNENFORELDERFAGSAK_ID,
+          MAX(TRANS_ID) KEEP(DENSE_RANK FIRST ORDER BY FUNKSJONELL_TID DESC)     AS MAX_TRANS_ID,
+          MAX(SOEKNADSDATO) KEEP(DENSE_RANK FIRST ORDER BY FUNKSJONELL_TID DESC) AS SOKNADSDATO,
+          MIN(SOEKNADSDATO)                                                      AS FORSTE_SOKNADSDATO,
+          MIN(VEDTAKSDATO)                                                       AS FORSTE_VEDTAKSDATO,
+          MAX(FUNKSJONELL_TID)                                                   AS FUNKSJONELL_TID,
+          MAX(VEDTAKSDATO)                                                       AS SISTE_VEDTAKSDATO,
+          P_IN_PERIODE_TYPE                                                      AS PERIODE,
+          LAST_DAY(TO_DATE(P_RAPPORT_DATO, 'yyyymm')) + P_FORSKYVNINGER          AS MAX_VEDTAKSDATO
+        FROM
+          DVH_FAM_FP.FAM_FP_FAGSAK
+        WHERE
+          FAM_FP_FAGSAK.FUNKSJONELL_TID <= LAST_DAY(TO_DATE(P_RAPPORT_DATO, 'yyyymm')) + P_FORSKYVNINGER
+        GROUP BY
+          FAGSAK_ID
+      ), TERMIN AS (
+        SELECT
+          FAGSAK_ID,
+          MAX(TERMINDATO)            TERMINDATO,
+          MAX(FOEDSELSDATO)          FOEDSELSDATO,
+          MAX(ANTALL_BARN_TERMIN)    ANTALL_BARN_TERMIN,
+          MAX(ANTALL_BARN_FOEDSEL)   ANTALL_BARN_FOEDSEL,
+          MAX(FOEDSELSDATO_ADOPSJON) FOEDSELSDATO_ADOPSJON,
+          MAX(ANTALL_BARN_ADOPSJON) ANTALL_BARN_ADOPSJON
+        FROM
+          (
+            SELECT
+              FAM_FP_FAGSAK.FAGSAK_ID,
+              MAX(FODSEL.TERMINDATO)              TERMINDATO,
+              MAX(FODSEL.FOEDSELSDATO)            FOEDSELSDATO,
+              MAX(FODSEL.ANTALL_BARN_FOEDSEL)     ANTALL_BARN_FOEDSEL,
+              MAX(FODSEL.ANTALL_BARN_TERMIN)      ANTALL_BARN_TERMIN,
+              MAX(ADOPSJON.FOEDSELSDATO_ADOPSJON) FOEDSELSDATO_ADOPSJON,
+              COUNT(ADOPSJON.TRANS_ID)            ANTALL_BARN_ADOPSJON
+            FROM
+              DVH_FAM_FP.FAM_FP_FAGSAK
+              LEFT JOIN DVH_FAM_FP.FAM_FP_FODSELTERMIN FODSEL
+              ON FODSEL.FAGSAK_ID = FAM_FP_FAGSAK.FAGSAK_ID
+              AND UPPER(FAM_FP_FAGSAK.BEHANDLINGSTEMA) = 'FORP_FODS'
+              LEFT JOIN DVH_FAM_FP.FAM_FP_FODSELTERMIN ADOPSJON
+              ON ADOPSJON.FAGSAK_ID = FAM_FP_FAGSAK.FAGSAK_ID
+              AND ADOPSJON.TRANS_ID = FAM_FP_FAGSAK.TRANS_ID
+              AND UPPER(FAM_FP_FAGSAK.BEHANDLINGSTEMA) = 'FORP_ADOP'
+            GROUP BY
+              FAM_FP_FAGSAK.FAGSAK_ID,
+              FAM_FP_FAGSAK.TRANS_ID
+          )
+        GROUP BY
+          FAGSAK_ID
+      ), FK_PERSON1 AS (
+        SELECT
+          PERSON.PERSON,
+          PERSON.FAGSAK_ID,
+          MAX(PERSON.BEHANDLINGSTEMA)                                                                             AS BEHANDLINGSTEMA,
+          PERSON.MAX_TRANS_ID,
+          MAX(PERSON.ANNENFORELDERFAGSAK_ID)                                                                      AS ANNENFORELDERFAGSAK_ID,
+          PERSON.AKTOER_ID,
+          MAX(PERSON.KJONN)                                                                                       AS KJONN,
+          MAX(PERSON_67_VASKET.FK_PERSON1) KEEP (DENSE_RANK FIRST ORDER BY PERSON_67_VASKET.GYLDIG_FRA_DATO DESC) AS FK_PERSON1,
+          MAX(FOEDSELSDATO)                                                                                       AS FOEDSELSDATO,
+          MAX(SIVILSTAND)                                                                                         AS SIVILSTAND,
+          MAX(STATSBORGERSKAP)                                                                                    AS STATSBORGERSKAP
+        FROM
+          (
+            SELECT
+              'MOTTAKER'                                AS PERSON,
+              FAGSAK.FAGSAK_ID,
+              FAGSAK.BEHANDLINGSTEMA,
+              FAGSAK.MAX_TRANS_ID,
+              FAGSAK.ANNENFORELDERFAGSAK_ID,
+              FAM_FP_PERSONOPPLYSNINGER.AKTOER_ID,
+              FAM_FP_PERSONOPPLYSNINGER.KJONN,
+              FAM_FP_PERSONOPPLYSNINGER.FOEDSELSDATO,
+              FAM_FP_PERSONOPPLYSNINGER.SIVILSTAND,
+              FAM_FP_PERSONOPPLYSNINGER.STATSBORGERSKAP
+            FROM
+              DVH_FAM_FP.FAM_FP_PERSONOPPLYSNINGER
+              JOIN FAGSAK
+              ON FAM_FP_PERSONOPPLYSNINGER.TRANS_ID = FAGSAK.MAX_TRANS_ID UNION ALL
+              SELECT
+                'BARN'                                    AS PERSON,
+                FAGSAK.FAGSAK_ID,
+                MAX(FAGSAK.BEHANDLINGSTEMA)               AS BEHANDLINGSTEMA,
+                FAGSAK.MAX_TRANS_ID,
+                MAX(FAGSAK.ANNENFORELDERFAGSAK_ID)        ANNENFORELDERFAGSAK_ID,
+                MAX(FAM_FP_FAMILIEHENDELSE.TIL_AKTOER_ID) AS AKTOER_ID,
+                MAX(FAM_FP_FAMILIEHENDELSE.KJOENN)        AS KJONN,
+                NULL                                      AS FOEDSELSDATO,
+                NULL                                      AS SIVILSTAND,
+                NULL                                      AS STATSBORGERSKAP
+              FROM
+                DVH_FAM_FP.FAM_FP_FAMILIEHENDELSE
+                JOIN FAGSAK
+                ON FAM_FP_FAMILIEHENDELSE.FAGSAK_ID = FAGSAK.FAGSAK_ID
+              WHERE
+                UPPER(FAM_FP_FAMILIEHENDELSE.RELASJON) = 'BARN'
+              GROUP BY
+                FAGSAK.FAGSAK_ID, FAGSAK.MAX_TRANS_ID
+          )                                    PERSON
+          JOIN DT_PERSON.DVH_PERSON_IDENT_AKTOR_IKKE_SKJERMET PERSON_67_VASKET
+ --join fk_person.fam_fp_person_67_vasket person_67_vasket
+          ON PERSON_67_VASKET.AKTOR_ID = PERSON.AKTOER_ID
+          AND TO_DATE(P_TID_TOM, 'yyyymmdd') BETWEEN PERSON_67_VASKET.GYLDIG_FRA_DATO
+          AND PERSON_67_VASKET.GYLDIG_TIL_DATO
+ --on person_67_vasket.lk_person_id_kilde_num = person.aktoer_id
+        GROUP BY
+          PERSON.PERSON, PERSON.FAGSAK_ID, PERSON.MAX_TRANS_ID, PERSON.AKTOER_ID
+      ), BARN AS (
+        SELECT
+          FAGSAK_ID,
+          LISTAGG(FK_PERSON1, ',') WITHIN GROUP (ORDER BY FK_PERSON1) AS FK_PERSON1_BARN
+        FROM
+          FK_PERSON1
+        WHERE
+          PERSON = 'BARN'
+        GROUP BY
+          FAGSAK_ID
+      ), MOTTAKER AS (
+        SELECT
+          FK_PERSON1.FAGSAK_ID,
+          FK_PERSON1.BEHANDLINGSTEMA,
+          FK_PERSON1.MAX_TRANS_ID,
+          FK_PERSON1.ANNENFORELDERFAGSAK_ID,
+          FK_PERSON1.AKTOER_ID,
+          FK_PERSON1.KJONN,
+          FK_PERSON1.FK_PERSON1                       AS FK_PERSON1_MOTTAKER,
+          EXTRACT(YEAR FROM FK_PERSON1.FOEDSELSDATO) AS MOTTAKER_FODSELS_AAR,
+          EXTRACT(MONTH FROM FK_PERSON1.FOEDSELSDATO) AS MOTTAKER_FODSELS_MND,
+          FK_PERSON1.SIVILSTAND,
+          FK_PERSON1.STATSBORGERSKAP,
+          BARN.FK_PERSON1_BARN,
+          TERMIN.TERMINDATO,
+          TERMIN.FOEDSELSDATO,
+          TERMIN.ANTALL_BARN_TERMIN,
+          TERMIN.ANTALL_BARN_FOEDSEL,
+          TERMIN.FOEDSELSDATO_ADOPSJON,
+          TERMIN.ANTALL_BARN_ADOPSJON
+        FROM
+          FK_PERSON1
+          LEFT JOIN BARN
+          ON BARN.FAGSAK_ID = FK_PERSON1.FAGSAK_ID
+          LEFT JOIN TERMIN
+          ON FK_PERSON1.FAGSAK_ID = TERMIN.FAGSAK_ID
+        WHERE
+          FK_PERSON1.PERSON = 'MOTTAKER'
+      ), ADOPSJON AS (
+        SELECT
+          FAM_FP_VILKAAR.FAGSAK_ID,
+          MAX(FAM_FP_VILKAAR.OMSORGS_OVERTAKELSESDATO) AS ADOPSJONSDATO,
+          MAX(FAM_FP_VILKAAR.EKTEFELLES_BARN)          AS STEBARNSADOPSJON
+        FROM
+          FAGSAK
+          JOIN DVH_FAM_FP.FAM_FP_VILKAAR
+          ON FAGSAK.FAGSAK_ID = FAM_FP_VILKAAR.FAGSAK_ID
+        WHERE
+          FAGSAK.BEHANDLINGSTEMA = 'FORP_ADOP'
+        GROUP BY
+          FAM_FP_VILKAAR.FAGSAK_ID
+      ), EOS AS (
+        SELECT
+          A.TRANS_ID,
+          CASE
+            WHEN UPPER(ER_BORGER_AV_EU_EOS) = 'TRUE' THEN
+              'J'
+            WHEN UPPER(ER_BORGER_AV_EU_EOS) = 'FALSE' THEN
+              'N'
+            ELSE
+              NULL
+          END EOS_SAK
+        FROM
+          (
+            SELECT
+              FAM_FP_VILKAAR.TRANS_ID,
+              MAX(FAM_FP_VILKAAR.ER_BORGER_AV_EU_EOS) AS ER_BORGER_AV_EU_EOS
+            FROM
+              FAGSAK
+              JOIN DVH_FAM_FP.FAM_FP_VILKAAR
+              ON FAGSAK.MAX_TRANS_ID = FAM_FP_VILKAAR.TRANS_ID
+              AND LENGTH(FAM_FP_VILKAAR.PERSON_STATUS) > 0
+            GROUP BY
+              FAM_FP_VILKAAR.TRANS_ID
+          ) A
+      ), ANNENFORELDERFAGSAK AS (
+        SELECT
+          ANNENFORELDERFAGSAK.*,
+          MOTTAKER.FK_PERSON1_MOTTAKER AS FK_PERSON1_ANNEN_PART
+        FROM
+          (
+            SELECT
+              FAGSAK_ID,
+              MAX_TRANS_ID,
+              MAX(ANNENFORELDERFAGSAK_ID) AS ANNENFORELDERFAGSAK_ID
+            FROM
+              (
+                SELECT
+                  FORELDER1.FAGSAK_ID,
+                  FORELDER1.MAX_TRANS_ID,
+                  NVL(FORELDER1.ANNENFORELDERFAGSAK_ID, FORELDER2.FAGSAK_ID) AS ANNENFORELDERFAGSAK_ID
+                FROM
+                  MOTTAKER FORELDER1
+                  JOIN MOTTAKER FORELDER2
+                  ON FORELDER1.FK_PERSON1_BARN = FORELDER2.FK_PERSON1_BARN
+                  AND FORELDER1.FK_PERSON1_MOTTAKER != FORELDER2.FK_PERSON1_MOTTAKER
+              )
+            GROUP BY
+              FAGSAK_ID,
+              MAX_TRANS_ID
+          )        ANNENFORELDERFAGSAK
+          JOIN MOTTAKER
+          ON ANNENFORELDERFAGSAK.ANNENFORELDERFAGSAK_ID = MOTTAKER.FAGSAK_ID
+      ), TID AS (
+        SELECT
+          PK_DIM_TID,
+          DATO,
+          AAR,
+          HALVAAR,
+          KVARTAL,
+          AAR_MAANED
+        FROM
+          DT_KODEVERK.DIM_TID
+        WHERE
+          DAG_I_UKE < 6
+          AND DIM_NIVAA = 1
+          AND GYLDIG_FLAGG = 1
+          AND PK_DIM_TID BETWEEN P_TID_FOM AND P_TID_TOM
+          AND PK_DIM_TID <= TO_CHAR(LAST_DAY(TO_DATE(P_RAPPORT_DATO, 'yyyymm')), 'yyyymmdd')
+      ), UTTAK AS (
+        SELECT
+          UTTAK.TRANS_ID,
+          UTTAK.TREKKONTO,
+          UTTAK.UTTAK_ARBEID_TYPE,
+          UTTAK.VIRKSOMHET,
+          UTTAK.UTBETALINGSPROSENT,
+          UTTAK.GRADERING_INNVILGET,
+          UTTAK.GRADERING,
+          UTTAK.ARBEIDSTIDSPROSENT,
+          UTTAK.SAMTIDIG_UTTAK,
+          UTTAK.PERIODE_RESULTAT_AARSAK,
+          UTTAK.FOM                                      AS UTTAK_FOM,
+          UTTAK.TOM                                      AS UTTAK_TOM,
+          UTTAK.TREKKDAGER,
+          FAGSAK.FAGSAK_ID,
+          FAGSAK.PERIODE,
+          FAGSAK.FUNKSJONELL_TID,
+          FAGSAK.FORSTE_VEDTAKSDATO,
+          FAGSAK.SISTE_VEDTAKSDATO,
+          FAGSAK.MAX_VEDTAKSDATO,
+          FAGSAK.FORSTE_SOKNADSDATO,
+          FAGSAK.SOKNADSDATO,
+          FAM_FP_TREKKONTO.PK_FAM_FP_TREKKONTO,
+          AARSAK_UTTAK.PK_FAM_FP_PERIODE_RESULTAT_AARSAK,
+          UTTAK.ARBEIDSFORHOLD_ID,
+          UTTAK.GRADERINGSDAGER,
+          FAM_FP_UTTAK_FORDELINGSPER.MORS_AKTIVITET
+        FROM
+          DVH_FAM_FP.FAM_FP_UTTAK_RES_PER_AKTIV UTTAK
+          JOIN FAGSAK
+          ON FAGSAK.MAX_TRANS_ID = UTTAK.TRANS_ID LEFT JOIN DVH_FAM_FP.FAM_FP_TREKKONTO
+          ON UPPER(UTTAK.TREKKONTO) = FAM_FP_TREKKONTO.TREKKONTO
+          LEFT JOIN (
+            SELECT
+              AARSAK_UTTAK,
+              MAX(PK_FAM_FP_PERIODE_RESULTAT_AARSAK) AS PK_FAM_FP_PERIODE_RESULTAT_AARSAK
+            FROM
+              DVH_FAM_FP.FAM_FP_PERIODE_RESULTAT_AARSAK
+            GROUP BY
+              AARSAK_UTTAK
+          ) AARSAK_UTTAK
+          ON UPPER(UTTAK.PERIODE_RESULTAT_AARSAK) = AARSAK_UTTAK.AARSAK_UTTAK
+          LEFT JOIN DVH_FAM_FP.FAM_FP_UTTAK_FORDELINGSPER
+          ON FAM_FP_UTTAK_FORDELINGSPER.TRANS_ID = UTTAK.TRANS_ID
+          AND UTTAK.FOM BETWEEN FAM_FP_UTTAK_FORDELINGSPER.FOM
+          AND FAM_FP_UTTAK_FORDELINGSPER.TOM
+          AND UPPER(UTTAK.TREKKONTO) = UPPER(FAM_FP_UTTAK_FORDELINGSPER.PERIODE_TYPE)
+          AND LENGTH(FAM_FP_UTTAK_FORDELINGSPER.MORS_AKTIVITET) > 1
+        WHERE
+          UTTAK.UTBETALINGSPROSENT > 0
+      ), STONADSDAGER_KVOTE AS (
+        SELECT
+          UTTAK.*,
+          TID1.PK_DIM_TID AS FK_DIM_TID_MIN_DATO_KVOTE,
+          TID2.PK_DIM_TID AS FK_DIM_TID_MAX_DATO_KVOTE
+        FROM
+          (
+            SELECT
+              FAGSAK_ID,
+              TRANS_ID,
+              TREKKONTO,
+              VIRKSOMHET,
+              UTTAK_ARBEID_TYPE,
+              SUM(TREKKDAGER)   AS STONADSDAGER_KVOTE,
+              MIN(UTTAK_FOM)    AS MIN_UTTAK_FOM,
+              MAX(UTTAK_TOM)    AS MAX_UTTAK_TOM
+            FROM
+              (
+                SELECT
+                  FAGSAK_ID,
+                  TRANS_ID,
+                  UTTAK_FOM,
+                  UTTAK_TOM,
+                  TREKKONTO,
+                  VIRKSOMHET,
+                  UTTAK_ARBEID_TYPE,
+                  MAX(TREKKDAGER)   AS TREKKDAGER
+                FROM
+                  UTTAK
+                GROUP BY
+                  FAGSAK_ID,
+                  TRANS_ID,
+                  UTTAK_FOM,
+                  UTTAK_TOM,
+                  TREKKONTO,
+                  VIRKSOMHET,
+                  UTTAK_ARBEID_TYPE
+              ) A
+            GROUP BY
+              FAGSAK_ID,
+              TRANS_ID,
+              TREKKONTO,
+              VIRKSOMHET,
+              UTTAK_ARBEID_TYPE
+          )                   UTTAK
+          JOIN DT_KODEVERK.DIM_TID TID1
+          ON TID1.DIM_NIVAA = 1
+          AND TID1.DATO = TRUNC(UTTAK.MIN_UTTAK_FOM, 'dd') JOIN DT_KODEVERK.DIM_TID TID2
+          ON TID2.DIM_NIVAA = 1
+          AND TID2.DATO = TRUNC(UTTAK.MAX_UTTAK_TOM,
+          'dd')
+      ), UTTAK_DAGER AS (
+        SELECT
+          UTTAK.*,
+          TID.PK_DIM_TID,
+          TID.DATO,
+          TID.AAR,
+          TID.HALVAAR,
+          TID.KVARTAL,
+          TID.AAR_MAANED
+        FROM
+          UTTAK
+          JOIN TID
+          ON TID.DATO BETWEEN UTTAK.UTTAK_FOM
+          AND UTTAK.UTTAK_TOM
+      ), ALENEOMSORG AS (
+        SELECT
+          UTTAK.FAGSAK_ID,
+          UTTAK.UTTAK_FOM
+        FROM
+          UTTAK
+          JOIN DVH_FAM_FP.FAM_FP_DOKUMENTASJONSPERIODER DOK1
+          ON DOK1.FAGSAK_ID = UTTAK.FAGSAK_ID
+          AND UTTAK.UTTAK_FOM >= DOK1.FOM
+          AND DOK1.DOKUMENTASJON_TYPE IN ('ALENEOMSORG', 'ALENEOMSORG_OVERFÃ˜RING') LEFT JOIN DVH_FAM_FP.FAM_FP_DOKUMENTASJONSPERIODER DOK2
+          ON DOK1.FAGSAK_ID = DOK2.FAGSAK_ID
+          AND UTTAK.UTTAK_FOM >= DOK2.FOM
+          AND DOK1.TRANS_ID < DOK2.TRANS_ID
+          AND DOK2.DOKUMENTASJON_TYPE = 'ANNEN_FORELDER_HAR_RETT'
+          AND DOK2.FAGSAK_ID IS NULL
+        GROUP BY
+          UTTAK.FAGSAK_ID,
+          UTTAK.UTTAK_FOM
+      ), BEREGNINGSGRUNNLAG AS (
+        SELECT
+          FAGSAK_ID,
+          TRANS_ID,
+          VIRKSOMHETSNUMMER,
+          MAX(STATUS_OG_ANDEL_BRUTTO)         AS STATUS_OG_ANDEL_BRUTTO,
+          MAX(STATUS_OG_ANDEL_AVKORTET)       AS STATUS_OG_ANDEL_AVKORTET,
+          FOM                                 AS BEREGNINGSGRUNNLAG_FOM,
+          TOM                                 AS BEREGNINGSGRUNNLAG_TOM,
+          MAX(DEKNINGSGRAD)                   AS DEKNINGSGRAD,
+          MAX(DAGSATS)                        AS DAGSATS,
+          DAGSATS_BRUKER,
+          DAGSATS_ARBEIDSGIVER,
+          DAGSATS_BRUKER+DAGSATS_ARBEIDSGIVER DAGSATS_VIRKSOMHET,
+          MAX(STATUS_OG_ANDEL_INNTEKTSKAT)    AS STATUS_OG_ANDEL_INNTEKTSKAT,
+          AKTIVITET_STATUS,
+          MAX(BRUTTO)                         AS BRUTTO_INNTEKT,
+          MAX(AVKORTET)                       AS AVKORTET_INNTEKT,
+          COUNT(1)                            AS ANTALL_BEREGNINGSGRUNNLAG
+        FROM
+          DVH_FAM_FP.FAM_FP_BEREGNINGSGRUNNLAG
+        GROUP BY
+          FAGSAK_ID,
+          TRANS_ID,
+          VIRKSOMHETSNUMMER,
+          FOM,
+          TOM,
+          AKTIVITET_STATUS,
+          DAGSATS_BRUKER,
+          DAGSATS_ARBEIDSGIVER
+      ), BEREGNINGSGRUNNLAG_DETALJ AS (
+        SELECT
+          UTTAK_DAGER.*,
+          STONADSDAGER_KVOTE.STONADSDAGER_KVOTE,
+          STONADSDAGER_KVOTE.MIN_UTTAK_FOM,
+          STONADSDAGER_KVOTE.MAX_UTTAK_TOM,
+          STONADSDAGER_KVOTE.FK_DIM_TID_MIN_DATO_KVOTE,
+          STONADSDAGER_KVOTE.FK_DIM_TID_MAX_DATO_KVOTE,
+          BEREG.STATUS_OG_ANDEL_BRUTTO,
+          BEREG.STATUS_OG_ANDEL_AVKORTET,
+          BEREG.BEREGNINGSGRUNNLAG_FOM,
+          BEREG.DEKNINGSGRAD,
+          BEREG.BEREGNINGSGRUNNLAG_TOM,
+          BEREG.DAGSATS,
+          BEREG.DAGSATS_BRUKER,
+          BEREG.DAGSATS_ARBEIDSGIVER,
+          BEREG.DAGSATS_VIRKSOMHET,
+          BEREG.STATUS_OG_ANDEL_INNTEKTSKAT,
+          BEREG.AKTIVITET_STATUS,
+          BEREG.BRUTTO_INNTEKT,
+          BEREG.AVKORTET_INNTEKT,
+          BEREG.DAGSATS*UTTAK_DAGER.UTBETALINGSPROSENT/100 AS DAGSATS_ERST,
+          BEREG.ANTALL_BEREGNINGSGRUNNLAG
+        FROM
+          BEREGNINGSGRUNNLAG                        BEREG
+          JOIN UTTAK_DAGER
+          ON UTTAK_DAGER.TRANS_ID = BEREG.TRANS_ID
+          AND NVL(UTTAK_DAGER.VIRKSOMHET, 'X') = NVL(BEREG.VIRKSOMHETSNUMMER, 'X')
+          AND BEREG.BEREGNINGSGRUNNLAG_FOM <= UTTAK_DAGER.DATO
+          AND NVL(BEREG.BEREGNINGSGRUNNLAG_TOM, TO_DATE('20991201', 'YYYYMMDD')) >= UTTAK_DAGER.DATO LEFT JOIN STONADSDAGER_KVOTE
+          ON UTTAK_DAGER.TRANS_ID = STONADSDAGER_KVOTE.TRANS_ID
+          AND UTTAK_DAGER.TREKKONTO = STONADSDAGER_KVOTE.TREKKONTO
+          AND NVL(UTTAK_DAGER.VIRKSOMHET,
+          'X') = NVL(STONADSDAGER_KVOTE.VIRKSOMHET,
+          'X')
+          AND UTTAK_DAGER.UTTAK_ARBEID_TYPE = STONADSDAGER_KVOTE.UTTAK_ARBEID_TYPE
+          JOIN DVH_FAM_FP.FAM_FP_UTTAK_AKTIVITET_MAPPING UTTAK_MAPPING
+          ON UTTAK_DAGER.UTTAK_ARBEID_TYPE = UTTAK_MAPPING.UTTAK_ARBEID
+          AND BEREG.AKTIVITET_STATUS = UTTAK_MAPPING.AKTIVITET_STATUS
+        WHERE
+          BEREG.DAGSATS_BRUKER + BEREG.DAGSATS_ARBEIDSGIVER != 0
+      ), BEREGNINGSGRUNNLAG_AGG AS (
+        SELECT
+          A.*,
+          DAGER_ERST*DAGSATS_VIRKSOMHET/DAGSATS*ANTALL_BEREGNINGSGRUNNLAG                                                                                                                    TILFELLE_ERST,
+          DAGER_ERST*ROUND(UTBETALINGSPROSENT/100*DAGSATS_VIRKSOMHET)                                                                                                                        BELOP,
+          ROUND(UTBETALINGSPROSENT/100*DAGSATS_VIRKSOMHET-0.5)                                                                                                                               DAGSATS_REDUSERT,
+          CASE
+            WHEN PERIODE_RESULTAT_AARSAK IN (2004, 2033) THEN
+              'N'
+            WHEN TREKKONTO IN ('FEDREKVOTE', 'FELLESPERIODE', 'MÃ˜DREKVOTE') THEN
+              'J'
+            WHEN TREKKONTO = 'FORELDREPENGER' THEN
+              'N'
+          END MOR_RETTIGHET
+        FROM
+          (
+            SELECT
+              FAGSAK_ID,
+              TRANS_ID,
+              TREKKONTO,
+              TREKKDAGER,
+              STONADSDAGER_KVOTE,
+              UTTAK_ARBEID_TYPE,
+              AAR,
+              HALVAAR --, kvartal, aar_maaned
+,
+              UTTAK_FOM,
+              UTTAK_TOM,
+              SUM(DAGSATS_VIRKSOMHET/DAGSATS*
+                CASE
+                  WHEN ((UPPER(GRADERING_INNVILGET) ='TRUE'
+                  AND UPPER(GRADERING)='TRUE')
+                  OR UPPER(SAMTIDIG_UTTAK)='TRUE') THEN
+                    (100-ARBEIDSTIDSPROSENT)/100
+                  ELSE
+                    1.0
+                END )                                DAGER_ERST2,
+              MAX(ARBEIDSTIDSPROSENT)                AS ARBEIDSTIDSPROSENT,
+              COUNT(DISTINCT PK_DIM_TID)             DAGER_ERST,
+ --count(distinct pk_dim_tid)*dagsats_virksomhet/dagsats tilfelle_erst,
+              MIN(BEREGNINGSGRUNNLAG_FOM)            BEREGNINGSGRUNNLAG_FOM,
+              MAX(BEREGNINGSGRUNNLAG_TOM)            BEREGNINGSGRUNNLAG_TOM,
+              DEKNINGSGRAD,
+ --count(distinct pk_dim_tid)*
+ --      round(utbetalingsprosent/100*dagsats_virksomhet-0.5) belop,
+              DAGSATS_BRUKER,
+              DAGSATS_ARBEIDSGIVER,
+              DAGSATS_VIRKSOMHET,
+              VIRKSOMHET,
+              PERIODE_RESULTAT_AARSAK,
+              DAGSATS,
+              DAGSATS_ERST, --dagsats_virksomhet,
+              UTBETALINGSPROSENT                     GRADERINGSPROSENT,
+              STATUS_OG_ANDEL_INNTEKTSKAT,
+              AKTIVITET_STATUS,
+              BRUTTO_INNTEKT,
+              AVKORTET_INNTEKT,
+              STATUS_OG_ANDEL_BRUTTO,
+              STATUS_OG_ANDEL_AVKORTET,
+ --round(utbetalingsprosent/100*dagsats_virksomhet-0.5) dagsats_redusert,
+              UTBETALINGSPROSENT,
+              MIN(PK_DIM_TID)                        PK_DIM_TID_DATO_UTBET_FOM,
+              MAX(PK_DIM_TID)                        PK_DIM_TID_DATO_UTBET_TOM,
+              FUNKSJONELL_TID,
+              FORSTE_VEDTAKSDATO,
+              SISTE_VEDTAKSDATO,
+              MAX_VEDTAKSDATO,
+              PERIODE,
+              MAX(FORSTE_SOKNADSDATO)                AS FORSTE_SOKNADSDATO,
+              MAX(SOKNADSDATO)                       AS SOKNADSDATO,
+              SAMTIDIG_UTTAK,
+              GRADERING,
+              GRADERING_INNVILGET,
+              MIN_UTTAK_FOM,
+              MAX_UTTAK_TOM,
+              FK_DIM_TID_MIN_DATO_KVOTE,
+              FK_DIM_TID_MAX_DATO_KVOTE,
+              MAX(PK_FAM_FP_TREKKONTO)               AS PK_FAM_FP_TREKKONTO,
+              MAX(PK_FAM_FP_PERIODE_RESULTAT_AARSAK) AS PK_FAM_FP_PERIODE_RESULTAT_AARSAK,
+              ANTALL_BEREGNINGSGRUNNLAG,
+              MAX(GRADERINGSDAGER)                   AS GRADERINGSDAGER,
+              MAX(MORS_AKTIVITET)                    AS MORS_AKTIVITET
+            FROM
+              BEREGNINGSGRUNNLAG_DETALJ
+            GROUP BY
+              FAGSAK_ID,
+              TRANS_ID,
+              TREKKONTO,
+              TREKKDAGER,
+              STONADSDAGER_KVOTE,
+              UTTAK_ARBEID_TYPE,
+              AAR,
+              HALVAAR --, kvartal, aar_maaned
+,
+              UTTAK_FOM,
+              UTTAK_TOM,
+              DEKNINGSGRAD,
+              VIRKSOMHET,
+              UTBETALINGSPROSENT,
+              PERIODE_RESULTAT_AARSAK,
+              DAGSATS,
+              DAGSATS_ERST,
+              DAGSATS_BRUKER,
+              DAGSATS_ARBEIDSGIVER,
+              DAGSATS_VIRKSOMHET,
+              UTBETALINGSPROSENT,
+              STATUS_OG_ANDEL_INNTEKTSKAT,
+              AKTIVITET_STATUS,
+              BRUTTO_INNTEKT,
+              AVKORTET_INNTEKT,
+              STATUS_OG_ANDEL_BRUTTO,
+              STATUS_OG_ANDEL_AVKORTET,
+              FUNKSJONELL_TID,
+              FORSTE_VEDTAKSDATO,
+              SISTE_VEDTAKSDATO,
+              MAX_VEDTAKSDATO,
+              PERIODE,
+              SAMTIDIG_UTTAK,
+              GRADERING,
+              GRADERING_INNVILGET,
+              MIN_UTTAK_FOM,
+              MAX_UTTAK_TOM,
+              FK_DIM_TID_MIN_DATO_KVOTE,
+              FK_DIM_TID_MAX_DATO_KVOTE,
+              ANTALL_BEREGNINGSGRUNNLAG
+          ) A
+      ), GRUNNLAG AS (
+        SELECT
+          BEREGNINGSGRUNNLAG_AGG.*,
+          SYSDATE                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      AS LASTET_DATO,
+          MOTTAKER.BEHANDLINGSTEMA,
+          MOTTAKER.MAX_TRANS_ID,
+          MOTTAKER.FK_PERSON1_MOTTAKER,
+          MOTTAKER.KJONN,
+          MOTTAKER.FK_PERSON1_BARN,
+          MOTTAKER.TERMINDATO,
+          MOTTAKER.FOEDSELSDATO,
+          MOTTAKER.ANTALL_BARN_TERMIN,
+          MOTTAKER.ANTALL_BARN_FOEDSEL,
+          MOTTAKER.FOEDSELSDATO_ADOPSJON,
+          MOTTAKER.ANTALL_BARN_ADOPSJON,
+          MOTTAKER.MOTTAKER_FODSELS_AAR,
+          MOTTAKER.MOTTAKER_FODSELS_MND,
+          SUBSTR(P_TID_FOM, 1, 4) - MOTTAKER.MOTTAKER_FODSELS_AAR                                                                                                                                                                                                                                                                                                                                                                                                                                                      AS MOTTAKER_ALDER,
+          MOTTAKER.SIVILSTAND,
+          MOTTAKER.STATSBORGERSKAP,
+          DIM_PERSON.PK_DIM_PERSON,
+          DIM_PERSON.BOSTED_KOMMUNE_NR,
+          DIM_PERSON.FK_DIM_SIVILSTATUS,
+          DIM_GEOGRAFI.PK_DIM_GEOGRAFI,
+          DIM_GEOGRAFI.BYDEL_KOMMUNE_NR,
+          DIM_GEOGRAFI.KOMMUNE_NR,
+          DIM_GEOGRAFI.KOMMUNE_NAVN,
+          DIM_GEOGRAFI.BYDEL_NR,
+          DIM_GEOGRAFI.BYDEL_NAVN,
+          ANNENFORELDERFAGSAK.ANNENFORELDERFAGSAK_ID,
+          ANNENFORELDERFAGSAK.FK_PERSON1_ANNEN_PART,
+          FAM_FP_UTTAK_FP_KONTOER.MAX_DAGER                                                                                                                                                                                                                                                                                                                                                                                                                                                                            MAX_STONADSDAGER_KONTO,
+          CASE
+            WHEN ALENEOMSORG.FAGSAK_ID IS NOT NULL THEN
+              'J'
+            ELSE
+              NULL
+          END AS                                                                                                                                                                                                                                                                                                                                                                                                                                           ALENEOMSORG,
+          CASE
+            WHEN BEHANDLINGSTEMA = 'FORP_FODS' THEN
+              '214'
+            WHEN BEHANDLINGSTEMA = 'FORP_ADOP' THEN
+              '216'
+          END AS                                                                                                                                                                                                                                                                                                                                                                                                         HOVEDKONTONR,
+          CASE
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='ARBEIDSTAKER' AND DAGSATS_ARBEIDSGIVER/DAGSATS*100<=50 THEN
+              '1000'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='ARBEIDSTAKER' AND DAGSATS_ARBEIDSGIVER/DAGSATS*100>50 THEN
+              '8020'
+ --when status_og_andel_inntektskat='ARBEIDSTAKER' then '1000'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='JORDBRUKER' THEN
+              '5210'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='SJÃ˜MANN' THEN
+              '1300'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='SELVSTENDIG_NÃ†RINGSDRIVENDE' THEN
+              '5010'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='DAGPENGER' THEN
+              '1200'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='ARBEIDSTAKER_UTEN_FERIEPENGER' THEN
+              '1000'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='FISKER' THEN
+              '5300'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='DAGMAMMA' THEN
+              '5110'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='FRILANSER' THEN
+              '1100'
+          END AS UNDERKONTONR,
+          ROUND(DAGSATS_ARBEIDSGIVER/DAGSATS*100, 0)                                                                                                                                                                                                                                                                                                                                                                                                                                                                   AS ANDEL_AV_REFUSJON,
+          CASE
+            WHEN RETT_TIL_MÃ˜DREKVOTE.TRANS_ID IS NULL THEN
+              'N'
+            ELSE
+              'J'
+          END AS                                                                                                                                                                                                                                                                                                                                                                                                                                         RETT_TIL_MÃ˜DREKVOTE,
+          CASE
+            WHEN RETT_TIL_FEDREKVOTE.TRANS_ID IS NULL THEN
+              'N'
+            ELSE
+              'J'
+          END AS                                                                                                                                                                                                                                                                                                                                                                                                                                         RETT_TIL_FEDREKVOTE,
+          FLERBARNSDAGER.FLERBARNSDAGER,
+          ADOPSJON.ADOPSJONSDATO,
+          ADOPSJON.STEBARNSADOPSJON,
+          EOS.EOS_SAK
+        FROM
+          BEREGNINGSGRUNNLAG_AGG
+          LEFT JOIN MOTTAKER
+          ON BEREGNINGSGRUNNLAG_AGG.FAGSAK_ID = MOTTAKER.FAGSAK_ID
+          AND BEREGNINGSGRUNNLAG_AGG.TRANS_ID = MOTTAKER.MAX_TRANS_ID
+          LEFT JOIN ANNENFORELDERFAGSAK
+          ON BEREGNINGSGRUNNLAG_AGG.FAGSAK_ID = ANNENFORELDERFAGSAK.FAGSAK_ID
+          AND BEREGNINGSGRUNNLAG_AGG.TRANS_ID = ANNENFORELDERFAGSAK.MAX_TRANS_ID
+          LEFT JOIN DVH_FAM_FP.FAM_FP_UTTAK_FP_KONTOER
+          ON BEREGNINGSGRUNNLAG_AGG.FAGSAK_ID = FAM_FP_UTTAK_FP_KONTOER.FAGSAK_ID
+          AND MOTTAKER.MAX_TRANS_ID = FAM_FP_UTTAK_FP_KONTOER.TRANS_ID
+ --AND UPPER(REGEXP_REPLACE(grunnlag_drp1.TREKKONTO, '_|-|[[:space:]]', '')) = UPPER(REGEXP_REPLACE(FAM_FP_Uttak_FP_Kontoer.STOENADSKONTOTYPE, '_|-|[[:space:]]', ''))
+          AND UPPER(REPLACE(BEREGNINGSGRUNNLAG_AGG.TREKKONTO,
+          '_',
+          '')) = UPPER(REPLACE(FAM_FP_UTTAK_FP_KONTOER.STOENADSKONTOTYPE,
+          ' ',
+          ''))
+          LEFT JOIN DT_PERSON.DIM_PERSON
+          ON MOTTAKER.FK_PERSON1_MOTTAKER = DIM_PERSON.FK_PERSON1
+ --and beregningsgrunnlag_agg.uttak_tom between dim_person.gyldig_fra_dato and dim_person.gyldig_til_dato
+          AND TO_DATE(BEREGNINGSGRUNNLAG_AGG.PK_DIM_TID_DATO_UTBET_TOM,
+          'yyyymmdd') BETWEEN DIM_PERSON.GYLDIG_FRA_DATO
+          AND DIM_PERSON.GYLDIG_TIL_DATO
+          LEFT JOIN DT_KODEVERK.DIM_GEOGRAFI
+          ON DIM_PERSON.FK_DIM_GEOGRAFI_BOSTED = DIM_GEOGRAFI.PK_DIM_GEOGRAFI
+          LEFT JOIN ALENEOMSORG
+          ON ALENEOMSORG.FAGSAK_ID = BEREGNINGSGRUNNLAG_AGG.FAGSAK_ID
+          AND ALENEOMSORG.UTTAK_FOM = BEREGNINGSGRUNNLAG_AGG.UTTAK_FOM
+          LEFT JOIN (
+            SELECT
+              TRANS_ID
+            FROM
+              DVH_FAM_FP.FAM_FP_UTTAK_FP_KONTOER
+            WHERE
+              UPPER(STOENADSKONTOTYPE) = 'MÃ˜DREKVOTE'
+            GROUP BY
+              TRANS_ID
+          ) RETT_TIL_MÃ˜DREKVOTE
+          ON RETT_TIL_MÃ˜DREKVOTE.TRANS_ID = BEREGNINGSGRUNNLAG_AGG.TRANS_ID
+          LEFT JOIN (
+            SELECT
+              TRANS_ID
+            FROM
+              DVH_FAM_FP.FAM_FP_UTTAK_FP_KONTOER
+            WHERE
+              UPPER(STOENADSKONTOTYPE) = 'FEDREKVOTE'
+            GROUP BY
+              TRANS_ID
+          ) RETT_TIL_FEDREKVOTE
+          ON RETT_TIL_FEDREKVOTE.TRANS_ID = BEREGNINGSGRUNNLAG_AGG.TRANS_ID
+          LEFT JOIN (
+            SELECT
+              TRANS_ID,
+              MAX(MAX_DAGER) AS FLERBARNSDAGER
+            FROM
+              DVH_FAM_FP.FAM_FP_UTTAK_FP_KONTOER
+            WHERE
+              UPPER(STOENADSKONTOTYPE) = 'FLERBARNSDAGER'
+            GROUP BY
+              TRANS_ID
+          ) FLERBARNSDAGER
+          ON FLERBARNSDAGER.TRANS_ID = BEREGNINGSGRUNNLAG_AGG.TRANS_ID
+          LEFT JOIN ADOPSJON
+          ON BEREGNINGSGRUNNLAG_AGG.FAGSAK_ID = ADOPSJON.FAGSAK_ID
+          LEFT JOIN EOS
+          ON BEREGNINGSGRUNNLAG_AGG.TRANS_ID = EOS.TRANS_ID
+      )
+      SELECT /*+ PARALLEL(8) */
+        *
+ --from uttak_dager
+      FROM
+        GRUNNLAG
+      WHERE
+        FAGSAK_ID NOT IN (1679117)
+ --where fagsak_id in (1035184)
+;
+    V_TID_FOM                      VARCHAR2(8) := NULL;
+    V_TID_TOM                      VARCHAR2(8) := NULL;
+    V_COMMIT                       NUMBER := 0;
+    V_ERROR_MELDING                VARCHAR2(1000) := NULL;
+    V_DIM_TID_ANTALL               NUMBER := 0;
+    V_UTBETALINGSPROSENT_KALKULERT NUMBER := 0;
+  BEGIN
+    V_TID_FOM := SUBSTR(P_IN_VEDTAK_TOM, 1, 4)
+                 || SUBSTR(P_IN_VEDTAK_TOM, 5, 6)-5
+                                                  || '01';
+    V_TID_TOM := TO_CHAR(LAST_DAY(TO_DATE(P_IN_VEDTAK_TOM, 'yyyymm')), 'yyyymmdd');
+ --dbms_output.put_line(v_tid_fom||v_tid_tom);--TEST!!!
+    FOR REC_PERIODE IN CUR_PERIODE(P_IN_RAPPORT_DATO, P_IN_FORSKYVNINGER, V_TID_FOM, V_TID_TOM) LOOP
+      V_DIM_TID_ANTALL := 0;
+      V_UTBETALINGSPROSENT_KALKULERT := 0;
+      V_DIM_TID_ANTALL := DIM_TID_ANTALL(TO_NUMBER(TO_CHAR(REC_PERIODE.UTTAK_FOM, 'yyyymmdd')), TO_NUMBER(TO_CHAR(REC_PERIODE.UTTAK_TOM, 'yyyymmdd')));
+      IF V_DIM_TID_ANTALL != 0 THEN
+        V_UTBETALINGSPROSENT_KALKULERT := ROUND(REC_PERIODE.TREKKDAGER/V_DIM_TID_ANTALL*100, 2);
+      ELSE
+        V_UTBETALINGSPROSENT_KALKULERT := 0;
+      END IF;
+      BEGIN
+        INSERT INTO DVH_FAM_FP.FAK_FAM_FP_VEDTAK_UTBETALING (
+          FAGSAK_ID,
+          TRANS_ID,
+          BEHANDLINGSTEMA,
+          TREKKONTO,
+          STONADSDAGER_KVOTE,
+          UTTAK_ARBEID_TYPE,
+          AAR,
+          HALVAAR, --AAR_MAANED,
+          RAPPORT_PERIODE,
+          UTTAK_FOM,
+          UTTAK_TOM,
+          DAGER_ERST,
+          BEREGNINGSGRUNNLAG_FOM,
+          BEREGNINGSGRUNNLAG_TOM,
+          DEKNINGSGRAD,
+          DAGSATS_BRUKER,
+          DAGSATS_ARBEIDSGIVER,
+          VIRKSOMHET,
+          PERIODE_RESULTAT_AARSAK,
+          DAGSATS,
+          GRADERINGSPROSENT,
+          STATUS_OG_ANDEL_INNTEKTSKAT,
+          AKTIVITET_STATUS,
+          BRUTTO_INNTEKT,
+          AVKORTET_INNTEKT,
+          STATUS_OG_ANDEL_BRUTTO,
+          STATUS_OG_ANDEL_AVKORTET,
+          UTBETALINGSPROSENT,
+          FK_DIM_TID_DATO_UTBET_FOM,
+          FK_DIM_TID_DATO_UTBET_TOM,
+          FUNKSJONELL_TID,
+          FORSTE_VEDTAKSDATO,
+          VEDTAKSDATO,
+          MAX_VEDTAKSDATO,
+          PERIODE_TYPE,
+          TILFELLE_ERST,
+          BELOP,
+          DAGSATS_REDUSERT,
+          LASTET_DATO,
+          MAX_TRANS_ID,
+          FK_PERSON1_MOTTAKER,
+          FK_PERSON1_ANNEN_PART,
+          KJONN,
+          FK_PERSON1_BARN,
+          TERMINDATO,
+          FOEDSELSDATO,
+          ANTALL_BARN_TERMIN,
+          ANTALL_BARN_FOEDSEL,
+          FOEDSELSDATO_ADOPSJON,
+          ANTALL_BARN_ADOPSJON,
+          ANNENFORELDERFAGSAK_ID,
+          MAX_STONADSDAGER_KONTO,
+          FK_DIM_PERSON,
+          BOSTED_KOMMUNE_NR,
+          FK_DIM_GEOGRAFI,
+          BYDEL_KOMMUNE_NR,
+          KOMMUNE_NR,
+          KOMMUNE_NAVN,
+          BYDEL_NR,
+          BYDEL_NAVN,
+          ALENEOMSORG,
+          HOVEDKONTONR,
+          UNDERKONTONR,
+          MOTTAKER_FODSELS_AAR,
+          MOTTAKER_FODSELS_MND,
+          MOTTAKER_ALDER,
+          RETT_TIL_FEDREKVOTE,
+          RETT_TIL_MODREKVOTE,
+          DAGSATS_ERST,
+          TREKKDAGER,
+          SAMTIDIG_UTTAK,
+          GRADERING,
+          GRADERING_INNVILGET,
+          ANTALL_DAGER_PERIODE,
+          FLERBARNSDAGER,
+          UTBETALINGSPROSENT_KALKULERT,
+          MIN_UTTAK_FOM,
+          MAX_UTTAK_TOM,
+          FK_FAM_FP_TREKKONTO,
+          FK_FAM_FP_PERIODE_RESULTAT_AARSAK,
+          SIVILSTATUS,
+          FK_DIM_SIVILSTATUS,
+          ANTALL_BEREGNINGSGRUNNLAG,
+          GRADERINGSDAGER,
+          FK_DIM_TID_MIN_DATO_KVOTE,
+          FK_DIM_TID_MAX_DATO_KVOTE,
+          ADOPSJONSDATO,
+          STEBARNSADOPSJON,
+          EOS_SAK,
+          MOR_RETTIGHET,
+          STATSBORGERSKAP,
+          ARBEIDSTIDSPROSENT,
+          MORS_AKTIVITET,
+          GYLDIG_FLAGG,
+          ANDEL_AV_REFUSJON,
+          FORSTE_SOKNADSDATO,
+          SOKNADSDATO
+        ) VALUES (
+          REC_PERIODE.FAGSAK_ID,
+          REC_PERIODE.TRANS_ID,
+          REC_PERIODE.BEHANDLINGSTEMA,
+          REC_PERIODE.TREKKONTO,
+          REC_PERIODE.STONADSDAGER_KVOTE,
+          REC_PERIODE.UTTAK_ARBEID_TYPE,
+          REC_PERIODE.AAR,
+          REC_PERIODE.HALVAAR --, AAR_MAANED
+,
+          P_IN_RAPPORT_DATO,
+          REC_PERIODE.UTTAK_FOM,
+          REC_PERIODE.UTTAK_TOM,
+          REC_PERIODE.DAGER_ERST,
+          REC_PERIODE.BEREGNINGSGRUNNLAG_FOM,
+          REC_PERIODE.BEREGNINGSGRUNNLAG_TOM,
+          REC_PERIODE.DEKNINGSGRAD,
+          REC_PERIODE.DAGSATS_BRUKER,
+          REC_PERIODE.DAGSATS_ARBEIDSGIVER,
+          REC_PERIODE.VIRKSOMHET,
+          REC_PERIODE.PERIODE_RESULTAT_AARSAK,
+          REC_PERIODE.DAGSATS,
+          REC_PERIODE.GRADERINGSPROSENT,
+          REC_PERIODE.STATUS_OG_ANDEL_INNTEKTSKAT,
+          REC_PERIODE.AKTIVITET_STATUS,
+          REC_PERIODE.BRUTTO_INNTEKT,
+          REC_PERIODE.AVKORTET_INNTEKT,
+          REC_PERIODE.STATUS_OG_ANDEL_BRUTTO,
+          REC_PERIODE.STATUS_OG_ANDEL_AVKORTET,
+          REC_PERIODE.UTBETALINGSPROSENT,
+          REC_PERIODE.PK_DIM_TID_DATO_UTBET_FOM,
+          REC_PERIODE.PK_DIM_TID_DATO_UTBET_TOM,
+          REC_PERIODE.FUNKSJONELL_TID,
+          REC_PERIODE.FORSTE_VEDTAKSDATO,
+          REC_PERIODE.SISTE_VEDTAKSDATO,
+          REC_PERIODE.MAX_VEDTAKSDATO,
+          REC_PERIODE.PERIODE,
+          REC_PERIODE.TILFELLE_ERST,
+          REC_PERIODE.BELOP,
+          REC_PERIODE.DAGSATS_REDUSERT,
+          REC_PERIODE.LASTET_DATO,
+          REC_PERIODE.MAX_TRANS_ID,
+          REC_PERIODE.FK_PERSON1_MOTTAKER,
+          REC_PERIODE.FK_PERSON1_ANNEN_PART,
+          REC_PERIODE.KJONN,
+          REC_PERIODE.FK_PERSON1_BARN,
+          REC_PERIODE.TERMINDATO,
+          REC_PERIODE.FOEDSELSDATO,
+          REC_PERIODE.ANTALL_BARN_TERMIN,
+          REC_PERIODE.ANTALL_BARN_FOEDSEL,
+          REC_PERIODE.FOEDSELSDATO_ADOPSJON,
+          REC_PERIODE.ANTALL_BARN_ADOPSJON,
+          REC_PERIODE.ANNENFORELDERFAGSAK_ID,
+          REC_PERIODE.MAX_STONADSDAGER_KONTO,
+          REC_PERIODE.PK_DIM_PERSON,
+          REC_PERIODE.BOSTED_KOMMUNE_NR,
+          REC_PERIODE.PK_DIM_GEOGRAFI,
+          REC_PERIODE.BYDEL_KOMMUNE_NR,
+          REC_PERIODE.KOMMUNE_NR,
+          REC_PERIODE.KOMMUNE_NAVN,
+          REC_PERIODE.BYDEL_NR,
+          REC_PERIODE.BYDEL_NAVN,
+          REC_PERIODE.ALENEOMSORG,
+          REC_PERIODE.HOVEDKONTONR,
+          REC_PERIODE.UNDERKONTONR,
+          REC_PERIODE.MOTTAKER_FODSELS_AAR,
+          REC_PERIODE.MOTTAKER_FODSELS_MND,
+          REC_PERIODE.MOTTAKER_ALDER,
+          REC_PERIODE.RETT_TIL_FEDREKVOTE,
+          REC_PERIODE.RETT_TIL_MÃ˜DREKVOTE,
+          REC_PERIODE.DAGSATS_ERST,
+          REC_PERIODE.TREKKDAGER,
+          REC_PERIODE.SAMTIDIG_UTTAK,
+          REC_PERIODE.GRADERING,
+          REC_PERIODE.GRADERING_INNVILGET,
+          V_DIM_TID_ANTALL,
+          REC_PERIODE.FLERBARNSDAGER,
+          V_UTBETALINGSPROSENT_KALKULERT,
+          REC_PERIODE.MIN_UTTAK_FOM,
+          REC_PERIODE.MAX_UTTAK_TOM,
+          REC_PERIODE.PK_FAM_FP_TREKKONTO,
+          REC_PERIODE.PK_FAM_FP_PERIODE_RESULTAT_AARSAK,
+          REC_PERIODE.SIVILSTAND,
+          REC_PERIODE.FK_DIM_SIVILSTATUS,
+          REC_PERIODE.ANTALL_BEREGNINGSGRUNNLAG,
+          REC_PERIODE.GRADERINGSDAGER,
+          REC_PERIODE.FK_DIM_TID_MIN_DATO_KVOTE,
+          REC_PERIODE.FK_DIM_TID_MAX_DATO_KVOTE,
+          REC_PERIODE.ADOPSJONSDATO,
+          REC_PERIODE.STEBARNSADOPSJON,
+          REC_PERIODE.EOS_SAK,
+          REC_PERIODE.MOR_RETTIGHET,
+          REC_PERIODE.STATSBORGERSKAP,
+          REC_PERIODE.ARBEIDSTIDSPROSENT,
+          REC_PERIODE.MORS_AKTIVITET,
+          P_IN_GYLDIG_FLAGG,
+          REC_PERIODE.ANDEL_AV_REFUSJON,
+          REC_PERIODE.FORSTE_SOKNADSDATO,
+          REC_PERIODE.SOKNADSDATO
+        );
+        V_COMMIT := V_COMMIT + 1;
+      EXCEPTION
+        WHEN OTHERS THEN
+          ROLLBACK;
+          V_ERROR_MELDING := SUBSTR(SQLCODE
+                                    || ' '
+                                    || SQLERRM, 1, 1000);
+          INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
+            MIN_LASTET_DATO,
+            ID,
+            ERROR_MSG,
+            OPPRETTET_TID,
+            KILDE
+          ) VALUES(
+            NULL,
+            REC_PERIODE.FAGSAK_ID,
+            V_ERROR_MELDING,
+            SYSDATE,
+            'FAM_FP_STATISTIKK_HALVAAR:INSERT'
+          );
+          COMMIT;
+          P_OUT_ERROR := SUBSTR(P_OUT_ERROR
+                                || V_ERROR_MELDING, 1, 1000);
+      END;
+      IF V_COMMIT > 100000 THEN
+        COMMIT;
+        V_COMMIT := 0;
+      END IF;
+    END LOOP;
+    COMMIT;
+  EXCEPTION
+    WHEN OTHERS THEN
+      ROLLBACK;
+      V_ERROR_MELDING := SUBSTR(SQLCODE
+                                || ' '
+                                || SQLERRM, 1, 1000);
+      INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
+        MIN_LASTET_DATO,
+        ID,
+        ERROR_MSG,
+        OPPRETTET_TID,
+        KILDE
+      ) VALUES(
+        NULL,
+        NULL,
+        V_ERROR_MELDING,
+        SYSDATE,
+        'FAM_FP_STATISTIKK_HALVAAR'
+      );
+      COMMIT;
+      P_OUT_ERROR := SUBSTR(P_OUT_ERROR
+                            || V_ERROR_MELDING, 1, 1000);
+  END FAM_FP_STATISTIKK_HALVAAR;
 
-        v_commit := v_commit + 1;
-      exception
-        when others then
-          rollback;
-          v_error_melding := substr(SQLCODE || ' ' || sqlerrm, 1, 1000);
-          insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
-          values(null, rec_periode.fagsak_id, v_error_melding, sysdate, 'FAM_FP_STATISTIKK_AAR:INSERT');
-          commit;
-          p_out_error := substr(p_out_error || v_error_melding, 1, 1000);
-      end;
+  PROCEDURE FAM_FP_STATISTIKK_S(
+    P_IN_VEDTAK_TOM IN VARCHAR2,
+    P_IN_RAPPORT_DATO IN VARCHAR2,
+    P_IN_FORSKYVNINGER IN NUMBER,
+    P_IN_GYLDIG_FLAGG IN NUMBER DEFAULT 0,
+    P_IN_PERIODE_TYPE IN VARCHAR2 DEFAULT 'S',
+    P_OUT_ERROR OUT VARCHAR2
+  ) AS
+    CURSOR CUR_PERIODE(P_RAPPORT_DATO IN VARCHAR2, P_FORSKYVNINGER IN NUMBER, P_TID_FOM IN VARCHAR2, P_TID_TOM IN VARCHAR2) IS
+      WITH FAGSAK AS (
+        SELECT
+          FAGSAK_ID,
+          MAX(BEHANDLINGSTEMA)                                                   AS BEHANDLINGSTEMA,
+          MAX(FAGSAKANNENFORELDER_ID)                                            AS ANNENFORELDERFAGSAK_ID,
+          MAX(TRANS_ID) KEEP(DENSE_RANK FIRST ORDER BY FUNKSJONELL_TID DESC)     AS MAX_TRANS_ID,
+          MAX(SOEKNADSDATO) KEEP(DENSE_RANK FIRST ORDER BY FUNKSJONELL_TID DESC) AS SOKNADSDATO,
+          MIN(SOEKNADSDATO)                                                      AS FORSTE_SOKNADSDATO,
+          MIN(VEDTAKSDATO)                                                       AS FORSTE_VEDTAKSDATO,
+          MAX(FUNKSJONELL_TID)                                                   AS FUNKSJONELL_TID,
+          MAX(VEDTAKSDATO)                                                       AS SISTE_VEDTAKSDATO,
+          P_IN_PERIODE_TYPE                                                      AS PERIODE,
+          LAST_DAY(TO_DATE(P_RAPPORT_DATO, 'yyyymm')) + P_FORSKYVNINGER          AS MAX_VEDTAKSDATO
+        FROM
+          DVH_FAM_FP.FAM_FP_FAGSAK
+        WHERE
+          FAM_FP_FAGSAK.FUNKSJONELL_TID <= LAST_DAY(TO_DATE(P_RAPPORT_DATO, 'yyyymm')) + P_FORSKYVNINGER
+        GROUP BY
+          FAGSAK_ID
+      ), TERMIN AS (
+        SELECT
+          FAGSAK_ID,
+          MAX(TERMINDATO)            TERMINDATO,
+          MAX(FOEDSELSDATO)          FOEDSELSDATO,
+          MAX(ANTALL_BARN_TERMIN)    ANTALL_BARN_TERMIN,
+          MAX(ANTALL_BARN_FOEDSEL)   ANTALL_BARN_FOEDSEL,
+          MAX(FOEDSELSDATO_ADOPSJON) FOEDSELSDATO_ADOPSJON,
+          MAX(ANTALL_BARN_ADOPSJON) ANTALL_BARN_ADOPSJON
+        FROM
+          (
+            SELECT
+              FAM_FP_FAGSAK.FAGSAK_ID,
+              MAX(FODSEL.TERMINDATO)              TERMINDATO,
+              MAX(FODSEL.FOEDSELSDATO)            FOEDSELSDATO,
+              MAX(FODSEL.ANTALL_BARN_FOEDSEL)     ANTALL_BARN_FOEDSEL,
+              MAX(FODSEL.ANTALL_BARN_TERMIN)      ANTALL_BARN_TERMIN,
+              MAX(ADOPSJON.FOEDSELSDATO_ADOPSJON) FOEDSELSDATO_ADOPSJON,
+              COUNT(ADOPSJON.TRANS_ID)            ANTALL_BARN_ADOPSJON
+            FROM
+              DVH_FAM_FP.FAM_FP_FAGSAK
+              LEFT JOIN DVH_FAM_FP.FAM_FP_FODSELTERMIN FODSEL
+              ON FODSEL.FAGSAK_ID = FAM_FP_FAGSAK.FAGSAK_ID
+              AND UPPER(FAM_FP_FAGSAK.BEHANDLINGSTEMA) = 'FORP_FODS'
+              LEFT JOIN DVH_FAM_FP.FAM_FP_FODSELTERMIN ADOPSJON
+              ON ADOPSJON.FAGSAK_ID = FAM_FP_FAGSAK.FAGSAK_ID
+              AND ADOPSJON.TRANS_ID = FAM_FP_FAGSAK.TRANS_ID
+              AND UPPER(FAM_FP_FAGSAK.BEHANDLINGSTEMA) = 'FORP_ADOP'
+            GROUP BY
+              FAM_FP_FAGSAK.FAGSAK_ID,
+              FAM_FP_FAGSAK.TRANS_ID
+          )
+        GROUP BY
+          FAGSAK_ID
+      ), FK_PERSON1 AS (
+        SELECT
+          PERSON.PERSON,
+          PERSON.FAGSAK_ID,
+          MAX(PERSON.BEHANDLINGSTEMA)                                                                             AS BEHANDLINGSTEMA,
+          PERSON.MAX_TRANS_ID,
+          MAX(PERSON.ANNENFORELDERFAGSAK_ID)                                                                      AS ANNENFORELDERFAGSAK_ID,
+          PERSON.AKTOER_ID,
+          MAX(PERSON.KJONN)                                                                                       AS KJONN,
+          MAX(PERSON_67_VASKET.FK_PERSON1) KEEP (DENSE_RANK FIRST ORDER BY PERSON_67_VASKET.GYLDIG_FRA_DATO DESC) AS FK_PERSON1,
+          MAX(FOEDSELSDATO)                                                                                       AS FOEDSELSDATO,
+          MAX(SIVILSTAND)                                                                                         AS SIVILSTAND,
+          MAX(STATSBORGERSKAP)                                                                                    AS STATSBORGERSKAP
+        FROM
+          (
+            SELECT
+              'MOTTAKER'                                AS PERSON,
+              FAGSAK.FAGSAK_ID,
+              FAGSAK.BEHANDLINGSTEMA,
+              FAGSAK.MAX_TRANS_ID,
+              FAGSAK.ANNENFORELDERFAGSAK_ID,
+              FAM_FP_PERSONOPPLYSNINGER.AKTOER_ID,
+              FAM_FP_PERSONOPPLYSNINGER.KJONN,
+              FAM_FP_PERSONOPPLYSNINGER.FOEDSELSDATO,
+              FAM_FP_PERSONOPPLYSNINGER.SIVILSTAND,
+              FAM_FP_PERSONOPPLYSNINGER.STATSBORGERSKAP
+            FROM
+              DVH_FAM_FP.FAM_FP_PERSONOPPLYSNINGER
+              JOIN FAGSAK
+              ON FAM_FP_PERSONOPPLYSNINGER.TRANS_ID = FAGSAK.MAX_TRANS_ID UNION ALL
+              SELECT
+                'BARN'                                    AS PERSON,
+                FAGSAK.FAGSAK_ID,
+                MAX(FAGSAK.BEHANDLINGSTEMA)               AS BEHANDLINGSTEMA,
+                FAGSAK.MAX_TRANS_ID,
+                MAX(FAGSAK.ANNENFORELDERFAGSAK_ID)        ANNENFORELDERFAGSAK_ID,
+                MAX(FAM_FP_FAMILIEHENDELSE.TIL_AKTOER_ID) AS AKTOER_ID,
+                MAX(FAM_FP_FAMILIEHENDELSE.KJOENN)        AS KJONN,
+                NULL                                      AS FOEDSELSDATO,
+                NULL                                      AS SIVILSTAND,
+                NULL                                      AS STATSBORGERSKAP
+              FROM
+                DVH_FAM_FP.FAM_FP_FAMILIEHENDELSE
+                JOIN FAGSAK
+                ON FAM_FP_FAMILIEHENDELSE.FAGSAK_ID = FAGSAK.FAGSAK_ID
+              WHERE
+                UPPER(FAM_FP_FAMILIEHENDELSE.RELASJON) = 'BARN'
+              GROUP BY
+                FAGSAK.FAGSAK_ID, FAGSAK.MAX_TRANS_ID
+          )                                    PERSON
+          JOIN DT_PERSON.DVH_PERSON_IDENT_AKTOR_IKKE_SKJERMET PERSON_67_VASKET
+          ON PERSON_67_VASKET.AKTOR_ID = PERSON.AKTOER_ID
+          AND TO_DATE(P_TID_TOM, 'yyyymmdd') BETWEEN PERSON_67_VASKET.GYLDIG_FRA_DATO
+          AND PERSON_67_VASKET.GYLDIG_TIL_DATO
+        GROUP BY
+          PERSON.PERSON, PERSON.FAGSAK_ID, PERSON.MAX_TRANS_ID, PERSON.AKTOER_ID
+      ), BARN AS (
+        SELECT
+          FAGSAK_ID,
+          LISTAGG(FK_PERSON1, ',') WITHIN GROUP (ORDER BY FK_PERSON1) AS FK_PERSON1_BARN
+        FROM
+          FK_PERSON1
+        WHERE
+          PERSON = 'BARN'
+        GROUP BY
+          FAGSAK_ID
+      ), MOTTAKER AS (
+        SELECT
+          FK_PERSON1.FAGSAK_ID,
+          FK_PERSON1.BEHANDLINGSTEMA,
+          FK_PERSON1.MAX_TRANS_ID,
+          FK_PERSON1.ANNENFORELDERFAGSAK_ID,
+          FK_PERSON1.AKTOER_ID,
+          FK_PERSON1.KJONN,
+          FK_PERSON1.FK_PERSON1                       AS FK_PERSON1_MOTTAKER,
+          EXTRACT(YEAR FROM FK_PERSON1.FOEDSELSDATO) AS MOTTAKER_FODSELS_AAR,
+          EXTRACT(MONTH FROM FK_PERSON1.FOEDSELSDATO) AS MOTTAKER_FODSELS_MND,
+          FK_PERSON1.SIVILSTAND,
+          FK_PERSON1.STATSBORGERSKAP,
+          BARN.FK_PERSON1_BARN,
+          TERMIN.TERMINDATO,
+          TERMIN.FOEDSELSDATO,
+          TERMIN.ANTALL_BARN_TERMIN,
+          TERMIN.ANTALL_BARN_FOEDSEL,
+          TERMIN.FOEDSELSDATO_ADOPSJON,
+          TERMIN.ANTALL_BARN_ADOPSJON
+        FROM
+          FK_PERSON1
+          LEFT JOIN BARN
+          ON BARN.FAGSAK_ID = FK_PERSON1.FAGSAK_ID
+          LEFT JOIN TERMIN
+          ON FK_PERSON1.FAGSAK_ID = TERMIN.FAGSAK_ID
+        WHERE
+          FK_PERSON1.PERSON = 'MOTTAKER'
+      ), ADOPSJON AS (
+        SELECT
+          FAM_FP_VILKAAR.FAGSAK_ID,
+          MAX(FAM_FP_VILKAAR.OMSORGS_OVERTAKELSESDATO) AS ADOPSJONSDATO,
+          MAX(FAM_FP_VILKAAR.EKTEFELLES_BARN)          AS STEBARNSADOPSJON
+        FROM
+          FAGSAK
+          JOIN DVH_FAM_FP.FAM_FP_VILKAAR
+          ON FAGSAK.FAGSAK_ID = FAM_FP_VILKAAR.FAGSAK_ID
+        WHERE
+          FAGSAK.BEHANDLINGSTEMA = 'FORP_ADOP'
+        GROUP BY
+          FAM_FP_VILKAAR.FAGSAK_ID
+      ), EOS AS (
+        SELECT
+          A.TRANS_ID,
+          CASE
+            WHEN UPPER(ER_BORGER_AV_EU_EOS) = 'TRUE' THEN
+              'J'
+            WHEN UPPER(ER_BORGER_AV_EU_EOS) = 'FALSE' THEN
+              'N'
+            ELSE
+              NULL
+          END EOS_SAK
+        FROM
+          (
+            SELECT
+              FAM_FP_VILKAAR.TRANS_ID,
+              MAX(FAM_FP_VILKAAR.ER_BORGER_AV_EU_EOS) AS ER_BORGER_AV_EU_EOS
+            FROM
+              FAGSAK
+              JOIN DVH_FAM_FP.FAM_FP_VILKAAR
+              ON FAGSAK.MAX_TRANS_ID = FAM_FP_VILKAAR.TRANS_ID
+              AND LENGTH(FAM_FP_VILKAAR.PERSON_STATUS) > 0
+            GROUP BY
+              FAM_FP_VILKAAR.TRANS_ID
+          ) A
+      ), ANNENFORELDERFAGSAK AS (
+        SELECT
+          ANNENFORELDERFAGSAK.*,
+          MOTTAKER.FK_PERSON1_MOTTAKER AS FK_PERSON1_ANNEN_PART
+        FROM
+          (
+            SELECT
+              FAGSAK_ID,
+              MAX_TRANS_ID,
+              MAX(ANNENFORELDERFAGSAK_ID) AS ANNENFORELDERFAGSAK_ID
+            FROM
+              (
+                SELECT
+                  FORELDER1.FAGSAK_ID,
+                  FORELDER1.MAX_TRANS_ID,
+                  NVL(FORELDER1.ANNENFORELDERFAGSAK_ID, FORELDER2.FAGSAK_ID) AS ANNENFORELDERFAGSAK_ID
+                FROM
+                  MOTTAKER FORELDER1
+                  JOIN MOTTAKER FORELDER2
+                  ON FORELDER1.FK_PERSON1_BARN = FORELDER2.FK_PERSON1_BARN
+                  AND FORELDER1.FK_PERSON1_MOTTAKER != FORELDER2.FK_PERSON1_MOTTAKER
+              )
+            GROUP BY
+              FAGSAK_ID,
+              MAX_TRANS_ID
+          )        ANNENFORELDERFAGSAK
+          JOIN MOTTAKER
+          ON ANNENFORELDERFAGSAK.ANNENFORELDERFAGSAK_ID = MOTTAKER.FAGSAK_ID
+      ), TID AS (
+        SELECT
+          PK_DIM_TID,
+          DATO,
+          AAR,
+          HALVAAR,
+          KVARTAL,
+          AAR_MAANED
+        FROM
+          DT_KODEVERK.DIM_TID
+        WHERE
+          DAG_I_UKE < 6
+          AND DIM_NIVAA = 1
+          AND GYLDIG_FLAGG = 1
+          AND PK_DIM_TID BETWEEN P_TID_FOM AND P_TID_TOM
+          AND PK_DIM_TID <= TO_CHAR(LAST_DAY(TO_DATE(P_RAPPORT_DATO, 'yyyymm')), 'yyyymmdd')
+      ), UTTAK AS (
+        SELECT
+          UTTAK.TRANS_ID,
+          UTTAK.TREKKONTO,
+          UTTAK.UTTAK_ARBEID_TYPE,
+          UTTAK.VIRKSOMHET,
+          UTTAK.UTBETALINGSPROSENT,
+          UTTAK.GRADERING_INNVILGET,
+          UTTAK.GRADERING,
+          UTTAK.ARBEIDSTIDSPROSENT,
+          UTTAK.SAMTIDIG_UTTAK,
+          UTTAK.PERIODE_RESULTAT_AARSAK,
+          UTTAK.FOM                                      AS UTTAK_FOM,
+          UTTAK.TOM                                      AS UTTAK_TOM,
+          UTTAK.TREKKDAGER,
+          FAGSAK.FAGSAK_ID,
+          FAGSAK.PERIODE,
+          FAGSAK.FUNKSJONELL_TID,
+          FAGSAK.FORSTE_VEDTAKSDATO,
+          FAGSAK.SISTE_VEDTAKSDATO,
+          FAGSAK.MAX_VEDTAKSDATO,
+          FAGSAK.FORSTE_SOKNADSDATO,
+          FAGSAK.SOKNADSDATO,
+          FAM_FP_TREKKONTO.PK_FAM_FP_TREKKONTO,
+          AARSAK_UTTAK.PK_FAM_FP_PERIODE_RESULTAT_AARSAK,
+          UTTAK.ARBEIDSFORHOLD_ID,
+          UTTAK.GRADERINGSDAGER,
+          FAM_FP_UTTAK_FORDELINGSPER.MORS_AKTIVITET
+        FROM
+          DVH_FAM_FP.FAM_FP_UTTAK_RES_PER_AKTIV UTTAK
+          JOIN FAGSAK
+          ON FAGSAK.MAX_TRANS_ID = UTTAK.TRANS_ID LEFT JOIN DVH_FAM_FP.FAM_FP_TREKKONTO
+          ON UPPER(UTTAK.TREKKONTO) = FAM_FP_TREKKONTO.TREKKONTO
+          LEFT JOIN (
+            SELECT
+              AARSAK_UTTAK,
+              MAX(PK_FAM_FP_PERIODE_RESULTAT_AARSAK) AS PK_FAM_FP_PERIODE_RESULTAT_AARSAK
+            FROM
+              DVH_FAM_FP.FAM_FP_PERIODE_RESULTAT_AARSAK
+            GROUP BY
+              AARSAK_UTTAK
+          ) AARSAK_UTTAK
+          ON UPPER(UTTAK.PERIODE_RESULTAT_AARSAK) = AARSAK_UTTAK.AARSAK_UTTAK
+          LEFT JOIN DVH_FAM_FP.FAM_FP_UTTAK_FORDELINGSPER
+          ON FAM_FP_UTTAK_FORDELINGSPER.TRANS_ID = UTTAK.TRANS_ID
+          AND UTTAK.FOM BETWEEN FAM_FP_UTTAK_FORDELINGSPER.FOM
+          AND FAM_FP_UTTAK_FORDELINGSPER.TOM
+          AND UPPER(UTTAK.TREKKONTO) = UPPER(FAM_FP_UTTAK_FORDELINGSPER.PERIODE_TYPE)
+          AND LENGTH(FAM_FP_UTTAK_FORDELINGSPER.MORS_AKTIVITET) > 1
+        WHERE
+          UTTAK.UTBETALINGSPROSENT > 0
+      ), STONADSDAGER_KVOTE AS (
+        SELECT
+          UTTAK.*,
+          TID1.PK_DIM_TID AS FK_DIM_TID_MIN_DATO_KVOTE,
+          TID2.PK_DIM_TID AS FK_DIM_TID_MAX_DATO_KVOTE
+        FROM
+          (
+            SELECT
+              FAGSAK_ID,
+              TRANS_ID,
+              TREKKONTO,
+              VIRKSOMHET,
+              UTTAK_ARBEID_TYPE,
+              SUM(TREKKDAGER)   AS STONADSDAGER_KVOTE,
+              MIN(UTTAK_FOM)    AS MIN_UTTAK_FOM,
+              MAX(UTTAK_TOM)    AS MAX_UTTAK_TOM
+            FROM
+              (
+                SELECT
+                  FAGSAK_ID,
+                  TRANS_ID,
+                  UTTAK_FOM,
+                  UTTAK_TOM,
+                  TREKKONTO,
+                  VIRKSOMHET,
+                  UTTAK_ARBEID_TYPE,
+                  MAX(TREKKDAGER)   AS TREKKDAGER
+                FROM
+                  UTTAK
+                GROUP BY
+                  FAGSAK_ID,
+                  TRANS_ID,
+                  UTTAK_FOM,
+                  UTTAK_TOM,
+                  TREKKONTO,
+                  VIRKSOMHET,
+                  UTTAK_ARBEID_TYPE
+              ) A
+            GROUP BY
+              FAGSAK_ID,
+              TRANS_ID,
+              TREKKONTO,
+              VIRKSOMHET,
+              UTTAK_ARBEID_TYPE
+          )                   UTTAK
+          JOIN DT_KODEVERK.DIM_TID TID1
+          ON TID1.DIM_NIVAA = 1
+          AND TID1.DATO = TRUNC(UTTAK.MIN_UTTAK_FOM, 'dd') JOIN DT_KODEVERK.DIM_TID TID2
+          ON TID2.DIM_NIVAA = 1
+          AND TID2.DATO = TRUNC(UTTAK.MAX_UTTAK_TOM,
+          'dd')
+      ), UTTAK_DAGER AS (
+        SELECT
+          UTTAK.*,
+          TID.PK_DIM_TID,
+          TID.DATO,
+          TID.AAR,
+          TID.HALVAAR,
+          TID.KVARTAL,
+          TID.AAR_MAANED
+        FROM
+          UTTAK
+          JOIN TID
+          ON TID.DATO BETWEEN UTTAK.UTTAK_FOM
+          AND UTTAK.UTTAK_TOM
+      ), ALENEOMSORG AS (
+        SELECT
+          UTTAK.FAGSAK_ID,
+          UTTAK.UTTAK_FOM
+        FROM
+          UTTAK
+          JOIN DVH_FAM_FP.FAM_FP_DOKUMENTASJONSPERIODER DOK1
+          ON DOK1.FAGSAK_ID = UTTAK.FAGSAK_ID
+          AND UTTAK.UTTAK_FOM >= DOK1.FOM
+          AND DOK1.DOKUMENTASJON_TYPE IN ('ALENEOMSORG', 'ALENEOMSORG_OVERFÃ˜RING') LEFT JOIN DVH_FAM_FP.FAM_FP_DOKUMENTASJONSPERIODER DOK2
+          ON DOK1.FAGSAK_ID = DOK2.FAGSAK_ID
+          AND UTTAK.UTTAK_FOM >= DOK2.FOM
+          AND DOK1.TRANS_ID < DOK2.TRANS_ID
+          AND DOK2.DOKUMENTASJON_TYPE = 'ANNEN_FORELDER_HAR_RETT'
+          AND DOK2.FAGSAK_ID IS NULL
+        GROUP BY
+          UTTAK.FAGSAK_ID,
+          UTTAK.UTTAK_FOM
+      ), BEREGNINGSGRUNNLAG AS (
+        SELECT
+          FAGSAK_ID,
+          TRANS_ID,
+          VIRKSOMHETSNUMMER,
+          MAX(STATUS_OG_ANDEL_BRUTTO)         AS STATUS_OG_ANDEL_BRUTTO,
+          MAX(STATUS_OG_ANDEL_AVKORTET)       AS STATUS_OG_ANDEL_AVKORTET,
+          FOM                                 AS BEREGNINGSGRUNNLAG_FOM,
+          TOM                                 AS BEREGNINGSGRUNNLAG_TOM,
+          MAX(DEKNINGSGRAD)                   AS DEKNINGSGRAD,
+          MAX(DAGSATS)                        AS DAGSATS,
+          DAGSATS_BRUKER,
+          DAGSATS_ARBEIDSGIVER,
+          DAGSATS_BRUKER+DAGSATS_ARBEIDSGIVER DAGSATS_VIRKSOMHET,
+          MAX(STATUS_OG_ANDEL_INNTEKTSKAT)    AS STATUS_OG_ANDEL_INNTEKTSKAT,
+          AKTIVITET_STATUS,
+          MAX(BRUTTO)                         AS BRUTTO_INNTEKT,
+          MAX(AVKORTET)                       AS AVKORTET_INNTEKT,
+          COUNT(1)                            AS ANTALL_BEREGNINGSGRUNNLAG
+        FROM
+          DVH_FAM_FP.FAM_FP_BEREGNINGSGRUNNLAG
+        GROUP BY
+          FAGSAK_ID,
+          TRANS_ID,
+          VIRKSOMHETSNUMMER,
+          FOM,
+          TOM,
+          AKTIVITET_STATUS,
+          DAGSATS_BRUKER,
+          DAGSATS_ARBEIDSGIVER
+      ), BEREGNINGSGRUNNLAG_DETALJ AS (
+        SELECT
+          UTTAK_DAGER.*,
+          STONADSDAGER_KVOTE.STONADSDAGER_KVOTE,
+          STONADSDAGER_KVOTE.MIN_UTTAK_FOM,
+          STONADSDAGER_KVOTE.MAX_UTTAK_TOM,
+          STONADSDAGER_KVOTE.FK_DIM_TID_MIN_DATO_KVOTE,
+          STONADSDAGER_KVOTE.FK_DIM_TID_MAX_DATO_KVOTE,
+          BEREG.STATUS_OG_ANDEL_BRUTTO,
+          BEREG.STATUS_OG_ANDEL_AVKORTET,
+          BEREG.BEREGNINGSGRUNNLAG_FOM,
+          BEREG.DEKNINGSGRAD,
+          BEREG.BEREGNINGSGRUNNLAG_TOM,
+          BEREG.DAGSATS,
+          BEREG.DAGSATS_BRUKER,
+          BEREG.DAGSATS_ARBEIDSGIVER,
+          BEREG.DAGSATS_VIRKSOMHET,
+          BEREG.STATUS_OG_ANDEL_INNTEKTSKAT,
+          BEREG.AKTIVITET_STATUS,
+          BEREG.BRUTTO_INNTEKT,
+          BEREG.AVKORTET_INNTEKT,
+          BEREG.DAGSATS*UTTAK_DAGER.UTBETALINGSPROSENT/100 AS DAGSATS_ERST,
+          BEREG.ANTALL_BEREGNINGSGRUNNLAG
+        FROM
+          BEREGNINGSGRUNNLAG                        BEREG
+          JOIN UTTAK_DAGER
+          ON UTTAK_DAGER.TRANS_ID = BEREG.TRANS_ID
+          AND NVL(UTTAK_DAGER.VIRKSOMHET, 'X') = NVL(BEREG.VIRKSOMHETSNUMMER, 'X')
+          AND BEREG.BEREGNINGSGRUNNLAG_FOM <= UTTAK_DAGER.DATO
+          AND NVL(BEREG.BEREGNINGSGRUNNLAG_TOM, TO_DATE('20991201', 'YYYYMMDD')) >= UTTAK_DAGER.DATO LEFT JOIN STONADSDAGER_KVOTE
+          ON UTTAK_DAGER.TRANS_ID = STONADSDAGER_KVOTE.TRANS_ID
+          AND UTTAK_DAGER.TREKKONTO = STONADSDAGER_KVOTE.TREKKONTO
+          AND NVL(UTTAK_DAGER.VIRKSOMHET,
+          'X') = NVL(STONADSDAGER_KVOTE.VIRKSOMHET,
+          'X')
+          AND UTTAK_DAGER.UTTAK_ARBEID_TYPE = STONADSDAGER_KVOTE.UTTAK_ARBEID_TYPE
+          JOIN DVH_FAM_FP.FAM_FP_UTTAK_AKTIVITET_MAPPING UTTAK_MAPPING
+          ON UTTAK_DAGER.UTTAK_ARBEID_TYPE = UTTAK_MAPPING.UTTAK_ARBEID
+          AND BEREG.AKTIVITET_STATUS = UTTAK_MAPPING.AKTIVITET_STATUS
+        WHERE
+          BEREG.DAGSATS_BRUKER + BEREG.DAGSATS_ARBEIDSGIVER != 0
+      ), BEREGNINGSGRUNNLAG_AGG AS (
+        SELECT
+          A.*,
+          DAGER_ERST*DAGSATS_VIRKSOMHET/DAGSATS*ANTALL_BEREGNINGSGRUNNLAG                                                                                                                    TILFELLE_ERST,
+          DAGER_ERST*ROUND(UTBETALINGSPROSENT/100*DAGSATS_VIRKSOMHET)                                                                                                                        BELOP,
+          ROUND(UTBETALINGSPROSENT/100*DAGSATS_VIRKSOMHET-0.5)                                                                                                                               DAGSATS_REDUSERT,
+          CASE
+            WHEN PERIODE_RESULTAT_AARSAK IN (2004, 2033) THEN
+              'N'
+            WHEN TREKKONTO IN ('FEDREKVOTE', 'FELLESPERIODE', 'MÃ˜DREKVOTE') THEN
+              'J'
+            WHEN TREKKONTO = 'FORELDREPENGER' THEN
+              'N'
+          END MOR_RETTIGHET
+        FROM
+          (
+            SELECT
+              FAGSAK_ID,
+              TRANS_ID,
+              TREKKONTO,
+              TREKKDAGER,
+              STONADSDAGER_KVOTE,
+              UTTAK_ARBEID_TYPE,
+              AAR --, halvaar, kvartal, aar_maaned
+,
+              UTTAK_FOM,
+              UTTAK_TOM,
+              SUM(DAGSATS_VIRKSOMHET/DAGSATS*
+                CASE
+                  WHEN ((UPPER(GRADERING_INNVILGET) ='TRUE'
+                  AND UPPER(GRADERING)='TRUE')
+                  OR UPPER(SAMTIDIG_UTTAK)='TRUE') THEN
+                    (100-ARBEIDSTIDSPROSENT)/100
+                  ELSE
+                    1.0
+                END )                                DAGER_ERST2,
+              MAX(ARBEIDSTIDSPROSENT)                AS ARBEIDSTIDSPROSENT,
+              COUNT(DISTINCT PK_DIM_TID)             DAGER_ERST,
+ --count(distinct pk_dim_tid)*dagsats_virksomhet/dagsats tilfelle_erst,
+              MIN(BEREGNINGSGRUNNLAG_FOM)            BEREGNINGSGRUNNLAG_FOM,
+              MAX(BEREGNINGSGRUNNLAG_TOM)            BEREGNINGSGRUNNLAG_TOM,
+              DEKNINGSGRAD,
+ --count(distinct pk_dim_tid)*
+ --      round(utbetalingsprosent/100*dagsats_virksomhet-0.5) belop,
+              DAGSATS_BRUKER,
+              DAGSATS_ARBEIDSGIVER,
+              DAGSATS_VIRKSOMHET,
+              VIRKSOMHET,
+              PERIODE_RESULTAT_AARSAK,
+              DAGSATS,
+              DAGSATS_ERST, --dagsats_virksomhet,
+              UTBETALINGSPROSENT                     GRADERINGSPROSENT,
+              STATUS_OG_ANDEL_INNTEKTSKAT,
+              AKTIVITET_STATUS,
+              BRUTTO_INNTEKT,
+              AVKORTET_INNTEKT,
+              STATUS_OG_ANDEL_BRUTTO,
+              STATUS_OG_ANDEL_AVKORTET,
+ --round(utbetalingsprosent/100*dagsats_virksomhet-0.5) dagsats_redusert,
+              UTBETALINGSPROSENT,
+              MIN(PK_DIM_TID)                        PK_DIM_TID_DATO_UTBET_FOM,
+              MAX(PK_DIM_TID)                        PK_DIM_TID_DATO_UTBET_TOM,
+              FUNKSJONELL_TID,
+              FORSTE_VEDTAKSDATO,
+              SISTE_VEDTAKSDATO,
+              MAX_VEDTAKSDATO,
+              PERIODE,
+              MAX(FORSTE_SOKNADSDATO)                AS FORSTE_SOKNADSDATO,
+              MAX(SOKNADSDATO)                       AS SOKNADSDATO,
+              SAMTIDIG_UTTAK,
+              GRADERING,
+              GRADERING_INNVILGET,
+              MIN_UTTAK_FOM,
+              MAX_UTTAK_TOM,
+              FK_DIM_TID_MIN_DATO_KVOTE,
+              FK_DIM_TID_MAX_DATO_KVOTE,
+              MAX(PK_FAM_FP_TREKKONTO)               AS PK_FAM_FP_TREKKONTO,
+              MAX(PK_FAM_FP_PERIODE_RESULTAT_AARSAK) AS PK_FAM_FP_PERIODE_RESULTAT_AARSAK,
+              ANTALL_BEREGNINGSGRUNNLAG,
+              MAX(GRADERINGSDAGER)                   AS GRADERINGSDAGER,
+              MAX(MORS_AKTIVITET)                    AS MORS_AKTIVITET
+            FROM
+              BEREGNINGSGRUNNLAG_DETALJ
+            GROUP BY
+              FAGSAK_ID,
+              TRANS_ID,
+              TREKKONTO,
+              TREKKDAGER,
+              STONADSDAGER_KVOTE,
+              UTTAK_ARBEID_TYPE,
+              AAR --, halvaar, kvartal, aar_maaned
+,
+              UTTAK_FOM,
+              UTTAK_TOM,
+              DEKNINGSGRAD,
+              VIRKSOMHET,
+              UTBETALINGSPROSENT,
+              PERIODE_RESULTAT_AARSAK,
+              DAGSATS,
+              DAGSATS_ERST,
+              DAGSATS_BRUKER,
+              DAGSATS_ARBEIDSGIVER,
+              DAGSATS_VIRKSOMHET,
+              UTBETALINGSPROSENT,
+              STATUS_OG_ANDEL_INNTEKTSKAT,
+              AKTIVITET_STATUS,
+              BRUTTO_INNTEKT,
+              AVKORTET_INNTEKT,
+              STATUS_OG_ANDEL_BRUTTO,
+              STATUS_OG_ANDEL_AVKORTET,
+              FUNKSJONELL_TID,
+              FORSTE_VEDTAKSDATO,
+              SISTE_VEDTAKSDATO,
+              MAX_VEDTAKSDATO,
+              PERIODE,
+              SAMTIDIG_UTTAK,
+              GRADERING,
+              GRADERING_INNVILGET,
+              MIN_UTTAK_FOM,
+              MAX_UTTAK_TOM,
+              FK_DIM_TID_MIN_DATO_KVOTE,
+              FK_DIM_TID_MAX_DATO_KVOTE,
+              ANTALL_BEREGNINGSGRUNNLAG
+          ) A
+      ), GRUNNLAG AS (
+        SELECT
+          BEREGNINGSGRUNNLAG_AGG.*,
+          SYSDATE                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      AS LASTET_DATO,
+          MOTTAKER.BEHANDLINGSTEMA,
+          MOTTAKER.MAX_TRANS_ID,
+          MOTTAKER.FK_PERSON1_MOTTAKER,
+          MOTTAKER.KJONN,
+          MOTTAKER.FK_PERSON1_BARN,
+          MOTTAKER.TERMINDATO,
+          MOTTAKER.FOEDSELSDATO,
+          MOTTAKER.ANTALL_BARN_TERMIN,
+          MOTTAKER.ANTALL_BARN_FOEDSEL,
+          MOTTAKER.FOEDSELSDATO_ADOPSJON,
+          MOTTAKER.ANTALL_BARN_ADOPSJON,
+          MOTTAKER.MOTTAKER_FODSELS_AAR,
+          MOTTAKER.MOTTAKER_FODSELS_MND,
+          SUBSTR(P_TID_FOM, 1, 4) - MOTTAKER.MOTTAKER_FODSELS_AAR                                                                                                                                                                                                                                                                                                                                                                                                                                                      AS MOTTAKER_ALDER,
+          MOTTAKER.SIVILSTAND,
+          MOTTAKER.STATSBORGERSKAP,
+          DIM_PERSON.PK_DIM_PERSON,
+          DIM_PERSON.BOSTED_KOMMUNE_NR,
+          DIM_PERSON.FK_DIM_SIVILSTATUS,
+          DIM_GEOGRAFI.PK_DIM_GEOGRAFI,
+          DIM_GEOGRAFI.BYDEL_KOMMUNE_NR,
+          DIM_GEOGRAFI.KOMMUNE_NR,
+          DIM_GEOGRAFI.KOMMUNE_NAVN,
+          DIM_GEOGRAFI.BYDEL_NR,
+          DIM_GEOGRAFI.BYDEL_NAVN,
+          ANNENFORELDERFAGSAK.ANNENFORELDERFAGSAK_ID,
+          ANNENFORELDERFAGSAK.FK_PERSON1_ANNEN_PART,
+          FAM_FP_UTTAK_FP_KONTOER.MAX_DAGER                                                                                                                                                                                                                                                                                                                                                                                                                                                                            MAX_STONADSDAGER_KONTO,
+          CASE
+            WHEN ALENEOMSORG.FAGSAK_ID IS NOT NULL THEN
+              'J'
+            ELSE
+              NULL
+          END AS                                                                                                                                                                                                                                                                                                                                                                                                                                           ALENEOMSORG,
+          CASE
+            WHEN BEHANDLINGSTEMA = 'FORP_FODS' THEN
+              '214'
+            WHEN BEHANDLINGSTEMA = 'FORP_ADOP' THEN
+              '216'
+          END AS                                                                                                                                                                                                                                                                                                                                                                                                         HOVEDKONTONR,
+          CASE
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='ARBEIDSTAKER' AND DAGSATS_ARBEIDSGIVER/DAGSATS*100<=50 THEN
+              '1000'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='ARBEIDSTAKER' AND DAGSATS_ARBEIDSGIVER/DAGSATS*100>50 THEN
+              '8020'
+ --when status_og_andel_inntektskat='ARBEIDSTAKER' then '1000'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='JORDBRUKER' THEN
+              '5210'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='SJÃ˜MANN' THEN
+              '1300'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='SELVSTENDIG_NÃ†RINGSDRIVENDE' THEN
+              '5010'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='DAGPENGER' THEN
+              '1200'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='ARBEIDSTAKER_UTEN_FERIEPENGER' THEN
+              '1000'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='FISKER' THEN
+              '5300'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='DAGMAMMA' THEN
+              '5110'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='FRILANSER' THEN
+              '1100'
+          END AS UNDERKONTONR,
+          ROUND(DAGSATS_ARBEIDSGIVER/DAGSATS*100, 0)                                                                                                                                                                                                                                                                                                                                                                                                                                                                   AS ANDEL_AV_REFUSJON,
+          CASE
+            WHEN RETT_TIL_MÃ˜DREKVOTE.TRANS_ID IS NULL THEN
+              'N'
+            ELSE
+              'J'
+          END AS                                                                                                                                                                                                                                                                                                                                                                                                                                         RETT_TIL_MÃ˜DREKVOTE,
+          CASE
+            WHEN RETT_TIL_FEDREKVOTE.TRANS_ID IS NULL THEN
+              'N'
+            ELSE
+              'J'
+          END AS                                                                                                                                                                                                                                                                                                                                                                                                                                         RETT_TIL_FEDREKVOTE,
+          FLERBARNSDAGER.FLERBARNSDAGER,
+          ADOPSJON.ADOPSJONSDATO,
+          ADOPSJON.STEBARNSADOPSJON,
+          EOS.EOS_SAK
+        FROM
+          BEREGNINGSGRUNNLAG_AGG
+          LEFT JOIN MOTTAKER
+          ON BEREGNINGSGRUNNLAG_AGG.FAGSAK_ID = MOTTAKER.FAGSAK_ID
+          AND BEREGNINGSGRUNNLAG_AGG.TRANS_ID = MOTTAKER.MAX_TRANS_ID
+          LEFT JOIN ANNENFORELDERFAGSAK
+          ON BEREGNINGSGRUNNLAG_AGG.FAGSAK_ID = ANNENFORELDERFAGSAK.FAGSAK_ID
+          AND BEREGNINGSGRUNNLAG_AGG.TRANS_ID = ANNENFORELDERFAGSAK.MAX_TRANS_ID
+          LEFT JOIN DVH_FAM_FP.FAM_FP_UTTAK_FP_KONTOER
+          ON BEREGNINGSGRUNNLAG_AGG.FAGSAK_ID = FAM_FP_UTTAK_FP_KONTOER.FAGSAK_ID
+          AND MOTTAKER.MAX_TRANS_ID = FAM_FP_UTTAK_FP_KONTOER.TRANS_ID
+ --AND UPPER(REGEXP_REPLACE(grunnlag_drp1.TREKKONTO, '_|-|[[:space:]]', '')) = UPPER(REGEXP_REPLACE(FAM_FP_Uttak_FP_Kontoer.STOENADSKONTOTYPE, '_|-|[[:space:]]', ''))
+          AND UPPER(REPLACE(BEREGNINGSGRUNNLAG_AGG.TREKKONTO,
+          '_',
+          '')) = UPPER(REPLACE(FAM_FP_UTTAK_FP_KONTOER.STOENADSKONTOTYPE,
+          ' ',
+          ''))
+          LEFT JOIN DT_PERSON.DIM_PERSON
+          ON MOTTAKER.FK_PERSON1_MOTTAKER = DIM_PERSON.FK_PERSON1
+ --and beregningsgrunnlag_agg.uttak_tom between dim_person.gyldig_fra_dato and dim_person.gyldig_til_dato
+          AND TO_DATE(BEREGNINGSGRUNNLAG_AGG.PK_DIM_TID_DATO_UTBET_TOM,
+          'yyyymmdd') BETWEEN DIM_PERSON.GYLDIG_FRA_DATO
+          AND DIM_PERSON.GYLDIG_TIL_DATO
+          LEFT JOIN DT_KODEVERK.DIM_GEOGRAFI
+          ON DIM_PERSON.FK_DIM_GEOGRAFI_BOSTED = DIM_GEOGRAFI.PK_DIM_GEOGRAFI
+          LEFT JOIN ALENEOMSORG
+          ON ALENEOMSORG.FAGSAK_ID = BEREGNINGSGRUNNLAG_AGG.FAGSAK_ID
+          AND ALENEOMSORG.UTTAK_FOM = BEREGNINGSGRUNNLAG_AGG.UTTAK_FOM
+          LEFT JOIN (
+            SELECT
+              TRANS_ID
+            FROM
+              DVH_FAM_FP.FAM_FP_UTTAK_FP_KONTOER
+            WHERE
+              UPPER(STOENADSKONTOTYPE) = 'MÃ˜DREKVOTE'
+            GROUP BY
+              TRANS_ID
+          ) RETT_TIL_MÃ˜DREKVOTE
+          ON RETT_TIL_MÃ˜DREKVOTE.TRANS_ID = BEREGNINGSGRUNNLAG_AGG.TRANS_ID
+          LEFT JOIN (
+            SELECT
+              TRANS_ID
+            FROM
+              DVH_FAM_FP.FAM_FP_UTTAK_FP_KONTOER
+            WHERE
+              UPPER(STOENADSKONTOTYPE) = 'FEDREKVOTE'
+            GROUP BY
+              TRANS_ID
+          ) RETT_TIL_FEDREKVOTE
+          ON RETT_TIL_FEDREKVOTE.TRANS_ID = BEREGNINGSGRUNNLAG_AGG.TRANS_ID
+          LEFT JOIN (
+            SELECT
+              TRANS_ID,
+              MAX(MAX_DAGER) AS FLERBARNSDAGER
+            FROM
+              DVH_FAM_FP.FAM_FP_UTTAK_FP_KONTOER
+            WHERE
+              UPPER(STOENADSKONTOTYPE) = 'FLERBARNSDAGER'
+            GROUP BY
+              TRANS_ID
+          ) FLERBARNSDAGER
+          ON FLERBARNSDAGER.TRANS_ID = BEREGNINGSGRUNNLAG_AGG.TRANS_ID
+          LEFT JOIN ADOPSJON
+          ON BEREGNINGSGRUNNLAG_AGG.FAGSAK_ID = ADOPSJON.FAGSAK_ID
+          LEFT JOIN EOS
+          ON BEREGNINGSGRUNNLAG_AGG.TRANS_ID = EOS.TRANS_ID
+      )
+      SELECT /*+ PARALLEL(8) */
+        *
+ --from uttak_dager
+      FROM
+        GRUNNLAG
+      WHERE
+        FAGSAK_ID NOT IN (1679117)
+ --where fagsak_id in (1035184)
+;
+    V_TID_FOM                      VARCHAR2(8) := NULL;
+    V_TID_TOM                      VARCHAR2(8) := NULL;
+    V_COMMIT                       NUMBER := 0;
+    V_ERROR_MELDING                VARCHAR2(1000) := NULL;
+    V_DIM_TID_ANTALL               NUMBER := 0;
+    V_UTBETALINGSPROSENT_KALKULERT NUMBER := 0;
+  BEGIN
+    V_TID_FOM := SUBSTR(P_IN_VEDTAK_TOM, 1, 4)
+                 || '0101';
+    V_TID_TOM := TO_CHAR(LAST_DAY(TO_DATE(P_IN_VEDTAK_TOM, 'yyyymm')), 'yyyymmdd');
+ --dbms_output.put_line(v_tid_fom||v_tid_tom);--TEST!!!
+    FOR REC_PERIODE IN CUR_PERIODE(P_IN_RAPPORT_DATO, P_IN_FORSKYVNINGER, V_TID_FOM, V_TID_TOM) LOOP
+      V_DIM_TID_ANTALL := 0;
+      V_UTBETALINGSPROSENT_KALKULERT := 0;
+      V_DIM_TID_ANTALL := DIM_TID_ANTALL(TO_NUMBER(TO_CHAR(REC_PERIODE.UTTAK_FOM, 'yyyymmdd')), TO_NUMBER(TO_CHAR(REC_PERIODE.UTTAK_TOM, 'yyyymmdd')));
+      IF V_DIM_TID_ANTALL != 0 THEN
+        V_UTBETALINGSPROSENT_KALKULERT := ROUND(REC_PERIODE.TREKKDAGER/V_DIM_TID_ANTALL*100, 2);
+      ELSE
+        V_UTBETALINGSPROSENT_KALKULERT := 0;
+      END IF;
+      BEGIN
+        INSERT INTO DVH_FAM_FP.FAK_FAM_FP_VEDTAK_UTBETALING (
+          FAGSAK_ID,
+          TRANS_ID,
+          BEHANDLINGSTEMA,
+          TREKKONTO,
+          STONADSDAGER_KVOTE,
+          UTTAK_ARBEID_TYPE,
+          AAR --, halvaar, kvartal, aar_maaned
+,
+          RAPPORT_PERIODE,
+          UTTAK_FOM,
+          UTTAK_TOM,
+          DAGER_ERST,
+          BEREGNINGSGRUNNLAG_FOM,
+          BEREGNINGSGRUNNLAG_TOM,
+          DEKNINGSGRAD,
+          DAGSATS_BRUKER,
+          DAGSATS_ARBEIDSGIVER,
+          VIRKSOMHET,
+          PERIODE_RESULTAT_AARSAK,
+          DAGSATS,
+          GRADERINGSPROSENT,
+          STATUS_OG_ANDEL_INNTEKTSKAT,
+          AKTIVITET_STATUS,
+          BRUTTO_INNTEKT,
+          AVKORTET_INNTEKT,
+          STATUS_OG_ANDEL_BRUTTO,
+          STATUS_OG_ANDEL_AVKORTET,
+          UTBETALINGSPROSENT,
+          FK_DIM_TID_DATO_UTBET_FOM,
+          FK_DIM_TID_DATO_UTBET_TOM,
+          FUNKSJONELL_TID,
+          FORSTE_VEDTAKSDATO,
+          VEDTAKSDATO,
+          MAX_VEDTAKSDATO,
+          PERIODE_TYPE,
+          TILFELLE_ERST,
+          BELOP,
+          DAGSATS_REDUSERT,
+          LASTET_DATO,
+          MAX_TRANS_ID,
+          FK_PERSON1_MOTTAKER,
+          FK_PERSON1_ANNEN_PART,
+          KJONN,
+          FK_PERSON1_BARN,
+          TERMINDATO,
+          FOEDSELSDATO,
+          ANTALL_BARN_TERMIN,
+          ANTALL_BARN_FOEDSEL,
+          FOEDSELSDATO_ADOPSJON,
+          ANTALL_BARN_ADOPSJON,
+          ANNENFORELDERFAGSAK_ID,
+          MAX_STONADSDAGER_KONTO,
+          FK_DIM_PERSON,
+          BOSTED_KOMMUNE_NR,
+          FK_DIM_GEOGRAFI,
+          BYDEL_KOMMUNE_NR,
+          KOMMUNE_NR,
+          KOMMUNE_NAVN,
+          BYDEL_NR,
+          BYDEL_NAVN,
+          ALENEOMSORG,
+          HOVEDKONTONR,
+          UNDERKONTONR,
+          MOTTAKER_FODSELS_AAR,
+          MOTTAKER_FODSELS_MND,
+          MOTTAKER_ALDER,
+          RETT_TIL_FEDREKVOTE,
+          RETT_TIL_MODREKVOTE,
+          DAGSATS_ERST,
+          TREKKDAGER,
+          SAMTIDIG_UTTAK,
+          GRADERING,
+          GRADERING_INNVILGET,
+          ANTALL_DAGER_PERIODE,
+          FLERBARNSDAGER,
+          UTBETALINGSPROSENT_KALKULERT,
+          MIN_UTTAK_FOM,
+          MAX_UTTAK_TOM,
+          FK_FAM_FP_TREKKONTO,
+          FK_FAM_FP_PERIODE_RESULTAT_AARSAK,
+          SIVILSTATUS,
+          FK_DIM_SIVILSTATUS,
+          ANTALL_BEREGNINGSGRUNNLAG,
+          GRADERINGSDAGER,
+          FK_DIM_TID_MIN_DATO_KVOTE,
+          FK_DIM_TID_MAX_DATO_KVOTE,
+          ADOPSJONSDATO,
+          STEBARNSADOPSJON,
+          EOS_SAK,
+          MOR_RETTIGHET,
+          STATSBORGERSKAP,
+          ARBEIDSTIDSPROSENT,
+          MORS_AKTIVITET,
+          GYLDIG_FLAGG,
+          ANDEL_AV_REFUSJON,
+          FORSTE_SOKNADSDATO,
+          SOKNADSDATO
+        ) VALUES (
+          REC_PERIODE.FAGSAK_ID,
+          REC_PERIODE.TRANS_ID,
+          REC_PERIODE.BEHANDLINGSTEMA,
+          REC_PERIODE.TREKKONTO,
+          REC_PERIODE.STONADSDAGER_KVOTE,
+          REC_PERIODE.UTTAK_ARBEID_TYPE,
+          REC_PERIODE.AAR --, rec_periode.halvaar, rec_periode.kvartal, rec_periode.aar_maaned
+,
+          P_IN_RAPPORT_DATO,
+          REC_PERIODE.UTTAK_FOM,
+          REC_PERIODE.UTTAK_TOM,
+          REC_PERIODE.DAGER_ERST,
+          REC_PERIODE.BEREGNINGSGRUNNLAG_FOM,
+          REC_PERIODE.BEREGNINGSGRUNNLAG_TOM,
+          REC_PERIODE.DEKNINGSGRAD,
+          REC_PERIODE.DAGSATS_BRUKER,
+          REC_PERIODE.DAGSATS_ARBEIDSGIVER,
+          REC_PERIODE.VIRKSOMHET,
+          REC_PERIODE.PERIODE_RESULTAT_AARSAK,
+          REC_PERIODE.DAGSATS,
+          REC_PERIODE.GRADERINGSPROSENT,
+          REC_PERIODE.STATUS_OG_ANDEL_INNTEKTSKAT,
+          REC_PERIODE.AKTIVITET_STATUS,
+          REC_PERIODE.BRUTTO_INNTEKT,
+          REC_PERIODE.AVKORTET_INNTEKT,
+          REC_PERIODE.STATUS_OG_ANDEL_BRUTTO,
+          REC_PERIODE.STATUS_OG_ANDEL_AVKORTET,
+          REC_PERIODE.UTBETALINGSPROSENT,
+          REC_PERIODE.PK_DIM_TID_DATO_UTBET_FOM,
+          REC_PERIODE.PK_DIM_TID_DATO_UTBET_TOM,
+          REC_PERIODE.FUNKSJONELL_TID,
+          REC_PERIODE.FORSTE_VEDTAKSDATO,
+          REC_PERIODE.SISTE_VEDTAKSDATO,
+          REC_PERIODE.MAX_VEDTAKSDATO,
+          REC_PERIODE.PERIODE,
+          REC_PERIODE.TILFELLE_ERST,
+          REC_PERIODE.BELOP,
+          REC_PERIODE.DAGSATS_REDUSERT,
+          REC_PERIODE.LASTET_DATO,
+          REC_PERIODE.MAX_TRANS_ID,
+          REC_PERIODE.FK_PERSON1_MOTTAKER,
+          REC_PERIODE.FK_PERSON1_ANNEN_PART,
+          REC_PERIODE.KJONN,
+          REC_PERIODE.FK_PERSON1_BARN,
+          REC_PERIODE.TERMINDATO,
+          REC_PERIODE.FOEDSELSDATO,
+          REC_PERIODE.ANTALL_BARN_TERMIN,
+          REC_PERIODE.ANTALL_BARN_FOEDSEL,
+          REC_PERIODE.FOEDSELSDATO_ADOPSJON,
+          REC_PERIODE.ANTALL_BARN_ADOPSJON,
+          REC_PERIODE.ANNENFORELDERFAGSAK_ID,
+          REC_PERIODE.MAX_STONADSDAGER_KONTO,
+          REC_PERIODE.PK_DIM_PERSON,
+          REC_PERIODE.BOSTED_KOMMUNE_NR,
+          REC_PERIODE.PK_DIM_GEOGRAFI,
+          REC_PERIODE.BYDEL_KOMMUNE_NR,
+          REC_PERIODE.KOMMUNE_NR,
+          REC_PERIODE.KOMMUNE_NAVN,
+          REC_PERIODE.BYDEL_NR,
+          REC_PERIODE.BYDEL_NAVN,
+          REC_PERIODE.ALENEOMSORG,
+          REC_PERIODE.HOVEDKONTONR,
+          REC_PERIODE.UNDERKONTONR,
+          REC_PERIODE.MOTTAKER_FODSELS_AAR,
+          REC_PERIODE.MOTTAKER_FODSELS_MND,
+          REC_PERIODE.MOTTAKER_ALDER,
+          REC_PERIODE.RETT_TIL_FEDREKVOTE,
+          REC_PERIODE.RETT_TIL_MÃ˜DREKVOTE,
+          REC_PERIODE.DAGSATS_ERST,
+          REC_PERIODE.TREKKDAGER,
+          REC_PERIODE.SAMTIDIG_UTTAK,
+          REC_PERIODE.GRADERING,
+          REC_PERIODE.GRADERING_INNVILGET,
+          V_DIM_TID_ANTALL,
+          REC_PERIODE.FLERBARNSDAGER,
+          V_UTBETALINGSPROSENT_KALKULERT,
+          REC_PERIODE.MIN_UTTAK_FOM,
+          REC_PERIODE.MAX_UTTAK_TOM,
+          REC_PERIODE.PK_FAM_FP_TREKKONTO,
+          REC_PERIODE.PK_FAM_FP_PERIODE_RESULTAT_AARSAK,
+          REC_PERIODE.SIVILSTAND,
+          REC_PERIODE.FK_DIM_SIVILSTATUS,
+          REC_PERIODE.ANTALL_BEREGNINGSGRUNNLAG,
+          REC_PERIODE.GRADERINGSDAGER,
+          REC_PERIODE.FK_DIM_TID_MIN_DATO_KVOTE,
+          REC_PERIODE.FK_DIM_TID_MAX_DATO_KVOTE,
+          REC_PERIODE.ADOPSJONSDATO,
+          REC_PERIODE.STEBARNSADOPSJON,
+          REC_PERIODE.EOS_SAK,
+          REC_PERIODE.MOR_RETTIGHET,
+          REC_PERIODE.STATSBORGERSKAP,
+          REC_PERIODE.ARBEIDSTIDSPROSENT,
+          REC_PERIODE.MORS_AKTIVITET,
+          P_IN_GYLDIG_FLAGG,
+          REC_PERIODE.ANDEL_AV_REFUSJON,
+          REC_PERIODE.FORSTE_SOKNADSDATO,
+          REC_PERIODE.SOKNADSDATO
+        );
+        V_COMMIT := V_COMMIT + 1;
+      EXCEPTION
+        WHEN OTHERS THEN
+          ROLLBACK;
+          V_ERROR_MELDING := SUBSTR(SQLCODE
+                                    || ' '
+                                    || SQLERRM, 1, 1000);
+          INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
+            MIN_LASTET_DATO,
+            ID,
+            ERROR_MSG,
+            OPPRETTET_TID,
+            KILDE
+          ) VALUES(
+            NULL,
+            REC_PERIODE.FAGSAK_ID,
+            V_ERROR_MELDING,
+            SYSDATE,
+            'FAM_FP_STATISTIKK_S:INSERT'
+          );
+          COMMIT;
+          P_OUT_ERROR := SUBSTR(P_OUT_ERROR
+                                || V_ERROR_MELDING, 1, 1000);
+      END;
+      IF V_COMMIT > 100000 THEN
+        COMMIT;
+        V_COMMIT := 0;
+      END IF;
+    END LOOP;
+    COMMIT;
+  EXCEPTION
+    WHEN OTHERS THEN
+      ROLLBACK;
+      V_ERROR_MELDING := SUBSTR(SQLCODE
+                                || ' '
+                                || SQLERRM, 1, 1000);
+      INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
+        MIN_LASTET_DATO,
+        ID,
+        ERROR_MSG,
+        OPPRETTET_TID,
+        KILDE
+      ) VALUES(
+        NULL,
+        NULL,
+        V_ERROR_MELDING,
+        SYSDATE,
+        'FAM_FP_STATISTIKK_S'
+      );
+      COMMIT;
+      P_OUT_ERROR := SUBSTR(P_OUT_ERROR
+                            || V_ERROR_MELDING, 1, 1000);
+  END FAM_FP_STATISTIKK_S;
 
-      if v_commit > 100000 then
-        commit;
-        v_commit := 0;
-      end if;
-   end loop;
-   commit;
-  exception
-    when others then
-      rollback;
-      v_error_melding := substr(SQLCODE || ' ' || sqlerrm, 1, 1000);
-      insert into dvh_fam_fp.fp_xml_utbrett_error(min_lastet_dato, id, error_msg, opprettet_tid, kilde)
-      values(null, null, v_error_melding, sysdate, 'FAM_FP_STATISTIKK_AAR');
-      commit;
-      p_out_error := substr(p_out_error || v_error_melding, 1, 1000);
-  end fam_fp_statistikk_aar_mnd;
+  PROCEDURE FAM_FP_STATISTIKK_AAR(
+    P_IN_VEDTAK_TOM IN VARCHAR2,
+    P_IN_RAPPORT_DATO IN VARCHAR2,
+    P_IN_FORSKYVNINGER IN NUMBER,
+    P_IN_GYLDIG_FLAGG IN NUMBER DEFAULT 0,
+    P_IN_PERIODE_TYPE IN VARCHAR2 DEFAULT 'A',
+    P_OUT_ERROR OUT VARCHAR2
+  ) AS
+    CURSOR CUR_PERIODE(P_RAPPORT_DATO IN VARCHAR2, P_FORSKYVNINGER IN NUMBER, P_TID_FOM IN VARCHAR2, P_TID_TOM IN VARCHAR2) IS
+      WITH FAGSAK AS (
+        SELECT
+          FAGSAK_ID,
+          MAX(BEHANDLINGSTEMA)                                                   AS BEHANDLINGSTEMA,
+          MAX(FAGSAKANNENFORELDER_ID)                                            AS ANNENFORELDERFAGSAK_ID,
+          MAX(TRANS_ID) KEEP(DENSE_RANK FIRST ORDER BY FUNKSJONELL_TID DESC)     AS MAX_TRANS_ID,
+          MAX(SOEKNADSDATO) KEEP(DENSE_RANK FIRST ORDER BY FUNKSJONELL_TID DESC) AS SOKNADSDATO,
+          MIN(SOEKNADSDATO)                                                      AS FORSTE_SOKNADSDATO,
+          MIN(VEDTAKSDATO)                                                       AS FORSTE_VEDTAKSDATO,
+          MAX(FUNKSJONELL_TID)                                                   AS FUNKSJONELL_TID,
+          MAX(VEDTAKSDATO)                                                       AS SISTE_VEDTAKSDATO,
+          P_IN_PERIODE_TYPE                                                      AS PERIODE,
+          LAST_DAY(TO_DATE(P_RAPPORT_DATO, 'yyyymm')) + P_FORSKYVNINGER          AS MAX_VEDTAKSDATO
+        FROM
+          DVH_FAM_FP.FAM_FP_FAGSAK
+        WHERE
+          FAM_FP_FAGSAK.FUNKSJONELL_TID <= LAST_DAY(TO_DATE(P_RAPPORT_DATO, 'yyyymm')) + P_FORSKYVNINGER
+        GROUP BY
+          FAGSAK_ID
+      ), TERMIN AS (
+        SELECT
+          FAGSAK_ID,
+          MAX(TERMINDATO)            TERMINDATO,
+          MAX(FOEDSELSDATO)          FOEDSELSDATO,
+          MAX(ANTALL_BARN_TERMIN)    ANTALL_BARN_TERMIN,
+          MAX(ANTALL_BARN_FOEDSEL)   ANTALL_BARN_FOEDSEL,
+          MAX(FOEDSELSDATO_ADOPSJON) FOEDSELSDATO_ADOPSJON,
+          MAX(ANTALL_BARN_ADOPSJON) ANTALL_BARN_ADOPSJON
+        FROM
+          (
+            SELECT
+              FAM_FP_FAGSAK.FAGSAK_ID,
+              MAX(FODSEL.TERMINDATO)              TERMINDATO,
+              MAX(FODSEL.FOEDSELSDATO)            FOEDSELSDATO,
+              MAX(FODSEL.ANTALL_BARN_FOEDSEL)     ANTALL_BARN_FOEDSEL,
+              MAX(FODSEL.ANTALL_BARN_TERMIN)      ANTALL_BARN_TERMIN,
+              MAX(ADOPSJON.FOEDSELSDATO_ADOPSJON) FOEDSELSDATO_ADOPSJON,
+              COUNT(ADOPSJON.TRANS_ID)            ANTALL_BARN_ADOPSJON
+            FROM
+              DVH_FAM_FP.FAM_FP_FAGSAK
+              LEFT JOIN DVH_FAM_FP.FAM_FP_FODSELTERMIN FODSEL
+              ON FODSEL.FAGSAK_ID = FAM_FP_FAGSAK.FAGSAK_ID
+              AND UPPER(FAM_FP_FAGSAK.BEHANDLINGSTEMA) = 'FORP_FODS'
+              LEFT JOIN DVH_FAM_FP.FAM_FP_FODSELTERMIN ADOPSJON
+              ON ADOPSJON.FAGSAK_ID = FAM_FP_FAGSAK.FAGSAK_ID
+              AND ADOPSJON.TRANS_ID = FAM_FP_FAGSAK.TRANS_ID
+              AND UPPER(FAM_FP_FAGSAK.BEHANDLINGSTEMA) = 'FORP_ADOP'
+            GROUP BY
+              FAM_FP_FAGSAK.FAGSAK_ID,
+              FAM_FP_FAGSAK.TRANS_ID
+          )
+        GROUP BY
+          FAGSAK_ID
+      ), FK_PERSON1 AS (
+        SELECT
+          PERSON.PERSON,
+          PERSON.FAGSAK_ID,
+          MAX(PERSON.BEHANDLINGSTEMA)                                                                             AS BEHANDLINGSTEMA,
+          PERSON.MAX_TRANS_ID,
+          MAX(PERSON.ANNENFORELDERFAGSAK_ID)                                                                      AS ANNENFORELDERFAGSAK_ID,
+          PERSON.AKTOER_ID,
+          MAX(PERSON.KJONN)                                                                                       AS KJONN,
+          MAX(PERSON_67_VASKET.FK_PERSON1) KEEP (DENSE_RANK FIRST ORDER BY PERSON_67_VASKET.GYLDIG_FRA_DATO DESC) AS FK_PERSON1,
+          MAX(FOEDSELSDATO)                                                                                       AS FOEDSELSDATO,
+          MAX(SIVILSTAND)                                                                                         AS SIVILSTAND,
+          MAX(STATSBORGERSKAP)                                                                                    AS STATSBORGERSKAP
+        FROM
+          (
+            SELECT
+              'MOTTAKER'                                AS PERSON,
+              FAGSAK.FAGSAK_ID,
+              FAGSAK.BEHANDLINGSTEMA,
+              FAGSAK.MAX_TRANS_ID,
+              FAGSAK.ANNENFORELDERFAGSAK_ID,
+              FAM_FP_PERSONOPPLYSNINGER.AKTOER_ID,
+              FAM_FP_PERSONOPPLYSNINGER.KJONN,
+              FAM_FP_PERSONOPPLYSNINGER.FOEDSELSDATO,
+              FAM_FP_PERSONOPPLYSNINGER.SIVILSTAND,
+              FAM_FP_PERSONOPPLYSNINGER.STATSBORGERSKAP
+            FROM
+              DVH_FAM_FP.FAM_FP_PERSONOPPLYSNINGER
+              JOIN FAGSAK
+              ON FAM_FP_PERSONOPPLYSNINGER.TRANS_ID = FAGSAK.MAX_TRANS_ID UNION ALL
+              SELECT
+                'BARN'                                    AS PERSON,
+                FAGSAK.FAGSAK_ID,
+                MAX(FAGSAK.BEHANDLINGSTEMA)               AS BEHANDLINGSTEMA,
+                FAGSAK.MAX_TRANS_ID,
+                MAX(FAGSAK.ANNENFORELDERFAGSAK_ID)        ANNENFORELDERFAGSAK_ID,
+                MAX(FAM_FP_FAMILIEHENDELSE.TIL_AKTOER_ID) AS AKTOER_ID,
+                MAX(FAM_FP_FAMILIEHENDELSE.KJOENN)        AS KJONN,
+                NULL                                      AS FOEDSELSDATO,
+                NULL                                      AS SIVILSTAND,
+                NULL                                      AS STATSBORGERSKAP
+              FROM
+                DVH_FAM_FP.FAM_FP_FAMILIEHENDELSE
+                JOIN FAGSAK
+                ON FAM_FP_FAMILIEHENDELSE.FAGSAK_ID = FAGSAK.FAGSAK_ID
+              WHERE
+                UPPER(FAM_FP_FAMILIEHENDELSE.RELASJON) = 'BARN'
+              GROUP BY
+                FAGSAK.FAGSAK_ID, FAGSAK.MAX_TRANS_ID
+          )                                    PERSON
+          JOIN DT_PERSON.DVH_PERSON_IDENT_AKTOR_IKKE_SKJERMET PERSON_67_VASKET
+          ON PERSON_67_VASKET.AKTOR_ID = PERSON.AKTOER_ID
+          AND TO_DATE(P_TID_TOM, 'yyyymmdd') BETWEEN PERSON_67_VASKET.GYLDIG_FRA_DATO
+          AND PERSON_67_VASKET.GYLDIG_TIL_DATO
+        GROUP BY
+          PERSON.PERSON, PERSON.FAGSAK_ID, PERSON.MAX_TRANS_ID, PERSON.AKTOER_ID
+      ), BARN AS (
+        SELECT
+          FAGSAK_ID,
+          LISTAGG(FK_PERSON1, ',') WITHIN GROUP (ORDER BY FK_PERSON1) AS FK_PERSON1_BARN
+        FROM
+          FK_PERSON1
+        WHERE
+          PERSON = 'BARN'
+        GROUP BY
+          FAGSAK_ID
+      ), MOTTAKER AS (
+        SELECT
+          FK_PERSON1.FAGSAK_ID,
+          FK_PERSON1.BEHANDLINGSTEMA,
+          FK_PERSON1.MAX_TRANS_ID,
+          FK_PERSON1.ANNENFORELDERFAGSAK_ID,
+          FK_PERSON1.AKTOER_ID,
+          FK_PERSON1.KJONN,
+          FK_PERSON1.FK_PERSON1                       AS FK_PERSON1_MOTTAKER,
+          EXTRACT(YEAR FROM FK_PERSON1.FOEDSELSDATO) AS MOTTAKER_FODSELS_AAR,
+          EXTRACT(MONTH FROM FK_PERSON1.FOEDSELSDATO) AS MOTTAKER_FODSELS_MND,
+          FK_PERSON1.SIVILSTAND,
+          FK_PERSON1.STATSBORGERSKAP,
+          BARN.FK_PERSON1_BARN,
+          TERMIN.TERMINDATO,
+          TERMIN.FOEDSELSDATO,
+          TERMIN.ANTALL_BARN_TERMIN,
+          TERMIN.ANTALL_BARN_FOEDSEL,
+          TERMIN.FOEDSELSDATO_ADOPSJON,
+          TERMIN.ANTALL_BARN_ADOPSJON
+        FROM
+          FK_PERSON1
+          LEFT JOIN BARN
+          ON BARN.FAGSAK_ID = FK_PERSON1.FAGSAK_ID
+          LEFT JOIN TERMIN
+          ON FK_PERSON1.FAGSAK_ID = TERMIN.FAGSAK_ID
+        WHERE
+          FK_PERSON1.PERSON = 'MOTTAKER'
+      ), ADOPSJON AS (
+        SELECT
+          FAM_FP_VILKAAR.FAGSAK_ID,
+          MAX(FAM_FP_VILKAAR.OMSORGS_OVERTAKELSESDATO) AS ADOPSJONSDATO,
+          MAX(FAM_FP_VILKAAR.EKTEFELLES_BARN)          AS STEBARNSADOPSJON
+        FROM
+          FAGSAK
+          JOIN DVH_FAM_FP.FAM_FP_VILKAAR
+          ON FAGSAK.FAGSAK_ID = FAM_FP_VILKAAR.FAGSAK_ID
+        WHERE
+          FAGSAK.BEHANDLINGSTEMA = 'FORP_ADOP'
+        GROUP BY
+          FAM_FP_VILKAAR.FAGSAK_ID
+      ), EOS AS (
+        SELECT
+          A.TRANS_ID,
+          CASE
+            WHEN UPPER(ER_BORGER_AV_EU_EOS) = 'TRUE' THEN
+              'J'
+            WHEN UPPER(ER_BORGER_AV_EU_EOS) = 'FALSE' THEN
+              'N'
+            ELSE
+              NULL
+          END EOS_SAK
+        FROM
+          (
+            SELECT
+              FAM_FP_VILKAAR.TRANS_ID,
+              MAX(FAM_FP_VILKAAR.ER_BORGER_AV_EU_EOS) AS ER_BORGER_AV_EU_EOS
+            FROM
+              FAGSAK
+              JOIN DVH_FAM_FP.FAM_FP_VILKAAR
+              ON FAGSAK.MAX_TRANS_ID = FAM_FP_VILKAAR.TRANS_ID
+              AND LENGTH(FAM_FP_VILKAAR.PERSON_STATUS) > 0
+            GROUP BY
+              FAM_FP_VILKAAR.TRANS_ID
+          ) A
+      ), ANNENFORELDERFAGSAK AS (
+        SELECT
+          ANNENFORELDERFAGSAK.*,
+          MOTTAKER.FK_PERSON1_MOTTAKER AS FK_PERSON1_ANNEN_PART
+        FROM
+          (
+            SELECT
+              FAGSAK_ID,
+              MAX_TRANS_ID,
+              MAX(ANNENFORELDERFAGSAK_ID) AS ANNENFORELDERFAGSAK_ID
+            FROM
+              (
+                SELECT
+                  FORELDER1.FAGSAK_ID,
+                  FORELDER1.MAX_TRANS_ID,
+                  NVL(FORELDER1.ANNENFORELDERFAGSAK_ID, FORELDER2.FAGSAK_ID) AS ANNENFORELDERFAGSAK_ID
+                FROM
+                  MOTTAKER FORELDER1
+                  JOIN MOTTAKER FORELDER2
+                  ON FORELDER1.FK_PERSON1_BARN = FORELDER2.FK_PERSON1_BARN
+                  AND FORELDER1.FK_PERSON1_MOTTAKER != FORELDER2.FK_PERSON1_MOTTAKER
+              )
+            GROUP BY
+              FAGSAK_ID,
+              MAX_TRANS_ID
+          )        ANNENFORELDERFAGSAK
+          JOIN MOTTAKER
+          ON ANNENFORELDERFAGSAK.ANNENFORELDERFAGSAK_ID = MOTTAKER.FAGSAK_ID
+      ), TID AS (
+        SELECT
+          PK_DIM_TID,
+          DATO,
+          AAR,
+          HALVAAR,
+          KVARTAL,
+          AAR_MAANED
+        FROM
+          DT_KODEVERK.DIM_TID
+        WHERE
+          DAG_I_UKE < 6
+          AND DIM_NIVAA = 1
+          AND GYLDIG_FLAGG = 1
+          AND PK_DIM_TID BETWEEN P_TID_FOM AND P_TID_TOM
+          AND PK_DIM_TID <= TO_CHAR(LAST_DAY(TO_DATE(P_RAPPORT_DATO, 'yyyymm')), 'yyyymmdd')
+      ), UTTAK AS (
+        SELECT
+          UTTAK.TRANS_ID,
+          UTTAK.TREKKONTO,
+          UTTAK.UTTAK_ARBEID_TYPE,
+          UTTAK.VIRKSOMHET,
+          UTTAK.UTBETALINGSPROSENT,
+          UTTAK.GRADERING_INNVILGET,
+          UTTAK.GRADERING,
+          UTTAK.ARBEIDSTIDSPROSENT,
+          UTTAK.SAMTIDIG_UTTAK,
+          UTTAK.PERIODE_RESULTAT_AARSAK,
+          UTTAK.FOM                                      AS UTTAK_FOM,
+          UTTAK.TOM                                      AS UTTAK_TOM,
+          UTTAK.TREKKDAGER,
+          FAGSAK.FAGSAK_ID,
+          FAGSAK.PERIODE,
+          FAGSAK.FUNKSJONELL_TID,
+          FAGSAK.FORSTE_VEDTAKSDATO,
+          FAGSAK.SISTE_VEDTAKSDATO,
+          FAGSAK.MAX_VEDTAKSDATO,
+          FAGSAK.FORSTE_SOKNADSDATO,
+          FAGSAK.SOKNADSDATO,
+          FAM_FP_TREKKONTO.PK_FAM_FP_TREKKONTO,
+          AARSAK_UTTAK.PK_FAM_FP_PERIODE_RESULTAT_AARSAK,
+          UTTAK.ARBEIDSFORHOLD_ID,
+          UTTAK.GRADERINGSDAGER,
+          FAM_FP_UTTAK_FORDELINGSPER.MORS_AKTIVITET
+        FROM
+          DVH_FAM_FP.FAM_FP_UTTAK_RES_PER_AKTIV UTTAK
+          JOIN FAGSAK
+          ON FAGSAK.MAX_TRANS_ID = UTTAK.TRANS_ID LEFT JOIN DVH_FAM_FP.FAM_FP_TREKKONTO
+          ON UPPER(UTTAK.TREKKONTO) = FAM_FP_TREKKONTO.TREKKONTO
+          LEFT JOIN (
+            SELECT
+              AARSAK_UTTAK,
+              MAX(PK_FAM_FP_PERIODE_RESULTAT_AARSAK) AS PK_FAM_FP_PERIODE_RESULTAT_AARSAK
+            FROM
+              DVH_FAM_FP.FAM_FP_PERIODE_RESULTAT_AARSAK
+            GROUP BY
+              AARSAK_UTTAK
+          ) AARSAK_UTTAK
+          ON UPPER(UTTAK.PERIODE_RESULTAT_AARSAK) = AARSAK_UTTAK.AARSAK_UTTAK
+          LEFT JOIN DVH_FAM_FP.FAM_FP_UTTAK_FORDELINGSPER
+          ON FAM_FP_UTTAK_FORDELINGSPER.TRANS_ID = UTTAK.TRANS_ID
+          AND UTTAK.FOM BETWEEN FAM_FP_UTTAK_FORDELINGSPER.FOM
+          AND FAM_FP_UTTAK_FORDELINGSPER.TOM
+          AND UPPER(UTTAK.TREKKONTO) = UPPER(FAM_FP_UTTAK_FORDELINGSPER.PERIODE_TYPE)
+          AND LENGTH(FAM_FP_UTTAK_FORDELINGSPER.MORS_AKTIVITET) > 1
+        WHERE
+          UTTAK.UTBETALINGSPROSENT > 0
+      ), STONADSDAGER_KVOTE AS (
+        SELECT
+          UTTAK.*,
+          TID1.PK_DIM_TID AS FK_DIM_TID_MIN_DATO_KVOTE,
+          TID2.PK_DIM_TID AS FK_DIM_TID_MAX_DATO_KVOTE
+        FROM
+          (
+            SELECT
+              FAGSAK_ID,
+              TRANS_ID,
+              TREKKONTO,
+              VIRKSOMHET,
+              UTTAK_ARBEID_TYPE,
+              SUM(TREKKDAGER)   AS STONADSDAGER_KVOTE,
+              MIN(UTTAK_FOM)    AS MIN_UTTAK_FOM,
+              MAX(UTTAK_TOM)    AS MAX_UTTAK_TOM
+            FROM
+              (
+                SELECT
+                  FAGSAK_ID,
+                  TRANS_ID,
+                  UTTAK_FOM,
+                  UTTAK_TOM,
+                  TREKKONTO,
+                  VIRKSOMHET,
+                  UTTAK_ARBEID_TYPE,
+                  MAX(TREKKDAGER)   AS TREKKDAGER
+                FROM
+                  UTTAK
+                GROUP BY
+                  FAGSAK_ID,
+                  TRANS_ID,
+                  UTTAK_FOM,
+                  UTTAK_TOM,
+                  TREKKONTO,
+                  VIRKSOMHET,
+                  UTTAK_ARBEID_TYPE
+              ) A
+            GROUP BY
+              FAGSAK_ID,
+              TRANS_ID,
+              TREKKONTO,
+              VIRKSOMHET,
+              UTTAK_ARBEID_TYPE
+          )                   UTTAK
+          JOIN DT_KODEVERK.DIM_TID TID1
+          ON TID1.DIM_NIVAA = 1
+          AND TID1.DATO = TRUNC(UTTAK.MIN_UTTAK_FOM, 'dd') JOIN DT_KODEVERK.DIM_TID TID2
+          ON TID2.DIM_NIVAA = 1
+          AND TID2.DATO = TRUNC(UTTAK.MAX_UTTAK_TOM,
+          'dd')
+      ), UTTAK_DAGER AS (
+        SELECT
+          UTTAK.*,
+          TID.PK_DIM_TID,
+          TID.DATO,
+          TID.AAR,
+          TID.HALVAAR,
+          TID.KVARTAL,
+          TID.AAR_MAANED
+        FROM
+          UTTAK
+          JOIN TID
+          ON TID.DATO BETWEEN UTTAK.UTTAK_FOM
+          AND UTTAK.UTTAK_TOM
+      ), ALENEOMSORG AS (
+        SELECT
+          UTTAK.FAGSAK_ID,
+          UTTAK.UTTAK_FOM
+        FROM
+          UTTAK
+          JOIN DVH_FAM_FP.FAM_FP_DOKUMENTASJONSPERIODER DOK1
+          ON DOK1.FAGSAK_ID = UTTAK.FAGSAK_ID
+          AND UTTAK.UTTAK_FOM >= DOK1.FOM
+          AND DOK1.DOKUMENTASJON_TYPE IN ('ALENEOMSORG', 'ALENEOMSORG_OVERFÃ˜RING') LEFT JOIN DVH_FAM_FP.FAM_FP_DOKUMENTASJONSPERIODER DOK2
+          ON DOK1.FAGSAK_ID = DOK2.FAGSAK_ID
+          AND UTTAK.UTTAK_FOM >= DOK2.FOM
+          AND DOK1.TRANS_ID < DOK2.TRANS_ID
+          AND DOK2.DOKUMENTASJON_TYPE = 'ANNEN_FORELDER_HAR_RETT'
+          AND DOK2.FAGSAK_ID IS NULL
+        GROUP BY
+          UTTAK.FAGSAK_ID,
+          UTTAK.UTTAK_FOM
+      ), BEREGNINGSGRUNNLAG AS (
+        SELECT
+          FAGSAK_ID,
+          TRANS_ID,
+          VIRKSOMHETSNUMMER,
+          MAX(STATUS_OG_ANDEL_BRUTTO)         AS STATUS_OG_ANDEL_BRUTTO,
+          MAX(STATUS_OG_ANDEL_AVKORTET)       AS STATUS_OG_ANDEL_AVKORTET,
+          FOM                                 AS BEREGNINGSGRUNNLAG_FOM,
+          TOM                                 AS BEREGNINGSGRUNNLAG_TOM,
+          MAX(DEKNINGSGRAD)                   AS DEKNINGSGRAD,
+          MAX(DAGSATS)                        AS DAGSATS,
+          DAGSATS_BRUKER,
+          DAGSATS_ARBEIDSGIVER,
+          DAGSATS_BRUKER+DAGSATS_ARBEIDSGIVER DAGSATS_VIRKSOMHET,
+          MAX(STATUS_OG_ANDEL_INNTEKTSKAT)    AS STATUS_OG_ANDEL_INNTEKTSKAT,
+          AKTIVITET_STATUS,
+          MAX(BRUTTO)                         AS BRUTTO_INNTEKT,
+          MAX(AVKORTET)                       AS AVKORTET_INNTEKT,
+          COUNT(1)                            AS ANTALL_BEREGNINGSGRUNNLAG
+        FROM
+          DVH_FAM_FP.FAM_FP_BEREGNINGSGRUNNLAG
+        GROUP BY
+          FAGSAK_ID,
+          TRANS_ID,
+          VIRKSOMHETSNUMMER,
+          FOM,
+          TOM,
+          AKTIVITET_STATUS,
+          DAGSATS_BRUKER,
+          DAGSATS_ARBEIDSGIVER
+      ), BEREGNINGSGRUNNLAG_DETALJ AS (
+        SELECT
+          UTTAK_DAGER.*,
+          STONADSDAGER_KVOTE.STONADSDAGER_KVOTE,
+          STONADSDAGER_KVOTE.MIN_UTTAK_FOM,
+          STONADSDAGER_KVOTE.MAX_UTTAK_TOM,
+          STONADSDAGER_KVOTE.FK_DIM_TID_MIN_DATO_KVOTE,
+          STONADSDAGER_KVOTE.FK_DIM_TID_MAX_DATO_KVOTE,
+          BEREG.STATUS_OG_ANDEL_BRUTTO,
+          BEREG.STATUS_OG_ANDEL_AVKORTET,
+          BEREG.BEREGNINGSGRUNNLAG_FOM,
+          BEREG.DEKNINGSGRAD,
+          BEREG.BEREGNINGSGRUNNLAG_TOM,
+          BEREG.DAGSATS,
+          BEREG.DAGSATS_BRUKER,
+          BEREG.DAGSATS_ARBEIDSGIVER,
+          BEREG.DAGSATS_VIRKSOMHET,
+          BEREG.STATUS_OG_ANDEL_INNTEKTSKAT,
+          BEREG.AKTIVITET_STATUS,
+          BEREG.BRUTTO_INNTEKT,
+          BEREG.AVKORTET_INNTEKT,
+          BEREG.DAGSATS*UTTAK_DAGER.UTBETALINGSPROSENT/100 AS DAGSATS_ERST,
+          BEREG.ANTALL_BEREGNINGSGRUNNLAG
+        FROM
+          BEREGNINGSGRUNNLAG                        BEREG
+          JOIN UTTAK_DAGER
+          ON UTTAK_DAGER.TRANS_ID = BEREG.TRANS_ID
+          AND NVL(UTTAK_DAGER.VIRKSOMHET, 'X') = NVL(BEREG.VIRKSOMHETSNUMMER, 'X')
+          AND BEREG.BEREGNINGSGRUNNLAG_FOM <= UTTAK_DAGER.DATO
+          AND NVL(BEREG.BEREGNINGSGRUNNLAG_TOM, TO_DATE('20991201', 'YYYYMMDD')) >= UTTAK_DAGER.DATO LEFT JOIN STONADSDAGER_KVOTE
+          ON UTTAK_DAGER.TRANS_ID = STONADSDAGER_KVOTE.TRANS_ID
+          AND UTTAK_DAGER.TREKKONTO = STONADSDAGER_KVOTE.TREKKONTO
+          AND NVL(UTTAK_DAGER.VIRKSOMHET,
+          'X') = NVL(STONADSDAGER_KVOTE.VIRKSOMHET,
+          'X')
+          AND UTTAK_DAGER.UTTAK_ARBEID_TYPE = STONADSDAGER_KVOTE.UTTAK_ARBEID_TYPE
+          JOIN DVH_FAM_FP.FAM_FP_UTTAK_AKTIVITET_MAPPING UTTAK_MAPPING
+          ON UTTAK_DAGER.UTTAK_ARBEID_TYPE = UTTAK_MAPPING.UTTAK_ARBEID
+          AND BEREG.AKTIVITET_STATUS = UTTAK_MAPPING.AKTIVITET_STATUS
+        WHERE
+          BEREG.DAGSATS_BRUKER + BEREG.DAGSATS_ARBEIDSGIVER != 0
+      ), BEREGNINGSGRUNNLAG_AGG AS (
+        SELECT
+          A.*,
+          DAGER_ERST*DAGSATS_VIRKSOMHET/DAGSATS*ANTALL_BEREGNINGSGRUNNLAG                                                                                                                    TILFELLE_ERST,
+          DAGER_ERST*ROUND(UTBETALINGSPROSENT/100*DAGSATS_VIRKSOMHET)                                                                                                                        BELOP,
+          ROUND(UTBETALINGSPROSENT/100*DAGSATS_VIRKSOMHET-0.5)                                                                                                                               DAGSATS_REDUSERT,
+          CASE
+            WHEN PERIODE_RESULTAT_AARSAK IN (2004, 2033) THEN
+              'N'
+            WHEN TREKKONTO IN ('FEDREKVOTE', 'FELLESPERIODE', 'MÃ˜DREKVOTE') THEN
+              'J'
+            WHEN TREKKONTO = 'FORELDREPENGER' THEN
+              'N'
+          END MOR_RETTIGHET
+        FROM
+          (
+            SELECT
+              FAGSAK_ID,
+              TRANS_ID,
+              TREKKONTO,
+              TREKKDAGER,
+              STONADSDAGER_KVOTE,
+              UTTAK_ARBEID_TYPE,
+              AAR --, halvaar--, kvartal, aar_maaned
+,
+              UTTAK_FOM,
+              UTTAK_TOM,
+              SUM(DAGSATS_VIRKSOMHET/DAGSATS*
+                CASE
+                  WHEN ((UPPER(GRADERING_INNVILGET) ='TRUE'
+                  AND UPPER(GRADERING)='TRUE')
+                  OR UPPER(SAMTIDIG_UTTAK)='TRUE') THEN
+                    (100-ARBEIDSTIDSPROSENT)/100
+                  ELSE
+                    1.0
+                END )                                DAGER_ERST2,
+              MAX(ARBEIDSTIDSPROSENT)                AS ARBEIDSTIDSPROSENT,
+              COUNT(DISTINCT PK_DIM_TID)             DAGER_ERST,
+ --count(distinct pk_dim_tid)*dagsats_virksomhet/dagsats tilfelle_erst,
+              MIN(BEREGNINGSGRUNNLAG_FOM)            BEREGNINGSGRUNNLAG_FOM,
+              MAX(BEREGNINGSGRUNNLAG_TOM)            BEREGNINGSGRUNNLAG_TOM,
+              DEKNINGSGRAD,
+ --count(distinct pk_dim_tid)*
+ --      round(utbetalingsprosent/100*dagsats_virksomhet-0.5) belop,
+              DAGSATS_BRUKER,
+              DAGSATS_ARBEIDSGIVER,
+              DAGSATS_VIRKSOMHET,
+              VIRKSOMHET,
+              PERIODE_RESULTAT_AARSAK,
+              DAGSATS,
+              DAGSATS_ERST, --dagsats_virksomhet,
+              UTBETALINGSPROSENT                     GRADERINGSPROSENT,
+              STATUS_OG_ANDEL_INNTEKTSKAT,
+              AKTIVITET_STATUS,
+              BRUTTO_INNTEKT,
+              AVKORTET_INNTEKT,
+              STATUS_OG_ANDEL_BRUTTO,
+              STATUS_OG_ANDEL_AVKORTET,
+ --round(utbetalingsprosent/100*dagsats_virksomhet-0.5) dagsats_redusert,
+              UTBETALINGSPROSENT,
+              MIN(PK_DIM_TID)                        PK_DIM_TID_DATO_UTBET_FOM,
+              MAX(PK_DIM_TID)                        PK_DIM_TID_DATO_UTBET_TOM,
+              FUNKSJONELL_TID,
+              FORSTE_VEDTAKSDATO,
+              SISTE_VEDTAKSDATO,
+              MAX_VEDTAKSDATO,
+              PERIODE,
+              MAX(FORSTE_SOKNADSDATO)                AS FORSTE_SOKNADSDATO,
+              MAX(SOKNADSDATO)                       AS SOKNADSDATO,
+              SAMTIDIG_UTTAK,
+              GRADERING,
+              GRADERING_INNVILGET,
+              MIN_UTTAK_FOM,
+              MAX_UTTAK_TOM,
+              FK_DIM_TID_MIN_DATO_KVOTE,
+              FK_DIM_TID_MAX_DATO_KVOTE,
+              MAX(PK_FAM_FP_TREKKONTO)               AS PK_FAM_FP_TREKKONTO,
+              MAX(PK_FAM_FP_PERIODE_RESULTAT_AARSAK) AS PK_FAM_FP_PERIODE_RESULTAT_AARSAK,
+              ANTALL_BEREGNINGSGRUNNLAG,
+              MAX(GRADERINGSDAGER)                   AS GRADERINGSDAGER,
+              MAX(MORS_AKTIVITET)                    AS MORS_AKTIVITET
+            FROM
+              BEREGNINGSGRUNNLAG_DETALJ
+            GROUP BY
+              FAGSAK_ID,
+              TRANS_ID,
+              TREKKONTO,
+              TREKKDAGER,
+              STONADSDAGER_KVOTE,
+              UTTAK_ARBEID_TYPE,
+              AAR --, halvaar--, kvartal, aar_maaned
+,
+              UTTAK_FOM,
+              UTTAK_TOM,
+              DEKNINGSGRAD,
+              VIRKSOMHET,
+              UTBETALINGSPROSENT,
+              PERIODE_RESULTAT_AARSAK,
+              DAGSATS,
+              DAGSATS_ERST,
+              DAGSATS_BRUKER,
+              DAGSATS_ARBEIDSGIVER,
+              DAGSATS_VIRKSOMHET,
+              UTBETALINGSPROSENT,
+              STATUS_OG_ANDEL_INNTEKTSKAT,
+              AKTIVITET_STATUS,
+              BRUTTO_INNTEKT,
+              AVKORTET_INNTEKT,
+              STATUS_OG_ANDEL_BRUTTO,
+              STATUS_OG_ANDEL_AVKORTET,
+              FUNKSJONELL_TID,
+              FORSTE_VEDTAKSDATO,
+              SISTE_VEDTAKSDATO,
+              MAX_VEDTAKSDATO,
+              PERIODE,
+              SAMTIDIG_UTTAK,
+              GRADERING,
+              GRADERING_INNVILGET,
+              MIN_UTTAK_FOM,
+              MAX_UTTAK_TOM,
+              FK_DIM_TID_MIN_DATO_KVOTE,
+              FK_DIM_TID_MAX_DATO_KVOTE,
+              ANTALL_BEREGNINGSGRUNNLAG
+          ) A
+      ), GRUNNLAG AS (
+        SELECT
+          BEREGNINGSGRUNNLAG_AGG.*,
+          SYSDATE                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      AS LASTET_DATO,
+          MOTTAKER.BEHANDLINGSTEMA,
+          MOTTAKER.MAX_TRANS_ID,
+          MOTTAKER.FK_PERSON1_MOTTAKER,
+          MOTTAKER.KJONN,
+          MOTTAKER.FK_PERSON1_BARN,
+          MOTTAKER.TERMINDATO,
+          MOTTAKER.FOEDSELSDATO,
+          MOTTAKER.ANTALL_BARN_TERMIN,
+          MOTTAKER.ANTALL_BARN_FOEDSEL,
+          MOTTAKER.FOEDSELSDATO_ADOPSJON,
+          MOTTAKER.ANTALL_BARN_ADOPSJON,
+          MOTTAKER.MOTTAKER_FODSELS_AAR,
+          MOTTAKER.MOTTAKER_FODSELS_MND,
+          SUBSTR(P_TID_FOM, 1, 4) - MOTTAKER.MOTTAKER_FODSELS_AAR                                                                                                                                                                                                                                                                                                                                                                                                                                                      AS MOTTAKER_ALDER,
+          MOTTAKER.SIVILSTAND,
+          MOTTAKER.STATSBORGERSKAP,
+          DIM_PERSON.PK_DIM_PERSON,
+          DIM_PERSON.BOSTED_KOMMUNE_NR,
+          DIM_PERSON.FK_DIM_SIVILSTATUS,
+          DIM_GEOGRAFI.PK_DIM_GEOGRAFI,
+          DIM_GEOGRAFI.BYDEL_KOMMUNE_NR,
+          DIM_GEOGRAFI.KOMMUNE_NR,
+          DIM_GEOGRAFI.KOMMUNE_NAVN,
+          DIM_GEOGRAFI.BYDEL_NR,
+          DIM_GEOGRAFI.BYDEL_NAVN,
+          ANNENFORELDERFAGSAK.ANNENFORELDERFAGSAK_ID,
+          ANNENFORELDERFAGSAK.FK_PERSON1_ANNEN_PART,
+          FAM_FP_UTTAK_FP_KONTOER.MAX_DAGER                                                                                                                                                                                                                                                                                                                                                                                                                                                                            MAX_STONADSDAGER_KONTO,
+          CASE
+            WHEN ALENEOMSORG.FAGSAK_ID IS NOT NULL THEN
+              'J'
+            ELSE
+              NULL
+          END AS                                                                                                                                                                                                                                                                                                                                                                                                                                           ALENEOMSORG,
+          CASE
+            WHEN BEHANDLINGSTEMA = 'FORP_FODS' THEN
+              '214'
+            WHEN BEHANDLINGSTEMA = 'FORP_ADOP' THEN
+              '216'
+          END AS                                                                                                                                                                                                                                                                                                                                                                                                         HOVEDKONTONR,
+          CASE
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='ARBEIDSTAKER' AND DAGSATS_ARBEIDSGIVER/DAGSATS*100<=50 THEN
+              '1000'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='ARBEIDSTAKER' AND DAGSATS_ARBEIDSGIVER/DAGSATS*100>50 THEN
+              '8020'
+ --when status_og_andel_inntektskat='ARBEIDSTAKER' then '1000'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='JORDBRUKER' THEN
+              '5210'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='SJÃ˜MANN' THEN
+              '1300'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='SELVSTENDIG_NÃ†RINGSDRIVENDE' THEN
+              '5010'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='DAGPENGER' THEN
+              '1200'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='ARBEIDSTAKER_UTEN_FERIEPENGER' THEN
+              '1000'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='FISKER' THEN
+              '5300'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='DAGMAMMA' THEN
+              '5110'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='FRILANSER' THEN
+              '1100'
+          END AS UNDERKONTONR,
+          ROUND(DAGSATS_ARBEIDSGIVER/DAGSATS*100, 0)                                                                                                                                                                                                                                                                                                                                                                                                                                                                   AS ANDEL_AV_REFUSJON,
+          CASE
+            WHEN RETT_TIL_MÃ˜DREKVOTE.TRANS_ID IS NULL THEN
+              'N'
+            ELSE
+              'J'
+          END AS                                                                                                                                                                                                                                                                                                                                                                                                                                         RETT_TIL_MÃ˜DREKVOTE,
+          CASE
+            WHEN RETT_TIL_FEDREKVOTE.TRANS_ID IS NULL THEN
+              'N'
+            ELSE
+              'J'
+          END AS                                                                                                                                                                                                                                                                                                                                                                                                                                         RETT_TIL_FEDREKVOTE,
+          FLERBARNSDAGER.FLERBARNSDAGER,
+          ADOPSJON.ADOPSJONSDATO,
+          ADOPSJON.STEBARNSADOPSJON,
+          EOS.EOS_SAK
+        FROM
+          BEREGNINGSGRUNNLAG_AGG
+          LEFT JOIN MOTTAKER
+          ON BEREGNINGSGRUNNLAG_AGG.FAGSAK_ID = MOTTAKER.FAGSAK_ID
+          AND BEREGNINGSGRUNNLAG_AGG.TRANS_ID = MOTTAKER.MAX_TRANS_ID
+          LEFT JOIN ANNENFORELDERFAGSAK
+          ON BEREGNINGSGRUNNLAG_AGG.FAGSAK_ID = ANNENFORELDERFAGSAK.FAGSAK_ID
+          AND BEREGNINGSGRUNNLAG_AGG.TRANS_ID = ANNENFORELDERFAGSAK.MAX_TRANS_ID
+          LEFT JOIN DVH_FAM_FP.FAM_FP_UTTAK_FP_KONTOER
+          ON BEREGNINGSGRUNNLAG_AGG.FAGSAK_ID = FAM_FP_UTTAK_FP_KONTOER.FAGSAK_ID
+          AND MOTTAKER.MAX_TRANS_ID = FAM_FP_UTTAK_FP_KONTOER.TRANS_ID
+ --AND UPPER(REGEXP_REPLACE(grunnlag_drp1.TREKKONTO, '_|-|[[:space:]]', '')) = UPPER(REGEXP_REPLACE(FAM_FP_Uttak_FP_Kontoer.STOENADSKONTOTYPE, '_|-|[[:space:]]', ''))
+          AND UPPER(REPLACE(BEREGNINGSGRUNNLAG_AGG.TREKKONTO,
+          '_',
+          '')) = UPPER(REPLACE(FAM_FP_UTTAK_FP_KONTOER.STOENADSKONTOTYPE,
+          ' ',
+          ''))
+          LEFT JOIN DT_PERSON.DIM_PERSON
+          ON MOTTAKER.FK_PERSON1_MOTTAKER = DIM_PERSON.FK_PERSON1
+ --and beregningsgrunnlag_agg.uttak_tom between dim_person.gyldig_fra_dato and dim_person.gyldig_til_dato
+          AND TO_DATE(BEREGNINGSGRUNNLAG_AGG.PK_DIM_TID_DATO_UTBET_TOM,
+          'yyyymmdd') BETWEEN DIM_PERSON.GYLDIG_FRA_DATO
+          AND DIM_PERSON.GYLDIG_TIL_DATO
+          LEFT JOIN DT_KODEVERK.DIM_GEOGRAFI
+          ON DIM_PERSON.FK_DIM_GEOGRAFI_BOSTED = DIM_GEOGRAFI.PK_DIM_GEOGRAFI
+          LEFT JOIN ALENEOMSORG
+          ON ALENEOMSORG.FAGSAK_ID = BEREGNINGSGRUNNLAG_AGG.FAGSAK_ID
+          AND ALENEOMSORG.UTTAK_FOM = BEREGNINGSGRUNNLAG_AGG.UTTAK_FOM
+          LEFT JOIN (
+            SELECT
+              TRANS_ID
+            FROM
+              DVH_FAM_FP.FAM_FP_UTTAK_FP_KONTOER
+            WHERE
+              UPPER(STOENADSKONTOTYPE) = 'MÃ˜DREKVOTE'
+            GROUP BY
+              TRANS_ID
+          ) RETT_TIL_MÃ˜DREKVOTE
+          ON RETT_TIL_MÃ˜DREKVOTE.TRANS_ID = BEREGNINGSGRUNNLAG_AGG.TRANS_ID
+          LEFT JOIN (
+            SELECT
+              TRANS_ID
+            FROM
+              DVH_FAM_FP.FAM_FP_UTTAK_FP_KONTOER
+            WHERE
+              UPPER(STOENADSKONTOTYPE) = 'FEDREKVOTE'
+            GROUP BY
+              TRANS_ID
+          ) RETT_TIL_FEDREKVOTE
+          ON RETT_TIL_FEDREKVOTE.TRANS_ID = BEREGNINGSGRUNNLAG_AGG.TRANS_ID
+          LEFT JOIN (
+            SELECT
+              TRANS_ID,
+              MAX(MAX_DAGER) AS FLERBARNSDAGER
+            FROM
+              DVH_FAM_FP.FAM_FP_UTTAK_FP_KONTOER
+            WHERE
+              UPPER(STOENADSKONTOTYPE) = 'FLERBARNSDAGER'
+            GROUP BY
+              TRANS_ID
+          ) FLERBARNSDAGER
+          ON FLERBARNSDAGER.TRANS_ID = BEREGNINGSGRUNNLAG_AGG.TRANS_ID
+          LEFT JOIN ADOPSJON
+          ON BEREGNINGSGRUNNLAG_AGG.FAGSAK_ID = ADOPSJON.FAGSAK_ID
+          LEFT JOIN EOS
+          ON BEREGNINGSGRUNNLAG_AGG.TRANS_ID = EOS.TRANS_ID
+      )
+      SELECT /*+ PARALLEL(8) */
+        *
+ --from uttak_dager
+      FROM
+        GRUNNLAG
+      WHERE
+        FAGSAK_ID NOT IN (1679117)
+ --where fagsak_id in (1035184)
+;
+    V_TID_FOM                      VARCHAR2(8) := NULL;
+    V_TID_TOM                      VARCHAR2(8) := NULL;
+    V_COMMIT                       NUMBER := 0;
+    V_ERROR_MELDING                VARCHAR2(1000) := NULL;
+    V_DIM_TID_ANTALL               NUMBER := 0;
+    V_UTBETALINGSPROSENT_KALKULERT NUMBER := 0;
+  BEGIN
+    V_TID_FOM := SUBSTR(P_IN_VEDTAK_TOM, 1, 4)
+                 || '0101';
+    V_TID_TOM := SUBSTR(P_IN_VEDTAK_TOM, 1, 4)
+                 || '1231';
+ --dbms_output.put_line(v_tid_fom||v_tid_tom);--TEST!!!
+    FOR REC_PERIODE IN CUR_PERIODE(P_IN_RAPPORT_DATO, P_IN_FORSKYVNINGER, V_TID_FOM, V_TID_TOM) LOOP
+      V_DIM_TID_ANTALL := 0;
+      V_UTBETALINGSPROSENT_KALKULERT := 0;
+      V_DIM_TID_ANTALL := DIM_TID_ANTALL(TO_NUMBER(TO_CHAR(REC_PERIODE.UTTAK_FOM, 'yyyymmdd')), TO_NUMBER(TO_CHAR(REC_PERIODE.UTTAK_TOM, 'yyyymmdd')));
+      IF V_DIM_TID_ANTALL != 0 THEN
+        V_UTBETALINGSPROSENT_KALKULERT := ROUND(REC_PERIODE.TREKKDAGER/V_DIM_TID_ANTALL*100, 2);
+      ELSE
+        V_UTBETALINGSPROSENT_KALKULERT := 0;
+      END IF;
+ --dbms_output.put_line(v_dim_tid_antall);
+      BEGIN
+        INSERT INTO DVH_FAM_FP.FAK_FAM_FP_VEDTAK_UTBETALING (
+          FAGSAK_ID,
+          TRANS_ID,
+          BEHANDLINGSTEMA,
+          TREKKONTO,
+          STONADSDAGER_KVOTE,
+          UTTAK_ARBEID_TYPE,
+          AAR --, halvaar, --AAR_MAANED,
+,
+          RAPPORT_PERIODE,
+          UTTAK_FOM,
+          UTTAK_TOM,
+          DAGER_ERST,
+          BEREGNINGSGRUNNLAG_FOM,
+          BEREGNINGSGRUNNLAG_TOM,
+          DEKNINGSGRAD,
+          DAGSATS_BRUKER,
+          DAGSATS_ARBEIDSGIVER,
+          VIRKSOMHET,
+          PERIODE_RESULTAT_AARSAK,
+          DAGSATS,
+          GRADERINGSPROSENT,
+          STATUS_OG_ANDEL_INNTEKTSKAT,
+          AKTIVITET_STATUS,
+          BRUTTO_INNTEKT,
+          AVKORTET_INNTEKT,
+          STATUS_OG_ANDEL_BRUTTO,
+          STATUS_OG_ANDEL_AVKORTET,
+          UTBETALINGSPROSENT,
+          FK_DIM_TID_DATO_UTBET_FOM,
+          FK_DIM_TID_DATO_UTBET_TOM,
+          FUNKSJONELL_TID,
+          FORSTE_VEDTAKSDATO,
+          VEDTAKSDATO,
+          MAX_VEDTAKSDATO,
+          PERIODE_TYPE,
+          TILFELLE_ERST,
+          BELOP,
+          DAGSATS_REDUSERT,
+          LASTET_DATO,
+          MAX_TRANS_ID,
+          FK_PERSON1_MOTTAKER,
+          FK_PERSON1_ANNEN_PART,
+          KJONN,
+          FK_PERSON1_BARN,
+          TERMINDATO,
+          FOEDSELSDATO,
+          ANTALL_BARN_TERMIN,
+          ANTALL_BARN_FOEDSEL,
+          FOEDSELSDATO_ADOPSJON,
+          ANTALL_BARN_ADOPSJON,
+          ANNENFORELDERFAGSAK_ID,
+          MAX_STONADSDAGER_KONTO,
+          FK_DIM_PERSON,
+          BOSTED_KOMMUNE_NR,
+          FK_DIM_GEOGRAFI,
+          BYDEL_KOMMUNE_NR,
+          KOMMUNE_NR,
+          KOMMUNE_NAVN,
+          BYDEL_NR,
+          BYDEL_NAVN,
+          ALENEOMSORG,
+          HOVEDKONTONR,
+          UNDERKONTONR,
+          MOTTAKER_FODSELS_AAR,
+          MOTTAKER_FODSELS_MND,
+          MOTTAKER_ALDER,
+          RETT_TIL_FEDREKVOTE,
+          RETT_TIL_MODREKVOTE,
+          DAGSATS_ERST,
+          TREKKDAGER,
+          SAMTIDIG_UTTAK,
+          GRADERING,
+          GRADERING_INNVILGET,
+          ANTALL_DAGER_PERIODE,
+          FLERBARNSDAGER,
+          UTBETALINGSPROSENT_KALKULERT,
+          MIN_UTTAK_FOM,
+          MAX_UTTAK_TOM,
+          FK_FAM_FP_TREKKONTO,
+          FK_FAM_FP_PERIODE_RESULTAT_AARSAK,
+          SIVILSTATUS,
+          FK_DIM_SIVILSTATUS,
+          ANTALL_BEREGNINGSGRUNNLAG,
+          GRADERINGSDAGER,
+          FK_DIM_TID_MIN_DATO_KVOTE,
+          FK_DIM_TID_MAX_DATO_KVOTE,
+          ADOPSJONSDATO,
+          STEBARNSADOPSJON,
+          EOS_SAK,
+          MOR_RETTIGHET,
+          STATSBORGERSKAP,
+          ARBEIDSTIDSPROSENT,
+          MORS_AKTIVITET,
+          GYLDIG_FLAGG,
+          ANDEL_AV_REFUSJON,
+          FORSTE_SOKNADSDATO,
+          SOKNADSDATO
+        ) VALUES (
+          REC_PERIODE.FAGSAK_ID,
+          REC_PERIODE.TRANS_ID,
+          REC_PERIODE.BEHANDLINGSTEMA,
+          REC_PERIODE.TREKKONTO,
+          REC_PERIODE.STONADSDAGER_KVOTE,
+          REC_PERIODE.UTTAK_ARBEID_TYPE,
+          REC_PERIODE.AAR --, rec_periode.halvaar--, AAR_MAANED
+,
+          P_IN_RAPPORT_DATO,
+          REC_PERIODE.UTTAK_FOM,
+          REC_PERIODE.UTTAK_TOM,
+          REC_PERIODE.DAGER_ERST,
+          REC_PERIODE.BEREGNINGSGRUNNLAG_FOM,
+          REC_PERIODE.BEREGNINGSGRUNNLAG_TOM,
+          REC_PERIODE.DEKNINGSGRAD,
+          REC_PERIODE.DAGSATS_BRUKER,
+          REC_PERIODE.DAGSATS_ARBEIDSGIVER,
+          REC_PERIODE.VIRKSOMHET,
+          REC_PERIODE.PERIODE_RESULTAT_AARSAK,
+          REC_PERIODE.DAGSATS,
+          REC_PERIODE.GRADERINGSPROSENT,
+          REC_PERIODE.STATUS_OG_ANDEL_INNTEKTSKAT,
+          REC_PERIODE.AKTIVITET_STATUS,
+          REC_PERIODE.BRUTTO_INNTEKT,
+          REC_PERIODE.AVKORTET_INNTEKT,
+          REC_PERIODE.STATUS_OG_ANDEL_BRUTTO,
+          REC_PERIODE.STATUS_OG_ANDEL_AVKORTET,
+          REC_PERIODE.UTBETALINGSPROSENT,
+          REC_PERIODE.PK_DIM_TID_DATO_UTBET_FOM,
+          REC_PERIODE.PK_DIM_TID_DATO_UTBET_TOM,
+          REC_PERIODE.FUNKSJONELL_TID,
+          REC_PERIODE.FORSTE_VEDTAKSDATO,
+          REC_PERIODE.SISTE_VEDTAKSDATO,
+          REC_PERIODE.MAX_VEDTAKSDATO,
+          REC_PERIODE.PERIODE,
+          REC_PERIODE.TILFELLE_ERST,
+          REC_PERIODE.BELOP,
+          REC_PERIODE.DAGSATS_REDUSERT,
+          REC_PERIODE.LASTET_DATO,
+          REC_PERIODE.MAX_TRANS_ID,
+          REC_PERIODE.FK_PERSON1_MOTTAKER,
+          REC_PERIODE.FK_PERSON1_ANNEN_PART,
+          REC_PERIODE.KJONN,
+          REC_PERIODE.FK_PERSON1_BARN,
+          REC_PERIODE.TERMINDATO,
+          REC_PERIODE.FOEDSELSDATO,
+          REC_PERIODE.ANTALL_BARN_TERMIN,
+          REC_PERIODE.ANTALL_BARN_FOEDSEL,
+          REC_PERIODE.FOEDSELSDATO_ADOPSJON,
+          REC_PERIODE.ANTALL_BARN_ADOPSJON,
+          REC_PERIODE.ANNENFORELDERFAGSAK_ID,
+          REC_PERIODE.MAX_STONADSDAGER_KONTO,
+          REC_PERIODE.PK_DIM_PERSON,
+          REC_PERIODE.BOSTED_KOMMUNE_NR,
+          REC_PERIODE.PK_DIM_GEOGRAFI,
+          REC_PERIODE.BYDEL_KOMMUNE_NR,
+          REC_PERIODE.KOMMUNE_NR,
+          REC_PERIODE.KOMMUNE_NAVN,
+          REC_PERIODE.BYDEL_NR,
+          REC_PERIODE.BYDEL_NAVN,
+          REC_PERIODE.ALENEOMSORG,
+          REC_PERIODE.HOVEDKONTONR,
+          REC_PERIODE.UNDERKONTONR,
+          REC_PERIODE.MOTTAKER_FODSELS_AAR,
+          REC_PERIODE.MOTTAKER_FODSELS_MND,
+          REC_PERIODE.MOTTAKER_ALDER,
+          REC_PERIODE.RETT_TIL_FEDREKVOTE,
+          REC_PERIODE.RETT_TIL_MÃ˜DREKVOTE,
+          REC_PERIODE.DAGSATS_ERST,
+          REC_PERIODE.TREKKDAGER,
+          REC_PERIODE.SAMTIDIG_UTTAK,
+          REC_PERIODE.GRADERING,
+          REC_PERIODE.GRADERING_INNVILGET,
+          V_DIM_TID_ANTALL,
+          REC_PERIODE.FLERBARNSDAGER,
+          V_UTBETALINGSPROSENT_KALKULERT,
+          REC_PERIODE.MIN_UTTAK_FOM,
+          REC_PERIODE.MAX_UTTAK_TOM,
+          REC_PERIODE.PK_FAM_FP_TREKKONTO,
+          REC_PERIODE.PK_FAM_FP_PERIODE_RESULTAT_AARSAK,
+          REC_PERIODE.SIVILSTAND,
+          REC_PERIODE.FK_DIM_SIVILSTATUS,
+          REC_PERIODE.ANTALL_BEREGNINGSGRUNNLAG,
+          REC_PERIODE.GRADERINGSDAGER,
+          REC_PERIODE.FK_DIM_TID_MIN_DATO_KVOTE,
+          REC_PERIODE.FK_DIM_TID_MAX_DATO_KVOTE,
+          REC_PERIODE.ADOPSJONSDATO,
+          REC_PERIODE.STEBARNSADOPSJON,
+          REC_PERIODE.EOS_SAK,
+          REC_PERIODE.MOR_RETTIGHET,
+          REC_PERIODE.STATSBORGERSKAP,
+          REC_PERIODE.ARBEIDSTIDSPROSENT,
+          REC_PERIODE.MORS_AKTIVITET,
+          P_IN_GYLDIG_FLAGG,
+          REC_PERIODE.ANDEL_AV_REFUSJON,
+          REC_PERIODE.FORSTE_SOKNADSDATO,
+          REC_PERIODE.SOKNADSDATO
+        );
+        V_COMMIT := V_COMMIT + 1;
+      EXCEPTION
+        WHEN OTHERS THEN
+          ROLLBACK;
+          V_ERROR_MELDING := SUBSTR(SQLCODE
+                                    || ' '
+                                    || SQLERRM, 1, 1000);
+          INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
+            MIN_LASTET_DATO,
+            ID,
+            ERROR_MSG,
+            OPPRETTET_TID,
+            KILDE
+          ) VALUES(
+            NULL,
+            REC_PERIODE.FAGSAK_ID,
+            V_ERROR_MELDING,
+            SYSDATE,
+            'FAM_FP_STATISTIKK_AAR:INSERT'
+          );
+          COMMIT;
+          P_OUT_ERROR := SUBSTR(P_OUT_ERROR
+                                || V_ERROR_MELDING, 1, 1000);
+      END;
+      IF V_COMMIT > 100000 THEN
+        COMMIT;
+        V_COMMIT := 0;
+      END IF;
+    END LOOP;
+    COMMIT;
+  EXCEPTION
+    WHEN OTHERS THEN
+      ROLLBACK;
+      V_ERROR_MELDING := SUBSTR(SQLCODE
+                                || ' '
+                                || SQLERRM, 1, 1000);
+      INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
+        MIN_LASTET_DATO,
+        ID,
+        ERROR_MSG,
+        OPPRETTET_TID,
+        KILDE
+      ) VALUES(
+        NULL,
+        NULL,
+        V_ERROR_MELDING,
+        SYSDATE,
+        'FAM_FP_STATISTIKK_AAR'
+      );
+      COMMIT;
+      P_OUT_ERROR := SUBSTR(P_OUT_ERROR
+                            || V_ERROR_MELDING, 1, 1000);
+  END FAM_FP_STATISTIKK_AAR;
 
+  PROCEDURE FAM_FP_STATISTIKK_AAR_MND(
+    P_IN_VEDTAK_TOM IN VARCHAR2,
+    P_IN_RAPPORT_DATO IN VARCHAR2,
+    P_IN_FORSKYVNINGER IN NUMBER,
+    P_IN_GYLDIG_FLAGG IN NUMBER DEFAULT 0,
+    P_IN_PERIODE_TYPE IN VARCHAR2 DEFAULT 'A',
+    P_OUT_ERROR OUT VARCHAR2
+  ) AS
+    CURSOR CUR_PERIODE(P_RAPPORT_DATO IN VARCHAR2, P_FORSKYVNINGER IN NUMBER, P_TID_FOM IN VARCHAR2, P_TID_TOM IN VARCHAR2) IS
+      WITH FAGSAK AS (
+        SELECT
+          FAGSAK_ID,
+          MAX(BEHANDLINGSTEMA)                                                   AS BEHANDLINGSTEMA,
+          MAX(FAGSAKANNENFORELDER_ID)                                            AS ANNENFORELDERFAGSAK_ID,
+          MAX(TRANS_ID) KEEP(DENSE_RANK FIRST ORDER BY FUNKSJONELL_TID DESC)     AS MAX_TRANS_ID,
+          MAX(SOEKNADSDATO) KEEP(DENSE_RANK FIRST ORDER BY FUNKSJONELL_TID DESC) AS SOKNADSDATO,
+          MIN(SOEKNADSDATO)                                                      AS FORSTE_SOKNADSDATO,
+          MIN(VEDTAKSDATO)                                                       AS FORSTE_VEDTAKSDATO,
+          MAX(FUNKSJONELL_TID)                                                   AS FUNKSJONELL_TID,
+          MAX(VEDTAKSDATO)                                                       AS SISTE_VEDTAKSDATO,
+          P_IN_PERIODE_TYPE                                                      AS PERIODE,
+          LAST_DAY(TO_DATE(P_RAPPORT_DATO, 'yyyymm')) + P_FORSKYVNINGER          AS MAX_VEDTAKSDATO
+        FROM
+          DVH_FAM_FP.FAM_FP_FAGSAK
+        WHERE
+          FAM_FP_FAGSAK.FUNKSJONELL_TID <= LAST_DAY(TO_DATE(P_RAPPORT_DATO, 'yyyymm')) + P_FORSKYVNINGER
+        GROUP BY
+          FAGSAK_ID
+      ), TERMIN AS (
+        SELECT
+          FAGSAK_ID,
+          MAX(TERMINDATO)            TERMINDATO,
+          MAX(FOEDSELSDATO)          FOEDSELSDATO,
+          MAX(ANTALL_BARN_TERMIN)    ANTALL_BARN_TERMIN,
+          MAX(ANTALL_BARN_FOEDSEL)   ANTALL_BARN_FOEDSEL,
+          MAX(FOEDSELSDATO_ADOPSJON) FOEDSELSDATO_ADOPSJON,
+          MAX(ANTALL_BARN_ADOPSJON) ANTALL_BARN_ADOPSJON
+        FROM
+          (
+            SELECT
+              FAM_FP_FAGSAK.FAGSAK_ID,
+              MAX(FODSEL.TERMINDATO)              TERMINDATO,
+              MAX(FODSEL.FOEDSELSDATO)            FOEDSELSDATO,
+              MAX(FODSEL.ANTALL_BARN_FOEDSEL)     ANTALL_BARN_FOEDSEL,
+              MAX(FODSEL.ANTALL_BARN_TERMIN)      ANTALL_BARN_TERMIN,
+              MAX(ADOPSJON.FOEDSELSDATO_ADOPSJON) FOEDSELSDATO_ADOPSJON,
+              COUNT(ADOPSJON.TRANS_ID)            ANTALL_BARN_ADOPSJON
+            FROM
+              DVH_FAM_FP.FAM_FP_FAGSAK
+              LEFT JOIN DVH_FAM_FP.FAM_FP_FODSELTERMIN FODSEL
+              ON FODSEL.FAGSAK_ID = FAM_FP_FAGSAK.FAGSAK_ID
+              AND UPPER(FAM_FP_FAGSAK.BEHANDLINGSTEMA) = 'FORP_FODS'
+              LEFT JOIN DVH_FAM_FP.FAM_FP_FODSELTERMIN ADOPSJON
+              ON ADOPSJON.FAGSAK_ID = FAM_FP_FAGSAK.FAGSAK_ID
+              AND ADOPSJON.TRANS_ID = FAM_FP_FAGSAK.TRANS_ID
+              AND UPPER(FAM_FP_FAGSAK.BEHANDLINGSTEMA) = 'FORP_ADOP'
+            GROUP BY
+              FAM_FP_FAGSAK.FAGSAK_ID,
+              FAM_FP_FAGSAK.TRANS_ID
+          )
+        GROUP BY
+          FAGSAK_ID
+      ), FK_PERSON1 AS (
+        SELECT
+          PERSON.PERSON,
+          PERSON.FAGSAK_ID,
+          MAX(PERSON.BEHANDLINGSTEMA)                                                                             AS BEHANDLINGSTEMA,
+          PERSON.MAX_TRANS_ID,
+          MAX(PERSON.ANNENFORELDERFAGSAK_ID)                                                                      AS ANNENFORELDERFAGSAK_ID,
+          PERSON.AKTOER_ID,
+          MAX(PERSON.KJONN)                                                                                       AS KJONN,
+          MAX(PERSON_67_VASKET.FK_PERSON1) KEEP (DENSE_RANK FIRST ORDER BY PERSON_67_VASKET.GYLDIG_FRA_DATO DESC) AS FK_PERSON1,
+          MAX(FOEDSELSDATO)                                                                                       AS FOEDSELSDATO,
+          MAX(SIVILSTAND)                                                                                         AS SIVILSTAND,
+          MAX(STATSBORGERSKAP)                                                                                    AS STATSBORGERSKAP
+        FROM
+          (
+            SELECT
+              'MOTTAKER'                                AS PERSON,
+              FAGSAK.FAGSAK_ID,
+              FAGSAK.BEHANDLINGSTEMA,
+              FAGSAK.MAX_TRANS_ID,
+              FAGSAK.ANNENFORELDERFAGSAK_ID,
+              FAM_FP_PERSONOPPLYSNINGER.AKTOER_ID,
+              FAM_FP_PERSONOPPLYSNINGER.KJONN,
+              FAM_FP_PERSONOPPLYSNINGER.FOEDSELSDATO,
+              FAM_FP_PERSONOPPLYSNINGER.SIVILSTAND,
+              FAM_FP_PERSONOPPLYSNINGER.STATSBORGERSKAP
+            FROM
+              DVH_FAM_FP.FAM_FP_PERSONOPPLYSNINGER
+              JOIN FAGSAK
+              ON FAM_FP_PERSONOPPLYSNINGER.TRANS_ID = FAGSAK.MAX_TRANS_ID UNION ALL
+              SELECT
+                'BARN'                                    AS PERSON,
+                FAGSAK.FAGSAK_ID,
+                MAX(FAGSAK.BEHANDLINGSTEMA)               AS BEHANDLINGSTEMA,
+                FAGSAK.MAX_TRANS_ID,
+                MAX(FAGSAK.ANNENFORELDERFAGSAK_ID)        ANNENFORELDERFAGSAK_ID,
+                MAX(FAM_FP_FAMILIEHENDELSE.TIL_AKTOER_ID) AS AKTOER_ID,
+                MAX(FAM_FP_FAMILIEHENDELSE.KJOENN)        AS KJONN,
+                NULL                                      AS FOEDSELSDATO,
+                NULL                                      AS SIVILSTAND,
+                NULL                                      AS STATSBORGERSKAP
+              FROM
+                DVH_FAM_FP.FAM_FP_FAMILIEHENDELSE
+                JOIN FAGSAK
+                ON FAM_FP_FAMILIEHENDELSE.FAGSAK_ID = FAGSAK.FAGSAK_ID
+              WHERE
+                UPPER(FAM_FP_FAMILIEHENDELSE.RELASJON) = 'BARN'
+              GROUP BY
+                FAGSAK.FAGSAK_ID, FAGSAK.MAX_TRANS_ID
+          )                                    PERSON
+          JOIN DT_PERSON.DVH_PERSON_IDENT_AKTOR_IKKE_SKJERMET PERSON_67_VASKET
+          ON PERSON_67_VASKET.AKTOR_ID = PERSON.AKTOER_ID
+          AND TO_DATE(P_TID_TOM, 'yyyymmdd') BETWEEN PERSON_67_VASKET.GYLDIG_FRA_DATO
+          AND PERSON_67_VASKET.GYLDIG_TIL_DATO
+        GROUP BY
+          PERSON.PERSON, PERSON.FAGSAK_ID, PERSON.MAX_TRANS_ID, PERSON.AKTOER_ID
+      ), BARN AS (
+        SELECT
+          FAGSAK_ID,
+          LISTAGG(FK_PERSON1, ',') WITHIN GROUP (ORDER BY FK_PERSON1) AS FK_PERSON1_BARN
+        FROM
+          FK_PERSON1
+        WHERE
+          PERSON = 'BARN'
+        GROUP BY
+          FAGSAK_ID
+      ), MOTTAKER AS (
+        SELECT
+          FK_PERSON1.FAGSAK_ID,
+          FK_PERSON1.BEHANDLINGSTEMA,
+          FK_PERSON1.MAX_TRANS_ID,
+          FK_PERSON1.ANNENFORELDERFAGSAK_ID,
+          FK_PERSON1.AKTOER_ID,
+          FK_PERSON1.KJONN,
+          FK_PERSON1.FK_PERSON1                       AS FK_PERSON1_MOTTAKER,
+          EXTRACT(YEAR FROM FK_PERSON1.FOEDSELSDATO) AS MOTTAKER_FODSELS_AAR,
+          EXTRACT(MONTH FROM FK_PERSON1.FOEDSELSDATO) AS MOTTAKER_FODSELS_MND,
+          FK_PERSON1.SIVILSTAND,
+          FK_PERSON1.STATSBORGERSKAP,
+          BARN.FK_PERSON1_BARN,
+          TERMIN.TERMINDATO,
+          TERMIN.FOEDSELSDATO,
+          TERMIN.ANTALL_BARN_TERMIN,
+          TERMIN.ANTALL_BARN_FOEDSEL,
+          TERMIN.FOEDSELSDATO_ADOPSJON,
+          TERMIN.ANTALL_BARN_ADOPSJON
+        FROM
+          FK_PERSON1
+          LEFT JOIN BARN
+          ON BARN.FAGSAK_ID = FK_PERSON1.FAGSAK_ID
+          LEFT JOIN TERMIN
+          ON FK_PERSON1.FAGSAK_ID = TERMIN.FAGSAK_ID
+        WHERE
+          FK_PERSON1.PERSON = 'MOTTAKER'
+      ), ADOPSJON AS (
+        SELECT
+          FAM_FP_VILKAAR.FAGSAK_ID,
+          MAX(FAM_FP_VILKAAR.OMSORGS_OVERTAKELSESDATO) AS ADOPSJONSDATO,
+          MAX(FAM_FP_VILKAAR.EKTEFELLES_BARN)          AS STEBARNSADOPSJON
+        FROM
+          FAGSAK
+          JOIN DVH_FAM_FP.FAM_FP_VILKAAR
+          ON FAGSAK.FAGSAK_ID = FAM_FP_VILKAAR.FAGSAK_ID
+        WHERE
+          FAGSAK.BEHANDLINGSTEMA = 'FORP_ADOP'
+        GROUP BY
+          FAM_FP_VILKAAR.FAGSAK_ID
+      ), EOS AS (
+        SELECT
+          A.TRANS_ID,
+          CASE
+            WHEN UPPER(ER_BORGER_AV_EU_EOS) = 'TRUE' THEN
+              'J'
+            WHEN UPPER(ER_BORGER_AV_EU_EOS) = 'FALSE' THEN
+              'N'
+            ELSE
+              NULL
+          END EOS_SAK
+        FROM
+          (
+            SELECT
+              FAM_FP_VILKAAR.TRANS_ID,
+              MAX(FAM_FP_VILKAAR.ER_BORGER_AV_EU_EOS) AS ER_BORGER_AV_EU_EOS
+            FROM
+              FAGSAK
+              JOIN DVH_FAM_FP.FAM_FP_VILKAAR
+              ON FAGSAK.MAX_TRANS_ID = FAM_FP_VILKAAR.TRANS_ID
+              AND LENGTH(FAM_FP_VILKAAR.PERSON_STATUS) > 0
+            GROUP BY
+              FAM_FP_VILKAAR.TRANS_ID
+          ) A
+      ), ANNENFORELDERFAGSAK AS (
+        SELECT
+          ANNENFORELDERFAGSAK.*,
+          MOTTAKER.FK_PERSON1_MOTTAKER AS FK_PERSON1_ANNEN_PART
+        FROM
+          (
+            SELECT
+              FAGSAK_ID,
+              MAX_TRANS_ID,
+              MAX(ANNENFORELDERFAGSAK_ID) AS ANNENFORELDERFAGSAK_ID
+            FROM
+              (
+                SELECT
+                  FORELDER1.FAGSAK_ID,
+                  FORELDER1.MAX_TRANS_ID,
+                  NVL(FORELDER1.ANNENFORELDERFAGSAK_ID, FORELDER2.FAGSAK_ID) AS ANNENFORELDERFAGSAK_ID
+                FROM
+                  MOTTAKER FORELDER1
+                  JOIN MOTTAKER FORELDER2
+                  ON FORELDER1.FK_PERSON1_BARN = FORELDER2.FK_PERSON1_BARN
+                  AND FORELDER1.FK_PERSON1_MOTTAKER != FORELDER2.FK_PERSON1_MOTTAKER
+              )
+            GROUP BY
+              FAGSAK_ID,
+              MAX_TRANS_ID
+          )        ANNENFORELDERFAGSAK
+          JOIN MOTTAKER
+          ON ANNENFORELDERFAGSAK.ANNENFORELDERFAGSAK_ID = MOTTAKER.FAGSAK_ID
+      ), TID AS (
+        SELECT
+          PK_DIM_TID,
+          DATO,
+          AAR,
+          HALVAAR,
+          KVARTAL,
+          AAR_MAANED
+        FROM
+          DT_KODEVERK.DIM_TID
+        WHERE
+          DAG_I_UKE < 6
+          AND DIM_NIVAA = 1
+          AND GYLDIG_FLAGG = 1
+          AND PK_DIM_TID BETWEEN P_TID_FOM AND P_TID_TOM
+ --and pk_dim_tid <= to_char(last_day(to_date(p_rapport_dato,'yyyymm')),'yyyymmdd')
+      ), UTTAK AS (
+        SELECT
+          UTTAK.TRANS_ID,
+          UTTAK.TREKKONTO,
+          UTTAK.UTTAK_ARBEID_TYPE,
+          UTTAK.VIRKSOMHET,
+          UTTAK.UTBETALINGSPROSENT,
+          UTTAK.GRADERING_INNVILGET,
+          UTTAK.GRADERING,
+          UTTAK.ARBEIDSTIDSPROSENT,
+          UTTAK.SAMTIDIG_UTTAK,
+          UTTAK.PERIODE_RESULTAT_AARSAK,
+          UTTAK.FOM                                      AS UTTAK_FOM,
+          UTTAK.TOM                                      AS UTTAK_TOM,
+          UTTAK.TREKKDAGER,
+          FAGSAK.FAGSAK_ID,
+          FAGSAK.PERIODE,
+          FAGSAK.FUNKSJONELL_TID,
+          FAGSAK.FORSTE_VEDTAKSDATO,
+          FAGSAK.SISTE_VEDTAKSDATO,
+          FAGSAK.MAX_VEDTAKSDATO,
+          FAGSAK.FORSTE_SOKNADSDATO,
+          FAGSAK.SOKNADSDATO,
+          FAM_FP_TREKKONTO.PK_FAM_FP_TREKKONTO,
+          AARSAK_UTTAK.PK_FAM_FP_PERIODE_RESULTAT_AARSAK,
+          UTTAK.ARBEIDSFORHOLD_ID,
+          UTTAK.GRADERINGSDAGER,
+          FAM_FP_UTTAK_FORDELINGSPER.MORS_AKTIVITET
+        FROM
+          DVH_FAM_FP.FAM_FP_UTTAK_RES_PER_AKTIV UTTAK
+          JOIN FAGSAK
+          ON FAGSAK.MAX_TRANS_ID = UTTAK.TRANS_ID LEFT JOIN DVH_FAM_FP.FAM_FP_TREKKONTO
+          ON UPPER(UTTAK.TREKKONTO) = FAM_FP_TREKKONTO.TREKKONTO
+          LEFT JOIN (
+            SELECT
+              AARSAK_UTTAK,
+              MAX(PK_FAM_FP_PERIODE_RESULTAT_AARSAK) AS PK_FAM_FP_PERIODE_RESULTAT_AARSAK
+            FROM
+              DVH_FAM_FP.FAM_FP_PERIODE_RESULTAT_AARSAK
+            GROUP BY
+              AARSAK_UTTAK
+          ) AARSAK_UTTAK
+          ON UPPER(UTTAK.PERIODE_RESULTAT_AARSAK) = AARSAK_UTTAK.AARSAK_UTTAK
+          LEFT JOIN DVH_FAM_FP.FAM_FP_UTTAK_FORDELINGSPER
+          ON FAM_FP_UTTAK_FORDELINGSPER.TRANS_ID = UTTAK.TRANS_ID
+          AND UTTAK.FOM BETWEEN FAM_FP_UTTAK_FORDELINGSPER.FOM
+          AND FAM_FP_UTTAK_FORDELINGSPER.TOM
+          AND UPPER(UTTAK.TREKKONTO) = UPPER(FAM_FP_UTTAK_FORDELINGSPER.PERIODE_TYPE)
+          AND LENGTH(FAM_FP_UTTAK_FORDELINGSPER.MORS_AKTIVITET) > 1
+        WHERE
+          UTTAK.UTBETALINGSPROSENT > 0
+      ), STONADSDAGER_KVOTE AS (
+        SELECT
+          UTTAK.*,
+          TID1.PK_DIM_TID AS FK_DIM_TID_MIN_DATO_KVOTE,
+          TID2.PK_DIM_TID AS FK_DIM_TID_MAX_DATO_KVOTE
+        FROM
+          (
+            SELECT
+              FAGSAK_ID,
+              TRANS_ID,
+              TREKKONTO,
+              VIRKSOMHET,
+              UTTAK_ARBEID_TYPE,
+              SUM(TREKKDAGER)   AS STONADSDAGER_KVOTE,
+              MIN(UTTAK_FOM)    AS MIN_UTTAK_FOM,
+              MAX(UTTAK_TOM)    AS MAX_UTTAK_TOM
+            FROM
+              (
+                SELECT
+                  FAGSAK_ID,
+                  TRANS_ID,
+                  UTTAK_FOM,
+                  UTTAK_TOM,
+                  TREKKONTO,
+                  VIRKSOMHET,
+                  UTTAK_ARBEID_TYPE,
+                  MAX(TREKKDAGER)   AS TREKKDAGER
+                FROM
+                  UTTAK
+                GROUP BY
+                  FAGSAK_ID,
+                  TRANS_ID,
+                  UTTAK_FOM,
+                  UTTAK_TOM,
+                  TREKKONTO,
+                  VIRKSOMHET,
+                  UTTAK_ARBEID_TYPE
+              ) A
+            GROUP BY
+              FAGSAK_ID,
+              TRANS_ID,
+              TREKKONTO,
+              VIRKSOMHET,
+              UTTAK_ARBEID_TYPE
+          )                   UTTAK
+          JOIN DT_KODEVERK.DIM_TID TID1
+          ON TID1.DIM_NIVAA = 1
+          AND TID1.DATO = TRUNC(UTTAK.MIN_UTTAK_FOM, 'dd') JOIN DT_KODEVERK.DIM_TID TID2
+          ON TID2.DIM_NIVAA = 1
+          AND TID2.DATO = TRUNC(UTTAK.MAX_UTTAK_TOM,
+          'dd')
+      ), UTTAK_DAGER AS (
+        SELECT
+          UTTAK.*,
+          TID.PK_DIM_TID,
+          TID.DATO,
+          TID.AAR,
+          TID.HALVAAR,
+          TID.KVARTAL,
+          TID.AAR_MAANED
+        FROM
+          UTTAK
+          JOIN TID
+          ON TID.DATO BETWEEN UTTAK.UTTAK_FOM
+          AND UTTAK.UTTAK_TOM
+      ), ALENEOMSORG AS (
+        SELECT
+          UTTAK.FAGSAK_ID,
+          UTTAK.UTTAK_FOM
+        FROM
+          UTTAK
+          JOIN DVH_FAM_FP.FAM_FP_DOKUMENTASJONSPERIODER DOK1
+          ON DOK1.FAGSAK_ID = UTTAK.FAGSAK_ID
+          AND UTTAK.UTTAK_FOM >= DOK1.FOM
+          AND DOK1.DOKUMENTASJON_TYPE IN ('ALENEOMSORG', 'ALENEOMSORG_OVERFÃ˜RING') LEFT JOIN DVH_FAM_FP.FAM_FP_DOKUMENTASJONSPERIODER DOK2
+          ON DOK1.FAGSAK_ID = DOK2.FAGSAK_ID
+          AND UTTAK.UTTAK_FOM >= DOK2.FOM
+          AND DOK1.TRANS_ID < DOK2.TRANS_ID
+          AND DOK2.DOKUMENTASJON_TYPE = 'ANNEN_FORELDER_HAR_RETT'
+          AND DOK2.FAGSAK_ID IS NULL
+        GROUP BY
+          UTTAK.FAGSAK_ID,
+          UTTAK.UTTAK_FOM
+      ), BEREGNINGSGRUNNLAG AS (
+        SELECT
+          FAGSAK_ID,
+          TRANS_ID,
+          VIRKSOMHETSNUMMER,
+          MAX(STATUS_OG_ANDEL_BRUTTO)         AS STATUS_OG_ANDEL_BRUTTO,
+          MAX(STATUS_OG_ANDEL_AVKORTET)       AS STATUS_OG_ANDEL_AVKORTET,
+          FOM                                 AS BEREGNINGSGRUNNLAG_FOM,
+          TOM                                 AS BEREGNINGSGRUNNLAG_TOM,
+          MAX(DEKNINGSGRAD)                   AS DEKNINGSGRAD,
+          MAX(DAGSATS)                        AS DAGSATS,
+          DAGSATS_BRUKER,
+          DAGSATS_ARBEIDSGIVER,
+          DAGSATS_BRUKER+DAGSATS_ARBEIDSGIVER DAGSATS_VIRKSOMHET,
+          MAX(STATUS_OG_ANDEL_INNTEKTSKAT)    AS STATUS_OG_ANDEL_INNTEKTSKAT,
+          AKTIVITET_STATUS,
+          MAX(BRUTTO)                         AS BRUTTO_INNTEKT,
+          MAX(AVKORTET)                       AS AVKORTET_INNTEKT,
+          COUNT(1)                            AS ANTALL_BEREGNINGSGRUNNLAG
+        FROM
+          DVH_FAM_FP.FAM_FP_BEREGNINGSGRUNNLAG
+        GROUP BY
+          FAGSAK_ID,
+          TRANS_ID,
+          VIRKSOMHETSNUMMER,
+          FOM,
+          TOM,
+          AKTIVITET_STATUS,
+          DAGSATS_BRUKER,
+          DAGSATS_ARBEIDSGIVER
+      ), BEREGNINGSGRUNNLAG_DETALJ AS (
+        SELECT
+          UTTAK_DAGER.*,
+          STONADSDAGER_KVOTE.STONADSDAGER_KVOTE,
+          STONADSDAGER_KVOTE.MIN_UTTAK_FOM,
+          STONADSDAGER_KVOTE.MAX_UTTAK_TOM,
+          STONADSDAGER_KVOTE.FK_DIM_TID_MIN_DATO_KVOTE,
+          STONADSDAGER_KVOTE.FK_DIM_TID_MAX_DATO_KVOTE,
+          BEREG.STATUS_OG_ANDEL_BRUTTO,
+          BEREG.STATUS_OG_ANDEL_AVKORTET,
+          BEREG.BEREGNINGSGRUNNLAG_FOM,
+          BEREG.DEKNINGSGRAD,
+          BEREG.BEREGNINGSGRUNNLAG_TOM,
+          BEREG.DAGSATS,
+          BEREG.DAGSATS_BRUKER,
+          BEREG.DAGSATS_ARBEIDSGIVER,
+          BEREG.DAGSATS_VIRKSOMHET,
+          BEREG.STATUS_OG_ANDEL_INNTEKTSKAT,
+          BEREG.AKTIVITET_STATUS,
+          BEREG.BRUTTO_INNTEKT,
+          BEREG.AVKORTET_INNTEKT,
+          BEREG.DAGSATS*UTTAK_DAGER.UTBETALINGSPROSENT/100 AS DAGSATS_ERST,
+          BEREG.ANTALL_BEREGNINGSGRUNNLAG
+        FROM
+          BEREGNINGSGRUNNLAG                        BEREG
+          JOIN UTTAK_DAGER
+          ON UTTAK_DAGER.TRANS_ID = BEREG.TRANS_ID
+          AND NVL(UTTAK_DAGER.VIRKSOMHET, 'X') = NVL(BEREG.VIRKSOMHETSNUMMER, 'X')
+          AND BEREG.BEREGNINGSGRUNNLAG_FOM <= UTTAK_DAGER.DATO
+          AND NVL(BEREG.BEREGNINGSGRUNNLAG_TOM, TO_DATE('20991201', 'YYYYMMDD')) >= UTTAK_DAGER.DATO LEFT JOIN STONADSDAGER_KVOTE
+          ON UTTAK_DAGER.TRANS_ID = STONADSDAGER_KVOTE.TRANS_ID
+          AND UTTAK_DAGER.TREKKONTO = STONADSDAGER_KVOTE.TREKKONTO
+          AND NVL(UTTAK_DAGER.VIRKSOMHET,
+          'X') = NVL(STONADSDAGER_KVOTE.VIRKSOMHET,
+          'X')
+          AND UTTAK_DAGER.UTTAK_ARBEID_TYPE = STONADSDAGER_KVOTE.UTTAK_ARBEID_TYPE
+          JOIN DVH_FAM_FP.FAM_FP_UTTAK_AKTIVITET_MAPPING UTTAK_MAPPING
+          ON UTTAK_DAGER.UTTAK_ARBEID_TYPE = UTTAK_MAPPING.UTTAK_ARBEID
+          AND BEREG.AKTIVITET_STATUS = UTTAK_MAPPING.AKTIVITET_STATUS
+        WHERE
+          BEREG.DAGSATS_BRUKER + BEREG.DAGSATS_ARBEIDSGIVER != 0
+      ), BEREGNINGSGRUNNLAG_AGG AS (
+        SELECT
+          A.*,
+          DAGER_ERST*DAGSATS_VIRKSOMHET/DAGSATS*ANTALL_BEREGNINGSGRUNNLAG                                                                                                                    TILFELLE_ERST,
+          DAGER_ERST*ROUND(UTBETALINGSPROSENT/100*DAGSATS_VIRKSOMHET)                                                                                                                        BELOP,
+          ROUND(UTBETALINGSPROSENT/100*DAGSATS_VIRKSOMHET-0.5)                                                                                                                               DAGSATS_REDUSERT,
+          CASE
+            WHEN PERIODE_RESULTAT_AARSAK IN (2004, 2033) THEN
+              'N'
+            WHEN TREKKONTO IN ('FEDREKVOTE', 'FELLESPERIODE', 'MÃ˜DREKVOTE') THEN
+              'J'
+            WHEN TREKKONTO = 'FORELDREPENGER' THEN
+              'N'
+          END MOR_RETTIGHET
+        FROM
+          (
+            SELECT
+              FAGSAK_ID,
+              TRANS_ID,
+              TREKKONTO,
+              TREKKDAGER,
+              STONADSDAGER_KVOTE,
+              UTTAK_ARBEID_TYPE,
+              AAR,
+              HALVAAR,
+              KVARTAL,
+              AAR_MAANED,
+              UTTAK_FOM,
+              UTTAK_TOM,
+              SUM(DAGSATS_VIRKSOMHET/DAGSATS*
+                CASE
+                  WHEN ((UPPER(GRADERING_INNVILGET) ='TRUE'
+                  AND UPPER(GRADERING)='TRUE')
+                  OR UPPER(SAMTIDIG_UTTAK)='TRUE') THEN
+                    (100-ARBEIDSTIDSPROSENT)/100
+                  ELSE
+                    1.0
+                END )                                DAGER_ERST2,
+              MAX(ARBEIDSTIDSPROSENT)                AS ARBEIDSTIDSPROSENT,
+              COUNT(DISTINCT PK_DIM_TID)             DAGER_ERST,
+ --count(distinct pk_dim_tid)*dagsats_virksomhet/dagsats tilfelle_erst,
+              MIN(BEREGNINGSGRUNNLAG_FOM)            BEREGNINGSGRUNNLAG_FOM,
+              MAX(BEREGNINGSGRUNNLAG_TOM)            BEREGNINGSGRUNNLAG_TOM,
+              DEKNINGSGRAD,
+ --count(distinct pk_dim_tid)*
+ --      round(utbetalingsprosent/100*dagsats_virksomhet-0.5) belop,
+              DAGSATS_BRUKER,
+              DAGSATS_ARBEIDSGIVER,
+              DAGSATS_VIRKSOMHET,
+              VIRKSOMHET,
+              PERIODE_RESULTAT_AARSAK,
+              DAGSATS,
+              DAGSATS_ERST, --dagsats_virksomhet,
+              UTBETALINGSPROSENT                     GRADERINGSPROSENT,
+              STATUS_OG_ANDEL_INNTEKTSKAT,
+              AKTIVITET_STATUS,
+              BRUTTO_INNTEKT,
+              AVKORTET_INNTEKT,
+              STATUS_OG_ANDEL_BRUTTO,
+              STATUS_OG_ANDEL_AVKORTET,
+ --round(utbetalingsprosent/100*dagsats_virksomhet-0.5) dagsats_redusert,
+              UTBETALINGSPROSENT,
+              MIN(PK_DIM_TID)                        PK_DIM_TID_DATO_UTBET_FOM,
+              MAX(PK_DIM_TID)                        PK_DIM_TID_DATO_UTBET_TOM,
+              FUNKSJONELL_TID,
+              FORSTE_VEDTAKSDATO,
+              SISTE_VEDTAKSDATO,
+              MAX_VEDTAKSDATO,
+              PERIODE,
+              MAX(FORSTE_SOKNADSDATO)                AS FORSTE_SOKNADSDATO,
+              MAX(SOKNADSDATO)                       AS SOKNADSDATO,
+              SAMTIDIG_UTTAK,
+              GRADERING,
+              GRADERING_INNVILGET,
+              MIN_UTTAK_FOM,
+              MAX_UTTAK_TOM,
+              FK_DIM_TID_MIN_DATO_KVOTE,
+              FK_DIM_TID_MAX_DATO_KVOTE,
+              MAX(PK_FAM_FP_TREKKONTO)               AS PK_FAM_FP_TREKKONTO,
+              MAX(PK_FAM_FP_PERIODE_RESULTAT_AARSAK) AS PK_FAM_FP_PERIODE_RESULTAT_AARSAK,
+              ANTALL_BEREGNINGSGRUNNLAG,
+              MAX(GRADERINGSDAGER)                   AS GRADERINGSDAGER,
+              MAX(MORS_AKTIVITET)                    AS MORS_AKTIVITET
+            FROM
+              BEREGNINGSGRUNNLAG_DETALJ
+            GROUP BY
+              FAGSAK_ID,
+              TRANS_ID,
+              TREKKONTO,
+              TREKKDAGER,
+              STONADSDAGER_KVOTE,
+              UTTAK_ARBEID_TYPE,
+              AAR,
+              HALVAAR,
+              KVARTAL,
+              AAR_MAANED,
+              UTTAK_FOM,
+              UTTAK_TOM,
+              DEKNINGSGRAD,
+              VIRKSOMHET,
+              UTBETALINGSPROSENT,
+              PERIODE_RESULTAT_AARSAK,
+              DAGSATS,
+              DAGSATS_ERST,
+              DAGSATS_BRUKER,
+              DAGSATS_ARBEIDSGIVER,
+              DAGSATS_VIRKSOMHET,
+              UTBETALINGSPROSENT,
+              STATUS_OG_ANDEL_INNTEKTSKAT,
+              AKTIVITET_STATUS,
+              BRUTTO_INNTEKT,
+              AVKORTET_INNTEKT,
+              STATUS_OG_ANDEL_BRUTTO,
+              STATUS_OG_ANDEL_AVKORTET,
+              FUNKSJONELL_TID,
+              FORSTE_VEDTAKSDATO,
+              SISTE_VEDTAKSDATO,
+              MAX_VEDTAKSDATO,
+              PERIODE,
+              SAMTIDIG_UTTAK,
+              GRADERING,
+              GRADERING_INNVILGET,
+              MIN_UTTAK_FOM,
+              MAX_UTTAK_TOM,
+              FK_DIM_TID_MIN_DATO_KVOTE,
+              FK_DIM_TID_MAX_DATO_KVOTE,
+              ANTALL_BEREGNINGSGRUNNLAG
+          ) A
+      ), GRUNNLAG AS (
+        SELECT
+          BEREGNINGSGRUNNLAG_AGG.*,
+          SYSDATE                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      AS LASTET_DATO,
+          CASE
+            WHEN BEREGNINGSGRUNNLAG_AGG.AAR_MAANED > TO_NUMBER(P_RAPPORT_DATO) THEN
+              'B'
+            ELSE
+              'A'
+          END BUDSJETT                                                                                                                                                                                                                                                                                                                                                                                                                ,
+          MOTTAKER.BEHANDLINGSTEMA,
+          MOTTAKER.MAX_TRANS_ID,
+          MOTTAKER.FK_PERSON1_MOTTAKER,
+          MOTTAKER.KJONN,
+          MOTTAKER.FK_PERSON1_BARN,
+          MOTTAKER.TERMINDATO,
+          MOTTAKER.FOEDSELSDATO,
+          MOTTAKER.ANTALL_BARN_TERMIN,
+          MOTTAKER.ANTALL_BARN_FOEDSEL,
+          MOTTAKER.FOEDSELSDATO_ADOPSJON,
+          MOTTAKER.ANTALL_BARN_ADOPSJON,
+          MOTTAKER.MOTTAKER_FODSELS_AAR,
+          MOTTAKER.MOTTAKER_FODSELS_MND,
+          SUBSTR(P_TID_FOM, 1, 4) - MOTTAKER.MOTTAKER_FODSELS_AAR                                                                                                                                                                                                                                                                                                                                                                                                                                                      AS MOTTAKER_ALDER,
+          MOTTAKER.SIVILSTAND,
+          MOTTAKER.STATSBORGERSKAP,
+          DIM_PERSON.PK_DIM_PERSON,
+          DIM_PERSON.BOSTED_KOMMUNE_NR,
+          DIM_PERSON.FK_DIM_SIVILSTATUS,
+          DIM_GEOGRAFI.PK_DIM_GEOGRAFI,
+          DIM_GEOGRAFI.BYDEL_KOMMUNE_NR,
+          DIM_GEOGRAFI.KOMMUNE_NR,
+          DIM_GEOGRAFI.KOMMUNE_NAVN,
+          DIM_GEOGRAFI.BYDEL_NR,
+          DIM_GEOGRAFI.BYDEL_NAVN,
+          ANNENFORELDERFAGSAK.ANNENFORELDERFAGSAK_ID,
+          ANNENFORELDERFAGSAK.FK_PERSON1_ANNEN_PART,
+          FAM_FP_UTTAK_FP_KONTOER.MAX_DAGER                                                                                                                                                                                                                                                                                                                                                                                                                                                                            MAX_STONADSDAGER_KONTO,
+          CASE
+            WHEN ALENEOMSORG.FAGSAK_ID IS NOT NULL THEN
+              'J'
+            ELSE
+              NULL
+          END AS                                                                                                                                                                                                                                                                                                                                                                                                                                           ALENEOMSORG,
+          CASE
+            WHEN BEHANDLINGSTEMA = 'FORP_FODS' THEN
+              '214'
+            WHEN BEHANDLINGSTEMA = 'FORP_ADOP' THEN
+              '216'
+          END AS                                                                                                                                                                                                                                                                                                                                                                                                         HOVEDKONTONR,
+          CASE
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='ARBEIDSTAKER' AND DAGSATS_ARBEIDSGIVER/DAGSATS*100<=50 THEN
+              '1000'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='ARBEIDSTAKER' AND DAGSATS_ARBEIDSGIVER/DAGSATS*100>50 THEN
+              '8020'
+ --when status_og_andel_inntektskat='ARBEIDSTAKER' then '1000'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='JORDBRUKER' THEN
+              '5210'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='SJÃ˜MANN' THEN
+              '1300'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='SELVSTENDIG_NÃ†RINGSDRIVENDE' THEN
+              '5010'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='DAGPENGER' THEN
+              '1200'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='ARBEIDSTAKER_UTEN_FERIEPENGER' THEN
+              '1000'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='FISKER' THEN
+              '5300'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='DAGMAMMA' THEN
+              '5110'
+            WHEN STATUS_OG_ANDEL_INNTEKTSKAT='FRILANSER' THEN
+              '1100'
+          END AS UNDERKONTONR,
+          ROUND(DAGSATS_ARBEIDSGIVER/DAGSATS*100, 0)                                                                                                                                                                                                                                                                                                                                                                                                                                                                   AS ANDEL_AV_REFUSJON,
+          CASE
+            WHEN RETT_TIL_MÃ˜DREKVOTE.TRANS_ID IS NULL THEN
+              'N'
+            ELSE
+              'J'
+          END AS                                                                                                                                                                                                                                                                                                                                                                                                                                         RETT_TIL_MÃ˜DREKVOTE,
+          CASE
+            WHEN RETT_TIL_FEDREKVOTE.TRANS_ID IS NULL THEN
+              'N'
+            ELSE
+              'J'
+          END AS                                                                                                                                                                                                                                                                                                                                                                                                                                         RETT_TIL_FEDREKVOTE,
+          FLERBARNSDAGER.FLERBARNSDAGER,
+          ADOPSJON.ADOPSJONSDATO,
+          ADOPSJON.STEBARNSADOPSJON,
+          EOS.EOS_SAK
+        FROM
+          BEREGNINGSGRUNNLAG_AGG
+          LEFT JOIN MOTTAKER
+          ON BEREGNINGSGRUNNLAG_AGG.FAGSAK_ID = MOTTAKER.FAGSAK_ID
+          AND BEREGNINGSGRUNNLAG_AGG.TRANS_ID = MOTTAKER.MAX_TRANS_ID
+          LEFT JOIN ANNENFORELDERFAGSAK
+          ON BEREGNINGSGRUNNLAG_AGG.FAGSAK_ID = ANNENFORELDERFAGSAK.FAGSAK_ID
+          AND BEREGNINGSGRUNNLAG_AGG.TRANS_ID = ANNENFORELDERFAGSAK.MAX_TRANS_ID
+          LEFT JOIN DVH_FAM_FP.FAM_FP_UTTAK_FP_KONTOER
+          ON BEREGNINGSGRUNNLAG_AGG.FAGSAK_ID = FAM_FP_UTTAK_FP_KONTOER.FAGSAK_ID
+          AND MOTTAKER.MAX_TRANS_ID = FAM_FP_UTTAK_FP_KONTOER.TRANS_ID
+ --AND UPPER(REGEXP_REPLACE(grunnlag_drp1.TREKKONTO, '_|-|[[:space:]]', '')) = UPPER(REGEXP_REPLACE(FAM_FP_Uttak_FP_Kontoer.STOENADSKONTOTYPE, '_|-|[[:space:]]', ''))
+          AND UPPER(REPLACE(BEREGNINGSGRUNNLAG_AGG.TREKKONTO,
+          '_',
+          '')) = UPPER(REPLACE(FAM_FP_UTTAK_FP_KONTOER.STOENADSKONTOTYPE,
+          ' ',
+          ''))
+          LEFT JOIN DT_PERSON.DIM_PERSON
+          ON MOTTAKER.FK_PERSON1_MOTTAKER = DIM_PERSON.FK_PERSON1
+ --and beregningsgrunnlag_agg.uttak_tom between dim_person.gyldig_fra_dato and dim_person.gyldig_til_dato
+          AND TO_DATE(BEREGNINGSGRUNNLAG_AGG.PK_DIM_TID_DATO_UTBET_TOM,
+          'yyyymmdd') BETWEEN DIM_PERSON.GYLDIG_FRA_DATO
+          AND DIM_PERSON.GYLDIG_TIL_DATO
+          LEFT JOIN DT_KODEVERK.DIM_GEOGRAFI
+          ON DIM_PERSON.FK_DIM_GEOGRAFI_BOSTED = DIM_GEOGRAFI.PK_DIM_GEOGRAFI
+          LEFT JOIN ALENEOMSORG
+          ON ALENEOMSORG.FAGSAK_ID = BEREGNINGSGRUNNLAG_AGG.FAGSAK_ID
+          AND ALENEOMSORG.UTTAK_FOM = BEREGNINGSGRUNNLAG_AGG.UTTAK_FOM
+          LEFT JOIN (
+            SELECT
+              TRANS_ID
+            FROM
+              DVH_FAM_FP.FAM_FP_UTTAK_FP_KONTOER
+            WHERE
+              UPPER(STOENADSKONTOTYPE) = 'MÃ˜DREKVOTE'
+            GROUP BY
+              TRANS_ID
+          ) RETT_TIL_MÃ˜DREKVOTE
+          ON RETT_TIL_MÃ˜DREKVOTE.TRANS_ID = BEREGNINGSGRUNNLAG_AGG.TRANS_ID
+          LEFT JOIN (
+            SELECT
+              TRANS_ID
+            FROM
+              DVH_FAM_FP.FAM_FP_UTTAK_FP_KONTOER
+            WHERE
+              UPPER(STOENADSKONTOTYPE) = 'FEDREKVOTE'
+            GROUP BY
+              TRANS_ID
+          ) RETT_TIL_FEDREKVOTE
+          ON RETT_TIL_FEDREKVOTE.TRANS_ID = BEREGNINGSGRUNNLAG_AGG.TRANS_ID
+          LEFT JOIN (
+            SELECT
+              TRANS_ID,
+              MAX(MAX_DAGER) AS FLERBARNSDAGER
+            FROM
+              DVH_FAM_FP.FAM_FP_UTTAK_FP_KONTOER
+            WHERE
+              UPPER(STOENADSKONTOTYPE) = 'FLERBARNSDAGER'
+            GROUP BY
+              TRANS_ID
+          ) FLERBARNSDAGER
+          ON FLERBARNSDAGER.TRANS_ID = BEREGNINGSGRUNNLAG_AGG.TRANS_ID
+          LEFT JOIN ADOPSJON
+          ON BEREGNINGSGRUNNLAG_AGG.FAGSAK_ID = ADOPSJON.FAGSAK_ID
+          LEFT JOIN EOS
+          ON BEREGNINGSGRUNNLAG_AGG.TRANS_ID = EOS.TRANS_ID
+      )
+      SELECT /*+ PARALLEL(8) */
+        * --Fjern parallel hint hvis man fÃ¥r feilmelding ved kjÃ¸ring
+ --from uttak_dager
+      FROM
+        GRUNNLAG --grunnlag
+      WHERE
+        FAGSAK_ID NOT IN (1679117)
+ --where fagsak_id in (1035184)
+;
+    V_TID_FOM                      VARCHAR2(8) := NULL;
+    V_TID_TOM                      VARCHAR2(8) := NULL;
+    V_COMMIT                       NUMBER := 0;
+    V_ERROR_MELDING                VARCHAR2(1000) := NULL;
+    V_DIM_TID_ANTALL               NUMBER := 0;
+    V_UTBETALINGSPROSENT_KALKULERT NUMBER := 0;
+  BEGIN
+    V_TID_FOM := SUBSTR(P_IN_VEDTAK_TOM, 1, 4)
+                 || '0101';
+    V_TID_TOM := SUBSTR(P_IN_VEDTAK_TOM, 1, 4)
+                 || '1231';
+ --dbms_output.put_line(v_tid_fom||v_tid_tom);--TEST!!!
+    FOR REC_PERIODE IN CUR_PERIODE(P_IN_RAPPORT_DATO, P_IN_FORSKYVNINGER, V_TID_FOM, V_TID_TOM) LOOP
+      V_DIM_TID_ANTALL := 0;
+      V_UTBETALINGSPROSENT_KALKULERT := 0;
+      V_DIM_TID_ANTALL := DIM_TID_ANTALL(TO_NUMBER(TO_CHAR(REC_PERIODE.UTTAK_FOM, 'yyyymmdd')), TO_NUMBER(TO_CHAR(REC_PERIODE.UTTAK_TOM, 'yyyymmdd')));
+      IF V_DIM_TID_ANTALL != 0 THEN
+        V_UTBETALINGSPROSENT_KALKULERT := ROUND(REC_PERIODE.TREKKDAGER/V_DIM_TID_ANTALL*100, 2);
+      ELSE
+        V_UTBETALINGSPROSENT_KALKULERT := 0;
+      END IF;
+ --dbms_output.put_line(v_dim_tid_antall);
+      BEGIN
+        INSERT INTO DVH_FAM_FP.FAK_FAM_FP_VEDTAK_UTBETALING (
+          FAGSAK_ID,
+          TRANS_ID,
+          BEHANDLINGSTEMA,
+          TREKKONTO,
+          STONADSDAGER_KVOTE,
+          UTTAK_ARBEID_TYPE,
+          AAR,
+          HALVAAR,
+          AAR_MAANED,
+          RAPPORT_PERIODE,
+          UTTAK_FOM,
+          UTTAK_TOM,
+          DAGER_ERST,
+          BEREGNINGSGRUNNLAG_FOM,
+          BEREGNINGSGRUNNLAG_TOM,
+          DEKNINGSGRAD,
+          DAGSATS_BRUKER,
+          DAGSATS_ARBEIDSGIVER,
+          VIRKSOMHET,
+          PERIODE_RESULTAT_AARSAK,
+          DAGSATS,
+          GRADERINGSPROSENT,
+          STATUS_OG_ANDEL_INNTEKTSKAT,
+          AKTIVITET_STATUS,
+          BRUTTO_INNTEKT,
+          AVKORTET_INNTEKT,
+          STATUS_OG_ANDEL_BRUTTO,
+          STATUS_OG_ANDEL_AVKORTET,
+          UTBETALINGSPROSENT,
+          FK_DIM_TID_DATO_UTBET_FOM,
+          FK_DIM_TID_DATO_UTBET_TOM,
+          FUNKSJONELL_TID,
+          FORSTE_VEDTAKSDATO,
+          VEDTAKSDATO,
+          MAX_VEDTAKSDATO,
+          PERIODE_TYPE,
+          TILFELLE_ERST,
+          BELOP,
+          DAGSATS_REDUSERT,
+          LASTET_DATO,
+          MAX_TRANS_ID,
+          FK_PERSON1_MOTTAKER,
+          FK_PERSON1_ANNEN_PART,
+          KJONN,
+          FK_PERSON1_BARN,
+          TERMINDATO,
+          FOEDSELSDATO,
+          ANTALL_BARN_TERMIN,
+          ANTALL_BARN_FOEDSEL,
+          FOEDSELSDATO_ADOPSJON,
+          ANTALL_BARN_ADOPSJON,
+          ANNENFORELDERFAGSAK_ID,
+          MAX_STONADSDAGER_KONTO,
+          FK_DIM_PERSON,
+          BOSTED_KOMMUNE_NR,
+          FK_DIM_GEOGRAFI,
+          BYDEL_KOMMUNE_NR,
+          KOMMUNE_NR,
+          KOMMUNE_NAVN,
+          BYDEL_NR,
+          BYDEL_NAVN,
+          ALENEOMSORG,
+          HOVEDKONTONR,
+          UNDERKONTONR,
+          MOTTAKER_FODSELS_AAR,
+          MOTTAKER_FODSELS_MND,
+          MOTTAKER_ALDER,
+          RETT_TIL_FEDREKVOTE,
+          RETT_TIL_MODREKVOTE,
+          DAGSATS_ERST,
+          TREKKDAGER,
+          SAMTIDIG_UTTAK,
+          GRADERING,
+          GRADERING_INNVILGET,
+          ANTALL_DAGER_PERIODE,
+          FLERBARNSDAGER,
+          UTBETALINGSPROSENT_KALKULERT,
+          MIN_UTTAK_FOM,
+          MAX_UTTAK_TOM,
+          FK_FAM_FP_TREKKONTO,
+          FK_FAM_FP_PERIODE_RESULTAT_AARSAK,
+          SIVILSTATUS,
+          FK_DIM_SIVILSTATUS,
+          ANTALL_BEREGNINGSGRUNNLAG,
+          GRADERINGSDAGER,
+          FK_DIM_TID_MIN_DATO_KVOTE,
+          FK_DIM_TID_MAX_DATO_KVOTE,
+          ADOPSJONSDATO,
+          STEBARNSADOPSJON,
+          EOS_SAK,
+          MOR_RETTIGHET,
+          STATSBORGERSKAP,
+          ARBEIDSTIDSPROSENT,
+          MORS_AKTIVITET,
+          GYLDIG_FLAGG,
+          ANDEL_AV_REFUSJON,
+          FORSTE_SOKNADSDATO,
+          SOKNADSDATO,
+          BUDSJETT
+        ) VALUES (
+          REC_PERIODE.FAGSAK_ID,
+          REC_PERIODE.TRANS_ID,
+          REC_PERIODE.BEHANDLINGSTEMA,
+          REC_PERIODE.TREKKONTO,
+          REC_PERIODE.STONADSDAGER_KVOTE,
+          REC_PERIODE.UTTAK_ARBEID_TYPE,
+          REC_PERIODE.AAR,
+          REC_PERIODE.HALVAAR,
+          REC_PERIODE.AAR_MAANED,
+          P_IN_RAPPORT_DATO,
+          REC_PERIODE.UTTAK_FOM,
+          REC_PERIODE.UTTAK_TOM,
+          REC_PERIODE.DAGER_ERST,
+          REC_PERIODE.BEREGNINGSGRUNNLAG_FOM,
+          REC_PERIODE.BEREGNINGSGRUNNLAG_TOM,
+          REC_PERIODE.DEKNINGSGRAD,
+          REC_PERIODE.DAGSATS_BRUKER,
+          REC_PERIODE.DAGSATS_ARBEIDSGIVER,
+          REC_PERIODE.VIRKSOMHET,
+          REC_PERIODE.PERIODE_RESULTAT_AARSAK,
+          REC_PERIODE.DAGSATS,
+          REC_PERIODE.GRADERINGSPROSENT,
+          REC_PERIODE.STATUS_OG_ANDEL_INNTEKTSKAT,
+          REC_PERIODE.AKTIVITET_STATUS,
+          REC_PERIODE.BRUTTO_INNTEKT,
+          REC_PERIODE.AVKORTET_INNTEKT,
+          REC_PERIODE.STATUS_OG_ANDEL_BRUTTO,
+          REC_PERIODE.STATUS_OG_ANDEL_AVKORTET,
+          REC_PERIODE.UTBETALINGSPROSENT,
+          REC_PERIODE.PK_DIM_TID_DATO_UTBET_FOM,
+          REC_PERIODE.PK_DIM_TID_DATO_UTBET_TOM,
+          REC_PERIODE.FUNKSJONELL_TID,
+          REC_PERIODE.FORSTE_VEDTAKSDATO,
+          REC_PERIODE.SISTE_VEDTAKSDATO,
+          REC_PERIODE.MAX_VEDTAKSDATO,
+          REC_PERIODE.PERIODE,
+          REC_PERIODE.TILFELLE_ERST,
+          REC_PERIODE.BELOP,
+          REC_PERIODE.DAGSATS_REDUSERT,
+          SYSDATE --rec_periode.lastet_dato
+,
+          REC_PERIODE.MAX_TRANS_ID,
+          REC_PERIODE.FK_PERSON1_MOTTAKER,
+          REC_PERIODE.FK_PERSON1_ANNEN_PART,
+          REC_PERIODE.KJONN,
+          REC_PERIODE.FK_PERSON1_BARN,
+          REC_PERIODE.TERMINDATO,
+          REC_PERIODE.FOEDSELSDATO,
+          REC_PERIODE.ANTALL_BARN_TERMIN,
+          REC_PERIODE.ANTALL_BARN_FOEDSEL,
+          REC_PERIODE.FOEDSELSDATO_ADOPSJON,
+          REC_PERIODE.ANTALL_BARN_ADOPSJON,
+          REC_PERIODE.ANNENFORELDERFAGSAK_ID,
+          REC_PERIODE.MAX_STONADSDAGER_KONTO,
+          REC_PERIODE.PK_DIM_PERSON,
+          REC_PERIODE.BOSTED_KOMMUNE_NR,
+          REC_PERIODE.PK_DIM_GEOGRAFI,
+          REC_PERIODE.BYDEL_KOMMUNE_NR,
+          REC_PERIODE.KOMMUNE_NR,
+          REC_PERIODE.KOMMUNE_NAVN,
+          REC_PERIODE.BYDEL_NR,
+          REC_PERIODE.BYDEL_NAVN,
+          REC_PERIODE.ALENEOMSORG,
+          REC_PERIODE.HOVEDKONTONR,
+          REC_PERIODE.UNDERKONTONR,
+          REC_PERIODE.MOTTAKER_FODSELS_AAR,
+          REC_PERIODE.MOTTAKER_FODSELS_MND,
+          REC_PERIODE.MOTTAKER_ALDER,
+          REC_PERIODE.RETT_TIL_FEDREKVOTE,
+          REC_PERIODE.RETT_TIL_MÃ˜DREKVOTE,
+          REC_PERIODE.DAGSATS_ERST,
+          REC_PERIODE.TREKKDAGER,
+          REC_PERIODE.SAMTIDIG_UTTAK,
+          REC_PERIODE.GRADERING,
+          REC_PERIODE.GRADERING_INNVILGET,
+          V_DIM_TID_ANTALL,
+          REC_PERIODE.FLERBARNSDAGER,
+          V_UTBETALINGSPROSENT_KALKULERT,
+          REC_PERIODE.MIN_UTTAK_FOM,
+          REC_PERIODE.MAX_UTTAK_TOM,
+          REC_PERIODE.PK_FAM_FP_TREKKONTO,
+          REC_PERIODE.PK_FAM_FP_PERIODE_RESULTAT_AARSAK,
+          REC_PERIODE.SIVILSTAND,
+          REC_PERIODE.FK_DIM_SIVILSTATUS,
+          REC_PERIODE.ANTALL_BEREGNINGSGRUNNLAG,
+          REC_PERIODE.GRADERINGSDAGER,
+          REC_PERIODE.FK_DIM_TID_MIN_DATO_KVOTE,
+          REC_PERIODE.FK_DIM_TID_MAX_DATO_KVOTE,
+          REC_PERIODE.ADOPSJONSDATO,
+          REC_PERIODE.STEBARNSADOPSJON,
+          REC_PERIODE.EOS_SAK,
+          REC_PERIODE.MOR_RETTIGHET,
+          REC_PERIODE.STATSBORGERSKAP,
+          REC_PERIODE.ARBEIDSTIDSPROSENT,
+          REC_PERIODE.MORS_AKTIVITET,
+          P_IN_GYLDIG_FLAGG,
+          REC_PERIODE.ANDEL_AV_REFUSJON,
+          REC_PERIODE.FORSTE_SOKNADSDATO,
+          REC_PERIODE.SOKNADSDATO,
+          REC_PERIODE.BUDSJETT
+        );
+        V_COMMIT := V_COMMIT + 1;
+      EXCEPTION
+        WHEN OTHERS THEN
+          ROLLBACK;
+          V_ERROR_MELDING := SUBSTR(SQLCODE
+                                    || ' '
+                                    || SQLERRM, 1, 1000);
+          INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
+            MIN_LASTET_DATO,
+            ID,
+            ERROR_MSG,
+            OPPRETTET_TID,
+            KILDE
+          ) VALUES(
+            NULL,
+            REC_PERIODE.FAGSAK_ID,
+            V_ERROR_MELDING,
+            SYSDATE,
+            'FAM_FP_STATISTIKK_AAR:INSERT'
+          );
+          COMMIT;
+          P_OUT_ERROR := SUBSTR(P_OUT_ERROR
+                                || V_ERROR_MELDING, 1, 1000);
+      END;
+      IF V_COMMIT > 100000 THEN
+        COMMIT;
+        V_COMMIT := 0;
+      END IF;
+    END LOOP;
+    COMMIT;
+  EXCEPTION
+    WHEN OTHERS THEN
+      ROLLBACK;
+      V_ERROR_MELDING := SUBSTR(SQLCODE
+                                || ' '
+                                || SQLERRM, 1, 1000);
+      INSERT INTO DVH_FAM_FP.FP_XML_UTBRETT_ERROR(
+        MIN_LASTET_DATO,
+        ID,
+        ERROR_MSG,
+        OPPRETTET_TID,
+        KILDE
+      ) VALUES(
+        NULL,
+        NULL,
+        V_ERROR_MELDING,
+        SYSDATE,
+        'FAM_FP_STATISTIKK_AAR'
+      );
+      COMMIT;
+      P_OUT_ERROR := SUBSTR(P_OUT_ERROR
+                            || V_ERROR_MELDING, 1, 1000);
+  END FAM_FP_STATISTIKK_AAR_MND;
 END FAM_FP;
