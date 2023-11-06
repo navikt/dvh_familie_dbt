@@ -39,7 +39,7 @@ def filter_logs(file_path: str) -> List[dict]:
       'E040', #Total runtime
     ]
 
-    filtered_logs = [log for log in logs if log['code'] in dbt_codes]
+    filtered_logs = [log for log in logs if log['info']['code'] in dbt_codes]
 
     return filtered_logs
 
@@ -93,5 +93,5 @@ if __name__ == "__main__":
                        err.stdout.decode("utf-8"))
        #raise Exception("dbt feiler")
 
-    filtered_logs = filter_logs(f"{project_path}/logs/dbt.log")
-    write_to_xcom_push_file(filtered_logs)
+    #filtered_logs = filter_logs(f"{project_path}/logs/dbt.log")
+    #write_to_xcom_push_file(filtered_logs)
