@@ -88,5 +88,6 @@ final as (
 select
   dvh_fambt_kafka.hibernate_sequence.nextval as PK_BT_KOMPETANSE_BARN,
   FK_BT_KOMPETANSE_PERIODER,
-  FK_PERSON1
+  FK_PERSON1,
+  localtimestamp as LASTET_DATO
 from final
