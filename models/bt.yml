@@ -10,8 +10,6 @@ models:
       - name: FAGSAK_TYPE
         quote: true
         description: Type vedtak og det er enten NORMAL, BARN_ENSLIG_MINDREÅRIG eller INSTITUSJON
-      - name: KAFKA_MOTTATT_DATO
-        description: Tidspunkt til når vedtaket er kommet på kafka_topic-en
       - name: KATEGORI
         description: Vedtakets kategori og det er enten NASJONAL (Norge) eller EØS
       - name: UNDERKATEGORI
