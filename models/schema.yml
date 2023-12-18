@@ -79,3 +79,10 @@ sources:
       - name: fam_pp_fagsak
         description: 'inneholder vedtaks informasjon'
 
+  - name: fam_fp
+    schema: dvh_fam_fp
+    tables:
+      - name: fam_fp_meta_data
+        description: 'inneholder meta_data for FP'
+      - name: json_fam_fp_fagsak
+        description: 'inneholder fagsak info for FP'
