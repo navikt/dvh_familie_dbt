@@ -1,6 +1,6 @@
 {{
     config(
-        materialized='table'
+        materialized='incremental'
     )
 }}
 
@@ -9,7 +9,7 @@ with fp_meta_data as (
 ),
 
 fp_fagsak as (
-  select saksnummer, fagsak_id, behandling_uuid from {{ ref('json_fam_fp_fagsak') }}
+  select saksnummer, fagsak_id, behandling_uuid, pk_fp_fagsak from {{ ref('json_fam_fp_fagsak') }}
 ),
 
 pre_final as (
@@ -21,7 +21,7 @@ pre_final as (
          ,fagsak_id       VARCHAR2 PATH '$.fagsakId'
          ,behandling_uuid VARCHAR2 PATH '$.behandlingUuid'
          ,nested PATH '$.familieHendelse.barn[*]' COLUMNS (
-            seq_i_perioder FOR ORDINALITY
+            seq_i_array    FOR ORDINALITY
            ,barn_aktor_id  VARCHAR2 PATH '$.aktørId'
            ,fodselsdato    VARCHAR2 PATH '$.fødselsdato'
            ,dodsdato       VARCHAR2 PATH '$.dødsdato'
@@ -35,7 +35,7 @@ pre_final as (
 
 final as (
   select
-    p.seq_i_perioder
+    p.seq_i_array
    ,p.barn_aktor_id
    ,to_date(p.fodselsdato, 'yyyy-mm-dd') as fodselsdato
    ,to_date(p.dodsdato, 'yyyy-mm-dd') as dodsdato
@@ -46,7 +46,7 @@ final as (
 
 select
      dvh_fam_fp.fam_fp_seq.nextval as pk_fp_familie_hendelse
-    ,seq_i_perioder
+    ,seq_i_array
     ,barn_aktor_id
     ,fodselsdato
     ,dodsdato

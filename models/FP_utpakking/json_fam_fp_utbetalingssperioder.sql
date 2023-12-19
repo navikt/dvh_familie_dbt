@@ -9,7 +9,7 @@ with fp_meta_data as (
 ),
 
 fp_fagsak as (
-  select saksnummer, fagsak_id, behandling_uuid from {{ ref('json_fam_fp_fagsak') }}
+  select saksnummer, fagsak_id, behandling_uuid, pk_fp_fagsak from {{ ref('json_fam_fp_fagsak') }}
 ),
 
 pre_final as (
@@ -21,7 +21,7 @@ pre_final as (
          ,fagsak_id                        VARCHAR2 PATH '$.fagsakId'
          ,behandling_uuid                  VARCHAR2 PATH '$.behandlingUuid'
          ,nested PATH '$.utbetalingssperioder[*]' COLUMNS (
-            seq_i_perioder                 FOR ORDINALITY
+            seq_i_array                 FOR ORDINALITY
            ,fom                            VARCHAR2 PATH '$.fom'
            ,tom                            VARCHAR2 PATH '$.tom'
            ,klasse_kode                    VARCHAR2 PATH '$.klasseKode'
@@ -39,7 +39,7 @@ pre_final as (
 
 final as (
   select
-    p.seq_i_perioder
+    p.seq_i_array
    ,to_date(p.fom, 'yyyy-mm-dd') as fom
    ,to_date(p.tom, 'yyyy-mm-dd') as tom
    ,p.klasse_kode
@@ -54,7 +54,7 @@ final as (
 
 select
      dvh_fam_fp.fam_fp_seq.nextval as pk_fp_utbetalingssperioder
-    ,seq_i_perioder
+    ,seq_i_array
     ,fom
     ,tom
     ,klasse_kode
