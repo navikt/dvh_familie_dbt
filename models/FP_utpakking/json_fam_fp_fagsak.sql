@@ -78,13 +78,14 @@ final as (
     ,p.dekningsgrad
     ,p.rettighet_type
     ,p.flerbarnsdager
-    ,p.KAFKA_OFFSET
+    ,p.pk_fp_meta_data as fk_fp_meta_data
+    ,p.kafka_offset
     ,p.kafka_mottatt_dato
   from pre_final p
 )
 
 select
-     dvh_fam_fp.fam_fp_seq.nextval as PK_FP_FAGSAK
+     dvh_fam_fp.fam_fp_seq.nextval as pk_fp_fagsak
     ,saksnummer
     ,fagsak_id
     ,ytelse_type
@@ -113,7 +114,8 @@ select
     ,dekningsgrad
     ,rettighet_type
     ,flerbarnsdager
-    ,KAFKA_OFFSET
+    ,fk_fp_meta_data
+    ,kafka_offset
     ,kafka_mottatt_dato
-    ,localtimestamp as LASTET_DATO
+    ,localtimestamp as lastet_dato
 from final

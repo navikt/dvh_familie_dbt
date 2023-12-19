@@ -13,16 +13,15 @@ fp_fagsak as (
 ),
 
 pre_final as (
-  select *
+  select fp_meta_data.kafka_offset, j.*
+        ,fp_fagsak.pk_fp_fagsak
   from fp_meta_data
-      ,json_table(melding, '$'
-        COLUMNS (
+      ,json_table(melding, '$' COLUMNS (
           saksnummer                 VARCHAR2 PATH '$.saksnummer'
          ,fagsak_id                  VARCHAR2 PATH '$.fagsakId'
          ,behandling_uuid            VARCHAR2 PATH '$.behandlingUuid'
-         ,nested PATH '$.uttaksperioder[*]'
-          COLUMNS (
-            seq_i_perioder FOR ORDINALITY
+         ,nested PATH '$.uttaksperioder[*]' COLUMNS (
+            seq_i_perioder           FOR ORDINALITY
            ,fom                      VARCHAR2 PATH '$.fom'
            ,tom                      VARCHAR2 PATH '$.tom'
            ,type                     VARCHAR2 PATH '$.type'
@@ -45,7 +44,7 @@ pre_final as (
 
 final as (
   select
-    seq_i_perioder
+    p.seq_i_perioder
    ,to_date(p.fom, 'yyyy-mm-dd') as fom
    ,to_date(p.tom, 'yyyy-mm-dd') as tom
    ,p.type
@@ -58,7 +57,8 @@ final as (
    ,p.gradering_aktivitet_type
    ,p.gradering_arbeidsprosent
    ,p.samtidig_uttak_prosent
-   ,p.KAFKA_OFFSET
+   ,p.pk_fp_fagsak as fk_fp_fagsak
+   ,p.kafka_offset
   from pre_final p
 )
 
@@ -77,6 +77,7 @@ select
     ,gradering_aktivitet_type
     ,gradering_arbeidsprosent
     ,samtidig_uttak_prosent
-    ,KAFKA_OFFSET
-    ,localtimestamp as LASTET_DATO
+    ,fk_fp_fagsak
+    ,kafka_offset
+    ,localtimestamp as lastet_dato
 from final
