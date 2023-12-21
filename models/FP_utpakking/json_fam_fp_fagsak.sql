@@ -19,6 +19,7 @@ pre_final as (
          ,lov_versjon                VARCHAR2 PATH '$.lovVersjon'
          ,behandling_uuid            VARCHAR2 PATH '$.behandlingUuid'
          ,forrige_behandling_uuid    VARCHAR2 PATH '$.forrigeBehandlingUuid'
+         ,soknadsdato                VARCHAR2 PATH '$.søknadsdato'
          ,skjæringstidspunkt         VARCHAR2 PATH '$.skjæringstidspunkt'
          ,vedtakstidspunkt           VARCHAR2 PATH '$.vedtakstidspunkt'
          ,vedtaksresultat            VARCHAR2 PATH '$.vedtaksresultat'
@@ -53,6 +54,7 @@ final as (
     ,p.lov_versjon
     ,p.behandling_uuid
     ,p.forrige_behandling_uuid
+    ,to_date(p.soknadsdato, 'yyyy-mm-dd') as soknadsdato
     ,to_date(p.skjæringstidspunkt, 'yyyy-mm-dd') as skjæringstidspunkt
     ,CASE
       WHEN LENGTH(vedtakstidspunkt) = 25 THEN CAST(to_timestamp_tz(vedtakstidspunkt, 'yyyy-mm-dd"T"hh24:mi:ss TZH:TZM') AT TIME ZONE 'Europe/Belgrade' AS TIMESTAMP)
@@ -92,6 +94,7 @@ select
     ,lov_versjon
     ,behandling_uuid
     ,forrige_behandling_uuid
+    ,soknadsdato
     ,skjæringstidspunkt
     ,vedtakstidspunkt
     ,vedtaksresultat

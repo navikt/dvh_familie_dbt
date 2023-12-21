@@ -21,8 +21,7 @@ pre_final as (
          ,fagsak_id       VARCHAR2 PATH '$.fagsakId'
          ,behandling_uuid VARCHAR2 PATH '$.behandlingUuid'
          ,nested PATH '$.familieHendelse.barn[*]' COLUMNS (
-            seq_i_array    FOR ORDINALITY
-           ,barn_aktor_id  VARCHAR2 PATH '$.aktørId'
+            barn_aktor_id  VARCHAR2 PATH '$.aktørId'
            ,fodselsdato    VARCHAR2 PATH '$.fødselsdato'
            ,dodsdato       VARCHAR2 PATH '$.dødsdato'
           ) ) ) j
@@ -35,8 +34,7 @@ pre_final as (
 
 final as (
   select
-    p.seq_i_array
-   ,p.barn_aktor_id
+    p.barn_aktor_id
    ,to_date(p.fodselsdato, 'yyyy-mm-dd') as fodselsdato
    ,to_date(p.dodsdato, 'yyyy-mm-dd') as dodsdato
    ,p.pk_fp_fagsak as fk_fp_fagsak
@@ -46,7 +44,6 @@ final as (
 
 select
      dvh_fam_fp.fam_fp_seq.nextval as pk_fp_familie_hendelse
-    ,seq_i_array
     ,barn_aktor_id
     ,fodselsdato
     ,dodsdato

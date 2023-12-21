@@ -28,6 +28,7 @@ pre_final as (
            ,stonadskonto_type        VARCHAR2 PATH '$.stønadskontoType'
            ,rettighet_type           VARCHAR2 PATH '$.rettighetType'
            ,forklaring               VARCHAR2 PATH '$.forklaring'
+           ,soknadsdato              VARCHAR2 PATH '$.søknadsDato'
            ,er_utbetaling            VARCHAR2 PATH '$.erUtbetaling'
            ,virkedager               VARCHAR2 PATH '$.virkedager'
            ,trekkdager               VARCHAR2 PATH '$.trekkdager'
@@ -51,6 +52,7 @@ final as (
    ,p.stonadskonto_type
    ,p.rettighet_type
    ,p.forklaring
+   ,to_date(p.soknadsdato, 'yyyy-mm-dd') as soknadsdato
    ,p.er_utbetaling
    ,p.virkedager
    ,p.trekkdager
@@ -71,6 +73,7 @@ select
     ,stonadskonto_type
     ,rettighet_type
     ,forklaring
+    ,soknadsdato
     ,er_utbetaling
     ,virkedager
     ,trekkdager

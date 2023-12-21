@@ -21,8 +21,7 @@ pre_final as (
          ,fagsak_id       VARCHAR2 PATH '$.fagsakId'
          ,behandling_uuid VARCHAR2 PATH '$.behandlingUuid'
          ,nested PATH '$.foreldrepengerRettigheter.stønadskonti[*]' COLUMNS (
-            seq_i_array FOR ORDINALITY
-           ,type           VARCHAR2 PATH '$.type'
+            type           VARCHAR2 PATH '$.type'
            ,maksdager      VARCHAR2 PATH '$.maksdager'
            ,restdager      VARCHAR2 PATH '$.restdager'
            ,minsterett     VARCHAR2 PATH '$.minsterett'
@@ -36,8 +35,7 @@ pre_final as (
 
 final as (
   select
-    p.seq_i_array
-   ,p.type
+    p.type
    ,p.maksdager
    ,p.restdager
    ,p.minsterett
@@ -48,7 +46,6 @@ final as (
 
 select
      dvh_fam_fp.fam_fp_seq.nextval as pk_fp_familie_hendelse
-    ,seq_i_array
     ,type
     ,maksdager
     ,restdager

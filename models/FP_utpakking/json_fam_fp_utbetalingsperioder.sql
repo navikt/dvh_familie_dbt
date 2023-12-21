@@ -24,8 +24,9 @@ pre_final as (
             seq_i_array                 FOR ORDINALITY
            ,fom                            VARCHAR2 PATH '$.fom'
            ,tom                            VARCHAR2 PATH '$.tom'
-           ,klasse_kode                    VARCHAR2 PATH '$.klasseKode'
+           ,inntektskategori               VARCHAR2 PATH '$.inntektskategori'
            ,arbeidsgiver                   VARCHAR2 PATH '$.arbeidsgiver'
+           ,mottaker                       VARCHAR2 PATH '$.mottaker'
            ,dagsats                        VARCHAR2 PATH '$.dagsats'
            ,dagsats_fra_beregningsgrunnlag VARCHAR2 PATH '$.dagsatsFraBeregningsgrunnlag'
            ,utbetalingsgrad                VARCHAR2 PATH '$.utbetalingsgrad'
@@ -42,8 +43,9 @@ final as (
     p.seq_i_array
    ,to_date(p.fom, 'yyyy-mm-dd') as fom
    ,to_date(p.tom, 'yyyy-mm-dd') as tom
-   ,p.klasse_kode
+   ,p.inntektskategori
    ,p.arbeidsgiver
+   ,p.mottaker
    ,p.dagsats
    ,p.dagsats_fra_beregningsgrunnlag
    ,p.utbetalingsgrad
@@ -53,12 +55,13 @@ final as (
 )
 
 select
-     dvh_fam_fp.fam_fp_seq.nextval as pk_fp_utbetalingssperioder
+     dvh_fam_fp.fam_fp_seq.nextval as pk_fp_utbetalingsperioder
     ,seq_i_array
     ,fom
     ,tom
-    ,klasse_kode
+    ,inntektskategori
     ,arbeidsgiver
+    ,mottaker
     ,dagsats
     ,dagsats_fra_beregningsgrunnlag
     ,utbetalingsgrad
