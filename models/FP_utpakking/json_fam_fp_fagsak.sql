@@ -42,8 +42,7 @@ pre_final as (
          ,dekningsgrad               VARCHAR2 PATH '$.foreldrepengerRettigheter.dekningsgrad'
          ,rettighet_type             VARCHAR2 PATH '$.foreldrepengerRettigheter.rettighetType'
          ,flerbarnsdager             VARCHAR2 PATH '$.foreldrepengerRettigheter.flerbarnsdager'
-         )
-      ) j
+         ) ) j
 ),
 
 final as (
