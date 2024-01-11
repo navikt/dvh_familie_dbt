@@ -51,6 +51,7 @@ final as (
 select
      dvh_fam_fp.fam_fp_seq.nextval as pk_fp_familie_hendelse
     ,barn_aktor_id
+    ,barn_fk_person1
     ,fodselsdato
     ,dodsdato
     ,fk_fp_fagsak
