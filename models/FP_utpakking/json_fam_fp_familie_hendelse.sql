@@ -15,7 +15,7 @@ fp_fagsak as (
 pre_final as (
   select fp_meta_data.kafka_offset, j.*
         ,fp_fagsak.pk_fp_fagsak
-        ,ident.fk_person1
+        ,ident.fk_person1 as barn_fk_person1
   from fp_meta_data
       ,json_table(melding, '$' COLUMNS (
           saksnummer      VARCHAR2 PATH '$.saksnummer'
@@ -41,6 +41,7 @@ pre_final as (
 final as (
   select
     p.barn_aktor_id
+   ,p.barn_fk_person1
    ,to_date(p.fodselsdato, 'yyyy-mm-dd') as fodselsdato
    ,to_date(p.dodsdato, 'yyyy-mm-dd') as dodsdato
    ,p.pk_fp_fagsak as fk_fp_fagsak
