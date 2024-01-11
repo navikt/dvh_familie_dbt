@@ -20,7 +20,7 @@ pre_final as (
          ,behandling_uuid            VARCHAR2 PATH '$.behandlingUuid'
          ,forrige_behandling_uuid    VARCHAR2 PATH '$.forrigeBehandlingUuid'
          ,soknadsdato                VARCHAR2 PATH '$.søknadsdato'
-         ,skjæringstidspunkt         VARCHAR2 PATH '$.skjæringstidspunkt'
+         ,skjaeringstidspunkt        VARCHAR2 PATH '$.skjæringstidspunkt'
          ,vedtakstidspunkt           VARCHAR2 PATH '$.vedtakstidspunkt'
          ,vedtaksresultat            VARCHAR2 PATH '$.vedtaksresultat'
          ,vilkaar_ikke_oppfylt       VARCHAR2 PATH '$.vilkårIkkeOppfylt'
@@ -54,7 +54,7 @@ final as (
     ,p.behandling_uuid
     ,p.forrige_behandling_uuid
     ,to_date(p.soknadsdato, 'yyyy-mm-dd') as soknadsdato
-    ,to_date(p.skjæringstidspunkt, 'yyyy-mm-dd') as skjæringstidspunkt
+    ,to_date(p.skjaeringstidspunkt, 'yyyy-mm-dd') as skjaeringstidspunkt
     ,CASE
       WHEN LENGTH(vedtakstidspunkt) = 25 THEN CAST(to_timestamp_tz(vedtakstidspunkt, 'yyyy-mm-dd"T"hh24:mi:ss TZH:TZM') AT TIME ZONE 'Europe/Belgrade' AS TIMESTAMP)
       ELSE CAST(to_timestamp_tz(vedtakstidspunkt, 'YYYY-MM-DD"T"HH24:MI:SS.FF3 TZH:TZM') AT TIME ZONE 'Europe/Belgrade' AS TIMESTAMP)
@@ -94,7 +94,7 @@ select
     ,behandling_uuid
     ,forrige_behandling_uuid
     ,soknadsdato
-    ,skjæringstidspunkt
+    ,skjaeringstidspunkt
     ,vedtakstidspunkt
     ,vedtaksresultat
     ,vilkaar_ikke_oppfylt
