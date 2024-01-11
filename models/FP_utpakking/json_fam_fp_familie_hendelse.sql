@@ -9,12 +9,13 @@ with fp_meta_data as (
 ),
 
 fp_fagsak as (
-  select saksnummer, fagsak_id, behandling_uuid, pk_fp_fagsak from {{ ref('json_fam_fp_fagsak') }}
+  select saksnummer, fagsak_id, behandling_uuid, pk_fp_fagsak, vedtakstidspunkt from {{ ref('json_fam_fp_fagsak') }}
 ),
 
 pre_final as (
   select fp_meta_data.kafka_offset, j.*
         ,fp_fagsak.pk_fp_fagsak
+        ,ident.fk_person1
   from fp_meta_data
       ,json_table(melding, '$' COLUMNS (
           saksnummer      VARCHAR2 PATH '$.saksnummer'
@@ -29,6 +30,11 @@ pre_final as (
   on fp_fagsak.saksnummer = j.saksnummer
   and fp_fagsak.fagsak_id = j.fagsak_id
   and fp_fagsak.behandling_uuid = j.behandling_uuid
+
+  left join dt_person.ident_aktor_til_fk_person1_ikke_skjermet ident
+  on j.barn_aktor_id = ident.aktor_id
+  and trunc(fp_fagsak.vedtakstidspunkt, 'dd') between ident.gyldig_fra_dato and ident.gyldig_til_dato
+
   where j.barn_aktor_id is not null
 ),
 

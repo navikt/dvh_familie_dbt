@@ -99,9 +99,11 @@ select
     ,vedtaksresultat
     ,vilkaar_ikke_oppfylt
     ,soker_aktor_id
+    ,ident.fk_person1 as soker_fk_person1
     ,sokers_rolle
     ,utlands_tilsnitt
     ,annen_forelder_aktor_id
+    ,ident_annen.fk_person1 as annen_forelder_fk_person1
     ,annen_forelder_saksnummer
     ,annen_forelder_ytelse_type
     ,annen_forelder_saksrolle
@@ -121,3 +123,11 @@ select
     ,kafka_mottatt_dato
     ,localtimestamp as lastet_dato
 from final
+
+left join dt_person.ident_aktor_til_fk_person1_ikke_skjermet ident
+on final.soker_aktor_id = ident.aktor_id
+and trunc(final.vedtakstidspunkt, 'dd') between ident.gyldig_fra_dato and ident.gyldig_til_dato
+
+left join dt_person.ident_aktor_til_fk_person1_ikke_skjermet ident_annen
+on final.annen_forelder_aktor_id = ident_annen.aktor_id
+and trunc(final.vedtakstidspunkt, 'dd') between ident_annen.gyldig_fra_dato and ident_annen.gyldig_til_dato
