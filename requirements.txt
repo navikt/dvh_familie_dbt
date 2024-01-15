@@ -1,0 +1,9 @@
+python = ">=3.10,<3.13"
+dbt-oracle = "^1.7.0"
+#google-api-python-client
+#google-cloud-core = "^2.3.3"
+#google-cloud-storage = "^2.12.0"
+google-cloud-secret-manager
+pandas
+oracledb
+#google-cloud-bigquery = "^3.13.0"
