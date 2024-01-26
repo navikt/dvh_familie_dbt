@@ -43,17 +43,17 @@ pre_final as (
 
 final as (
   select
-    p.grunnbelop
-   ,p.aarsbelop_brutto
-   ,p.aarsbelop_avkortet
-   ,p.aarsbelop_redusert
-   ,p.aarsbelop_dagsats
+    to_number(replace(p.grunnbelop, '.', ',')) grunnbelop
+   ,to_number(replace(p.aarsbelop_brutto, '.', ',')) aarsbelop_brutto
+   ,to_number(replace(p.aarsbelop_avkortet, '.', ',')) aarsbelop_avkortet
+   ,to_number(replace(p.aarsbelop_redusert, '.', ',')) aarsbelop_redusert
+   ,to_number(replace(p.aarsbelop_dagsats, '.', ',')) aarsbelop_dagsats
    ,p.andeler_aktivitet
    ,p.andeler_arbeidsgiver
-   ,p.andeler_aarsbelop_brutto
-   ,p.andeler_aarsbelop_avkortet
-   ,p.andeler_aarsbelop_redusert
-   ,p.andeler_aarsbelop_dagsats
+   ,to_number(replace(p.andeler_aarsbelop_brutto, '.', ',')) andeler_aarsbelop_brutto
+   ,to_number(replace(p.andeler_aarsbelop_avkortet, '.', ',')) andeler_aarsbelop_avkortet
+   ,to_number(replace(p.andeler_aarsbelop_redusert, '.', ',')) andeler_aarsbelop_redusert
+   ,to_number(replace(p.andeler_aarsbelop_dagsats, '.', ',')) andeler_aarsbelop_dagsats
    ,p.pk_fp_fagsak as fk_fp_fagsak
    ,p.kafka_offset
   from pre_final p
