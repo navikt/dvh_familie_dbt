@@ -75,11 +75,11 @@ select
     ,forklaring
     ,soknadsdato
     ,er_utbetaling
-    ,virkedager
-    ,trekkdager
+    ,to_number(replace(virkedager, '.', ',')) virkedager
+    ,to_number(replace(trekkdager, '.', ',')) trekkdager
     ,gradering_aktivitet_type
-    ,gradering_arbeidsprosent
-    ,samtidig_uttak_prosent
+    ,to_number(replace(gradering_arbeidsprosent, '.', ',')) gradering_arbeidsprosent
+    ,to_number(replace(samtidig_uttak_prosent, '.', ',')) samtidig_uttak_prosent
     ,fk_fp_fagsak
     ,kafka_offset
     ,localtimestamp as lastet_dato

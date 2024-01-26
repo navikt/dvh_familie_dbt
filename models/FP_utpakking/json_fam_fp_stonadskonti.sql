@@ -36,9 +36,9 @@ pre_final as (
 final as (
   select
     p.type
-   ,p.maksdager
-   ,p.restdager
-   ,p.minsterett
+   ,to_number(replace(p.maksdager, '.', ',')) maksdager
+   ,to_number(replace(p.restdager, '.', ',')) restdager
+   ,to_number(replace(p.minsterett, '.', ',')) minsterett
    ,p.pk_fp_fagsak as fk_fp_fagsak
    ,p.kafka_offset
   from pre_final p
