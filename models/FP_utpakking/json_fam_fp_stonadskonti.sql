@@ -45,7 +45,7 @@ final as (
 )
 
 select
-     dvh_fam_fp.fam_fp_seq.nextval as pk_fp_familie_hendelse
+     dvh_fam_fp.fam_fp_seq.nextval as pk_fp_stonadskonti
     ,type
     ,maksdager
     ,restdager
