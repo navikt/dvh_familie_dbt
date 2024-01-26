@@ -54,11 +54,11 @@ final as (
    ,p.forklaring
    ,to_date(p.soknadsdato, 'yyyy-mm-dd') as soknadsdato
    ,p.er_utbetaling
-   ,p.virkedager
-   ,p.trekkdager
+   ,to_number(replace(p.virkedager, '.', ',')) virkedager
+   ,to_number(replace(p.trekkdager, '.', ',')) trekkdager
    ,p.gradering_aktivitet_type
-   ,p.gradering_arbeidsprosent
-   ,p.samtidig_uttak_prosent
+   ,to_number(replace(p.gradering_arbeidsprosent, '.', ',')) gradering_arbeidsprosent
+   ,to_number(replace(p.samtidig_uttak_prosent, '.', ',')) samtidig_uttak_prosent
    ,p.pk_fp_fagsak as fk_fp_fagsak
    ,p.kafka_offset
   from pre_final p
@@ -75,11 +75,11 @@ select
     ,forklaring
     ,soknadsdato
     ,er_utbetaling
-    ,to_number(replace(virkedager, '.', ',')) virkedager
-    ,to_number(replace(trekkdager, '.', ',')) trekkdager
+    ,virkedager
+    ,trekkdager
     ,gradering_aktivitet_type
-    ,to_number(replace(gradering_arbeidsprosent, '.', ',')) gradering_arbeidsprosent
-    ,to_number(replace(samtidig_uttak_prosent, '.', ',')) samtidig_uttak_prosent
+    ,gradering_arbeidsprosent
+    ,samtidig_uttak_prosent
     ,fk_fp_fagsak
     ,kafka_offset
     ,localtimestamp as lastet_dato
