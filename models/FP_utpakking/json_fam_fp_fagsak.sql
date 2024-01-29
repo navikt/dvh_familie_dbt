@@ -25,7 +25,7 @@ pre_final as (
          ,vedtaksresultat            VARCHAR2 PATH '$.vedtaksresultat'
          ,vilkaar_ikke_oppfylt       VARCHAR2 PATH '$.vilkårIkkeOppfylt'
          ,soker_aktor_id             VARCHAR2 PATH '$.søker'
-         ,sokers_rolle               VARCHAR2 PATH '$.søkersRolle'
+         ,sokers_rolle               VARCHAR2 PATH '$.saksrolle'
          ,utlands_tilsnitt           VARCHAR2 PATH '$.utlandsTilsnitt'
          ,annen_forelder_aktor_id    VARCHAR2 PATH '$.annenForelder.aktørId'
          ,annen_forelder_saksnummer  VARCHAR2 PATH '$.annenForelder.saksnummer'
