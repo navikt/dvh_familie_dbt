@@ -28,13 +28,13 @@ pre_final as (
            ,stonadskonto_type        VARCHAR2 PATH '$.stønadskontoType'
            ,rettighet_type           VARCHAR2 PATH '$.rettighetType'
            ,forklaring               VARCHAR2 PATH '$.forklaring'
-           ,soknadsdato              VARCHAR2 PATH '$.søknadsDato'
+           ,soknadsdato              VARCHAR2 PATH '$.søknadsdato'
            ,er_utbetaling            VARCHAR2 PATH '$.erUtbetaling'
-           ,virkedager               VARCHAR2 PATH '$.virkedager'
-           ,trekkdager               VARCHAR2 PATH '$.trekkdager'
+           ,virkedager               number PATH '$.virkedager'
+           ,trekkdager               number PATH '$.trekkdager'
            ,gradering_aktivitet_type VARCHAR2 PATH '$.gradering.aktivitetType'
-           ,gradering_arbeidsprosent VARCHAR2 PATH '$.gradering.arbeidsprosent'
-           ,samtidig_uttak_prosent   VARCHAR2 PATH '$.samtidigUttakProsent'
+           ,gradering_arbeidsprosent number PATH '$.gradering.arbeidsprosent'
+           ,samtidig_uttak_prosent   number PATH '$.samtidigUttakProsent'
           ) ) ) j
   join fp_fagsak
   on fp_fagsak.saksnummer = j.saksnummer
@@ -54,11 +54,11 @@ final as (
    ,p.forklaring
    ,to_date(p.soknadsdato, 'yyyy-mm-dd') as soknadsdato
    ,p.er_utbetaling
-   ,to_number(replace(p.virkedager, '.', ',')) virkedager
-   ,to_number(replace(p.trekkdager, '.', ',')) trekkdager
+   ,p.virkedager
+   ,p.trekkdager
    ,p.gradering_aktivitet_type
-   ,to_number(replace(p.gradering_arbeidsprosent, '.', ',')) gradering_arbeidsprosent
-   ,to_number(replace(p.samtidig_uttak_prosent, '.', ',')) samtidig_uttak_prosent
+   ,p.gradering_arbeidsprosent
+   ,p.samtidig_uttak_prosent
    ,p.pk_fp_fagsak as fk_fp_fagsak
    ,p.kafka_offset
   from pre_final p
