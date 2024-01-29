@@ -19,13 +19,14 @@ pre_final as (
          ,lov_versjon                VARCHAR2 PATH '$.lovVersjon'
          ,behandling_uuid            VARCHAR2 PATH '$.behandlingUuid'
          ,forrige_behandling_uuid    VARCHAR2 PATH '$.forrigeBehandlingUuid'
+         ,revurdering_aarsak         VARCHAR2 PATH '$.revurderingÅrsak'
          ,soknadsdato                VARCHAR2 PATH '$.søknadsdato'
          ,skjaeringstidspunkt        VARCHAR2 PATH '$.skjæringstidspunkt'
          ,vedtakstidspunkt           VARCHAR2 PATH '$.vedtakstidspunkt'
          ,vedtaksresultat            VARCHAR2 PATH '$.vedtaksresultat'
          ,vilkaar_ikke_oppfylt       VARCHAR2 PATH '$.vilkårIkkeOppfylt'
          ,soker_aktor_id             VARCHAR2 PATH '$.søker'
-         ,sokers_rolle               VARCHAR2 PATH '$.saksrolle'
+         ,saksrolle                  VARCHAR2 PATH '$.saksrolle'
          ,utlands_tilsnitt           VARCHAR2 PATH '$.utlandsTilsnitt'
          ,annen_forelder_aktor_id    VARCHAR2 PATH '$.annenForelder.aktørId'
          ,annen_forelder_saksnummer  VARCHAR2 PATH '$.annenForelder.saksnummer'
@@ -53,6 +54,7 @@ final as (
     ,p.lov_versjon
     ,p.behandling_uuid
     ,p.forrige_behandling_uuid
+    ,p.revurdering_aarsak
     ,to_date(p.soknadsdato, 'yyyy-mm-dd') as soknadsdato
     ,to_date(p.skjaeringstidspunkt, 'yyyy-mm-dd') as skjaeringstidspunkt
     ,CASE
@@ -62,7 +64,7 @@ final as (
     ,p.vedtaksresultat
     ,p.vilkaar_ikke_oppfylt
     ,p.soker_aktor_id
-    ,p.sokers_rolle
+    ,p.saksrolle
     ,p.utlands_tilsnitt
     ,p.annen_forelder_aktor_id
     ,p.annen_forelder_saksnummer
@@ -93,6 +95,7 @@ select
     ,lov_versjon
     ,behandling_uuid
     ,forrige_behandling_uuid
+    ,revurdering_aarsak
     ,soknadsdato
     ,skjaeringstidspunkt
     ,vedtakstidspunkt
@@ -100,7 +103,7 @@ select
     ,vilkaar_ikke_oppfylt
     ,soker_aktor_id
     ,ident.fk_person1 as soker_fk_person1
-    ,sokers_rolle
+    ,saksrolle
     ,utlands_tilsnitt
     ,annen_forelder_aktor_id
     ,ident_annen.fk_person1 as annen_forelder_fk_person1
