@@ -46,9 +46,9 @@ final as (
    ,p.inntektskategori
    ,p.arbeidsgiver
    ,p.mottaker
-   ,to_number(replace(p.dagsats, '.', ',')) dagsats
-   ,to_number(replace(p.dagsats_fra_beregningsgrunnlag, '.', ',')) dagsats_fra_beregningsgrunnlag
-   ,to_number(replace(p.utbetalingsgrad, '.', ',')) utbetalingsgrad
+   ,to_number(p.dagsats) dagsats
+   ,to_number(p.dagsats_fra_beregningsgrunnlag) dagsats_fra_beregningsgrunnlag
+   ,to_number(p.utbetalingsgrad) utbetalingsgrad
    ,p.pk_fp_fagsak as fk_fp_fagsak
    ,p.kafka_offset
   from pre_final p
