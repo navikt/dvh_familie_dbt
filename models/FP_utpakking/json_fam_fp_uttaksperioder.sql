@@ -9,12 +9,11 @@ with fp_meta_data as (
 ),
 
 fp_fagsak as (
-  select saksnummer, fagsak_id, behandling_uuid, pk_fp_fagsak from {{ ref('json_fam_fp_fagsak') }}
+  select kafka_offset, saksnummer, fagsak_id, behandling_uuid, pk_fp_fagsak from {{ ref('json_fam_fp_fagsak') }}
 ),
 
 pre_final as (
   select fp_meta_data.kafka_offset, j.*
-        ,fp_fagsak.pk_fp_fagsak
   from fp_meta_data
       ,json_table(melding, '$' COLUMNS (
           saksnummer                 VARCHAR2 PATH '$.saksnummer'
@@ -36,10 +35,6 @@ pre_final as (
            ,gradering_arbeidsprosent number PATH '$.gradering.arbeidsprosent'
            ,samtidig_uttak_prosent   number PATH '$.samtidigUttakProsent'
           ) ) ) j
-  join fp_fagsak
-  on fp_fagsak.saksnummer = j.saksnummer
-  and fp_fagsak.fagsak_id = j.fagsak_id
-  and fp_fagsak.behandling_uuid = j.behandling_uuid
   where j.fom is not null
 ),
 
@@ -59,9 +54,14 @@ final as (
    ,p.gradering_aktivitet_type
    ,p.gradering_arbeidsprosent
    ,p.samtidig_uttak_prosent
-   ,p.pk_fp_fagsak as fk_fp_fagsak
+   ,fp_fagsak.pk_fp_fagsak as fk_fp_fagsak
    ,p.kafka_offset
   from pre_final p
+  join fp_fagsak
+  on fp_fagsak.kafka_offset = p.kafka_offset
+  and fp_fagsak.saksnummer = p.saksnummer
+  and fp_fagsak.fagsak_id = p.fagsak_id
+  and fp_fagsak.behandling_uuid = p.behandling_uuid
 )
 
 select
