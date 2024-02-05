@@ -53,7 +53,7 @@ FINAL AS (
         --( SELECT to_char(ADD_MONTHS(SYSDATE, -1), 'YYYYMM') FROM dual) periode,
         '{{ var ("periode") }}' AS periode,
         fs.lk_postering_id,
-        ald.alder,
+        max(ald.alder) over (PARTITION by fs.fk_person1) alder,
         so.stonad_kode,
         geo.kommune_nr,
         geo.bydel_nr,
@@ -85,8 +85,8 @@ FINAL AS (
 
         JOIN person per
         ON fs.fk_dim_person = per.pk_dim_person
-        --and per.gyldig_fra_dato <= last_day(fs.postert_dato)
-        --and per.gyldig_til_dato > last_day(fs.postert_dato)
+        and per.gyldig_fra_dato <= last_day(fs.postert_dato)
+        and per.gyldig_til_dato >= last_day(fs.postert_dato)
 
         JOIN person_kontaktinfo dtp
         ON per.fk_person1 = dtp.fk_person1
