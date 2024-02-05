@@ -16,19 +16,19 @@ pre_final as (
   select fp_meta_data.kafka_offset, j.*
   from fp_meta_data
       ,json_table(melding, '$' COLUMNS (
-          saksnummer                       VARCHAR2 PATH '$.saksnummer'
-         ,fagsak_id                        VARCHAR2 PATH '$.fagsakId'
-         ,behandling_uuid                  VARCHAR2 PATH '$.behandlingUuid'
+          saksnummer                       VARCHAR2(255) PATH '$.saksnummer'
+         ,fagsak_id                        VARCHAR2(255) PATH '$.fagsakId'
+         ,behandling_uuid                  VARCHAR2(255) PATH '$.behandlingUuid'
          ,nested PATH '$.utbetalingssperioder[*]' COLUMNS (
             seq_i_array                 FOR ORDINALITY
-           ,fom                            VARCHAR2 PATH '$.fom'
-           ,tom                            VARCHAR2 PATH '$.tom'
-           ,inntektskategori               VARCHAR2 PATH '$.inntektskategori'
-           ,arbeidsgiver                   VARCHAR2 PATH '$.arbeidsgiver'
-           ,mottaker                       VARCHAR2 PATH '$.mottaker'
-           ,dagsats                        VARCHAR2 PATH '$.dagsats'
-           ,dagsats_fra_beregningsgrunnlag VARCHAR2 PATH '$.dagsatsFraBeregningsgrunnlag'
-           ,utbetalingsgrad                VARCHAR2 PATH '$.utbetalingsgrad'
+           ,fom                            VARCHAR2(255) PATH '$.fom'
+           ,tom                            VARCHAR2(255) PATH '$.tom'
+           ,inntektskategori               VARCHAR2(255) PATH '$.inntektskategori'
+           ,arbeidsgiver                   VARCHAR2(255) PATH '$.arbeidsgiver'
+           ,mottaker                       VARCHAR2(255) PATH '$.mottaker'
+           ,dagsats                        VARCHAR2(255) PATH '$.dagsats'
+           ,dagsats_fra_beregningsgrunnlag VARCHAR2(255) PATH '$.dagsatsFraBeregningsgrunnlag'
+           ,utbetalingsgrad                VARCHAR2(255) PATH '$.utbetalingsgrad'
           ) ) ) j
   where j.fom is not null
 ),

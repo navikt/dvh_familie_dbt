@@ -16,22 +16,22 @@ pre_final as (
   select fp_meta_data.kafka_offset, j.*
   from fp_meta_data
       ,json_table(melding, '$' COLUMNS (
-          saksnummer                 VARCHAR2 PATH '$.saksnummer'
-         ,fagsak_id                  VARCHAR2 PATH '$.fagsakId'
-         ,behandling_uuid            VARCHAR2 PATH '$.behandlingUuid'
+          saksnummer                 VARCHAR2(255) PATH '$.saksnummer'
+         ,fagsak_id                  VARCHAR2(255) PATH '$.fagsakId'
+         ,behandling_uuid            VARCHAR2(255) PATH '$.behandlingUuid'
          ,nested PATH '$.uttaksperioder[*]' COLUMNS (
             seq_i_array           FOR ORDINALITY
-           ,fom                      VARCHAR2 PATH '$.fom'
-           ,tom                      VARCHAR2 PATH '$.tom'
-           ,type                     VARCHAR2 PATH '$.type'
-           ,stonadskonto_type        VARCHAR2 PATH '$.stønadskontoType'
-           ,rettighet_type           VARCHAR2 PATH '$.rettighetType'
-           ,forklaring               VARCHAR2 PATH '$.forklaring'
-           ,soknadsdato              VARCHAR2 PATH '$.søknadsdato'
-           ,er_utbetaling            VARCHAR2 PATH '$.erUtbetaling'
+           ,fom                      VARCHAR2(255) PATH '$.fom'
+           ,tom                      VARCHAR2(255) PATH '$.tom'
+           ,type                     VARCHAR2(255) PATH '$.type'
+           ,stonadskonto_type        VARCHAR2(255) PATH '$.stønadskontoType'
+           ,rettighet_type           VARCHAR2(255) PATH '$.rettighetType'
+           ,forklaring               VARCHAR2(255) PATH '$.forklaring'
+           ,soknadsdato              VARCHAR2(255) PATH '$.søknadsdato'
+           ,er_utbetaling            VARCHAR2(255) PATH '$.erUtbetaling'
            ,virkedager               number PATH '$.virkedager'
            ,trekkdager               number PATH '$.trekkdager'
-           ,gradering_aktivitet_type VARCHAR2 PATH '$.gradering.aktivitetType'
+           ,gradering_aktivitet_type VARCHAR2(255) PATH '$.gradering.aktivitetType'
            ,gradering_arbeidsprosent number PATH '$.gradering.arbeidsprosent'
            ,samtidig_uttak_prosent   number PATH '$.samtidigUttakProsent'
           ) ) ) j

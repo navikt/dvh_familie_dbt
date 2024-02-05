@@ -16,22 +16,22 @@ pre_final as (
   select fp_meta_data.kafka_offset, j.*
   from fp_meta_data
       ,json_table(melding, '$' COLUMNS (
-          saksnummer      VARCHAR2 PATH '$.saksnummer'
-         ,fagsak_id       VARCHAR2 PATH '$.fagsakId'
-         ,behandling_uuid VARCHAR2 PATH '$.behandlingUuid'
+          saksnummer      VARCHAR2(255) PATH '$.saksnummer'
+         ,fagsak_id       VARCHAR2(255) PATH '$.fagsakId'
+         ,behandling_uuid VARCHAR2(255) PATH '$.behandlingUuid'
          ,nested PATH '$.beregning' COLUMNS (
-            grunnbelop         VARCHAR2 PATH '$.grunnbeløp'
-           ,aarsbelop_brutto   VARCHAR2 PATH '$.årsbeløp.brutto'
-           ,aarsbelop_avkortet VARCHAR2 PATH '$.årsbeløp.avkortet'
-           ,aarsbelop_redusert VARCHAR2 PATH '$.årsbeløp.redusert'
-           ,aarsbelop_dagsats  VARCHAR2 PATH '$.årsbeløp.dagsats'
+            grunnbelop         VARCHAR2(255) PATH '$.grunnbeløp'
+           ,aarsbelop_brutto   VARCHAR2(255) PATH '$.årsbeløp.brutto'
+           ,aarsbelop_avkortet VARCHAR2(255) PATH '$.årsbeløp.avkortet'
+           ,aarsbelop_redusert VARCHAR2(255) PATH '$.årsbeløp.redusert'
+           ,aarsbelop_dagsats  VARCHAR2(255) PATH '$.årsbeløp.dagsats'
            ,nested PATH '$.andeler[*]' COLUMNS (
-              andeler_aktivitet          VARCHAR2 PATH '$.aktivitet'
-             ,andeler_arbeidsgiver       VARCHAR2 PATH '$.arbeidsgiver'
-             ,andeler_aarsbelop_brutto   VARCHAR2 PATH '$.årsbeløp.brutto'
-             ,andeler_aarsbelop_avkortet VARCHAR2 PATH '$.årsbeløp.avkortet'
-             ,andeler_aarsbelop_redusert VARCHAR2 PATH '$.årsbeløp.redusert'
-             ,andeler_aarsbelop_dagsats  VARCHAR2 PATH '$.årsbeløp.dagsats'
+              andeler_aktivitet          VARCHAR2(255) PATH '$.aktivitet'
+             ,andeler_arbeidsgiver       VARCHAR2(255) PATH '$.arbeidsgiver'
+             ,andeler_aarsbelop_brutto   VARCHAR2(255) PATH '$.årsbeløp.brutto'
+             ,andeler_aarsbelop_avkortet VARCHAR2(255) PATH '$.årsbeløp.avkortet'
+             ,andeler_aarsbelop_redusert VARCHAR2(255) PATH '$.årsbeløp.redusert'
+             ,andeler_aarsbelop_dagsats  VARCHAR2(255) PATH '$.årsbeløp.dagsats'
            ) ) ) ) j
   where j.grunnbelop is not null
 ),

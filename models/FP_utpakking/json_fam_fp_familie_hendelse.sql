@@ -16,13 +16,13 @@ pre_final as (
   select fp_meta_data.kafka_offset, j.*
   from fp_meta_data
       ,json_table(melding, '$' COLUMNS (
-          saksnummer      VARCHAR2 PATH '$.saksnummer'
-         ,fagsak_id       VARCHAR2 PATH '$.fagsakId'
-         ,behandling_uuid VARCHAR2 PATH '$.behandlingUuid'
+          saksnummer      VARCHAR2(255) PATH '$.saksnummer'
+         ,fagsak_id       VARCHAR2(255) PATH '$.fagsakId'
+         ,behandling_uuid VARCHAR2(255) PATH '$.behandlingUuid'
          ,nested PATH '$.familieHendelse.barn[*]' COLUMNS (
-            barn_aktor_id  VARCHAR2 PATH '$.aktørId'
-           ,fodselsdato    VARCHAR2 PATH '$.fødselsdato'
-           ,dodsdato       VARCHAR2 PATH '$.dødsdato'
+            barn_aktor_id  VARCHAR2(255) PATH '$.aktørId'
+           ,fodselsdato    VARCHAR2(255) PATH '$.fødselsdato'
+           ,dodsdato       VARCHAR2(255) PATH '$.dødsdato'
           ) ) ) j
   where j.barn_aktor_id is not null
 ),
