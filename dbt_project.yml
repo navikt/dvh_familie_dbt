@@ -7,7 +7,7 @@ version: '1.0.0'
 config-version: 2
 
 #vars:
-#  periode: 202301
+#  periode: 202401
 # This setting configures which "profile" dbt uses for this project.
 profile: 'dvh_familie'
 

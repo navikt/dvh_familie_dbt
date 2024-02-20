@@ -6,9 +6,9 @@ dvh_familie:
       user: "{{env_var('DBT_DB_USER')}}"
       pass: "{{env_var('DBT_DB_PASS')}}"
       protocol: tcp
-      host: dm07-scan.adeo.no
+      host: dmv07-scan.adeo.no
       port: 1521
-      service: dwhu1
+      service: ccdwhu1_ha
       schema: "{{env_var('DBT_DB_SCHEMA')}}"
       threads: 4
     dwhr:
@@ -36,7 +36,7 @@ dvh_familie:
       user: "{{env_var('DBT_DB_USER')}}"
       pass: "{{env_var('DBT_DB_PASS')}}"
       protocol: tcp
-      host: dm09-scan.adeo.no
+      host: dm08-scan.adeo.no
       port: 1521
       service: dwh_ha
       schema: "{{env_var('DBT_DB_SCHEMA')}}"
