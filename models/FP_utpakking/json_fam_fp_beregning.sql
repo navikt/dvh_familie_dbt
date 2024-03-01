@@ -21,6 +21,8 @@ pre_final as (
          ,behandling_uuid VARCHAR2(255) PATH '$.behandlingUuid'
          ,nested PATH '$.beregning' COLUMNS (
             grunnbelop         VARCHAR2(255) PATH '$.grunnbeløp'
+           ,hjemmel            VARCHAR2(255) PATH '$.hjemmel'
+           ,fastsatt           VARCHAR2(255) PATH '$.fastsatt'
            ,aarsbelop_brutto   VARCHAR2(255) PATH '$.årsbeløp.brutto'
            ,aarsbelop_avkortet VARCHAR2(255) PATH '$.årsbeløp.avkortet'
            ,aarsbelop_redusert VARCHAR2(255) PATH '$.årsbeløp.redusert'
@@ -39,6 +41,8 @@ pre_final as (
 final as (
   select
     to_number(p.grunnbelop) grunnbelop
+   ,hjemmel
+   ,fastsatt
    ,to_number(p.aarsbelop_brutto) aarsbelop_brutto
    ,to_number(p.aarsbelop_avkortet) aarsbelop_avkortet
    ,to_number(p.aarsbelop_redusert) aarsbelop_redusert
@@ -75,4 +79,6 @@ select
     ,fk_fp_fagsak
     ,kafka_offset
     ,localtimestamp as lastet_dato
+    ,hjemmel
+    ,fastsatt
 from final
