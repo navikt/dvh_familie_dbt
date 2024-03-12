@@ -85,10 +85,10 @@ FINAL AS (
 
         JOIN person per
         ON fs.fk_dim_person = per.pk_dim_person
-        and per.gyldig_fra_dato <= last_day(fs.postert_dato)
-        and per.gyldig_til_dato >= last_day(fs.postert_dato)
+        --and per.gyldig_fra_dato <= last_day(fs.postert_dato)
+        --and per.gyldig_til_dato >= last_day(fs.postert_dato)
 
-        JOIN person_kontaktinfo dtp
+        left JOIN person_kontaktinfo dtp
         ON per.fk_person1 = dtp.fk_person1
         JOIN dim_kjonn_ kjonn
         ON fs.fk_dim_kjonn = kjonn.pk_dim_kjonn
