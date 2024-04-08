@@ -42,12 +42,29 @@ pre_final as (
          ,engangsstonad_innvilget    VARCHAR2(255) PATH '$.engangsstønadInnvilget'
          ,dekningsgrad               VARCHAR2(255) PATH '$.foreldrepengerRettigheter.dekningsgrad'
          ,rettighet_type             VARCHAR2(255) PATH '$.foreldrepengerRettigheter.rettighetType'
-         ,flerbarnsdager             VARCHAR2(255) PATH '$.foreldrepengerRettigheter.flerbarnsdager'
+         ,nested PATH '$.stønadsutvidelser[*]' COLUMNS (
+            type  VARCHAR2(255) PATH '$.type'
+           ,dager NUMBER        PATH '$.dager'
+          )
          ) ) j
 ),
 
+pre_final_dager as
+(
+  select kafka_offset, saksnummer, behandling_uuid, j.type, j.dager
+  from fp_meta_data
+      ,json_table(melding, '$'
+        COLUMNS (
+          nested PATH '$.foreldrepengerRettigheter' COLUMNS (
+            nested PATH '$.stønadsutvidelser[*]' COLUMNS (
+              type  VARCHAR2(255) PATH '$.type'
+             ,dager NUMBER        PATH '$.dager'
+            )
+        ) ) ) j
+),
+
 final as (
-  select
+  select distinct
      p.saksnummer
     ,p.fagsak_id
     ,p.ytelse_type
@@ -80,11 +97,24 @@ final as (
     ,p.engangsstonad_innvilget
     ,p.dekningsgrad
     ,p.rettighet_type
-    ,p.flerbarnsdager
+    ,flerbarnsdager.dager as flerbarnsdager
+    ,prematurdager.dager as prematurdager
     ,p.pk_fp_meta_data as fk_fp_meta_data
     ,p.kafka_offset
     ,p.kafka_mottatt_dato
   from pre_final p
+
+  left join pre_final_dager flerbarnsdager
+  on p.kafka_offset = flerbarnsdager.kafka_offset
+  and p.saksnummer = flerbarnsdager.saksnummer
+  and p.behandling_uuid = flerbarnsdager.behandling_uuid
+  and flerbarnsdager.type = 'FLERBARNSDAGER'
+
+  left join pre_final_dager prematurdager
+  on p.kafka_offset = prematurdager.kafka_offset
+  and p.saksnummer = prematurdager.saksnummer
+  and p.behandling_uuid = prematurdager.behandling_uuid
+  and prematurdager.type = 'PREMATURDAGER'
 )
 
 select
@@ -125,6 +155,7 @@ select
     ,kafka_offset
     ,kafka_mottatt_dato
     ,localtimestamp as lastet_dato
+    ,prematurdager
 from final
 
 left join dt_person.ident_aktor_til_fk_person1_ikke_skjermet ident
