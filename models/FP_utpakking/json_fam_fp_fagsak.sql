@@ -51,10 +51,12 @@ pre_final as (
 
 pre_final_dager as
 (
-  select kafka_offset, saksnummer, behandling_uuid, j.type, j.dager
+  select kafka_offset, j.saksnummer, j.behandling_uuid, j.type, j.dager
   from fp_meta_data
       ,json_table(melding, '$'
         COLUMNS (
+          saksnummer                 VARCHAR2(255) PATH '$.saksnummer'
+         ,behandling_uuid            VARCHAR2(255) PATH '$.behandlingUuid'
           nested PATH '$.foreldrepengerRettigheter' COLUMNS (
             nested PATH '$.stønadsutvidelser[*]' COLUMNS (
               type  VARCHAR2(255) PATH '$.type'
