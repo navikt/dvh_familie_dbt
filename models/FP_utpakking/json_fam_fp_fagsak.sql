@@ -57,11 +57,9 @@ pre_final_dager as
         COLUMNS (
           saksnummer                 VARCHAR2(255) PATH '$.saksnummer'
          ,behandling_uuid            VARCHAR2(255) PATH '$.behandlingUuid'
-          nested PATH '$.foreldrepengerRettigheter' COLUMNS (
-            nested PATH '$.stønadsutvidelser[*]' COLUMNS (
-              type  VARCHAR2(255) PATH '$.type'
-             ,dager NUMBER        PATH '$.dager'
-            )
+         ,nested PATH '$.foreldrepengerRettigheter.stønadsutvidelser[*]' COLUMNS (
+            type  VARCHAR2(255) PATH '$.type'
+           ,dager NUMBER        PATH '$.dager'
         ) ) ) j
 ),
 
