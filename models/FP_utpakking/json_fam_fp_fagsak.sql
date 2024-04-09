@@ -42,10 +42,6 @@ pre_final as (
          ,engangsstonad_innvilget    VARCHAR2(255) PATH '$.engangsstønadInnvilget'
          ,dekningsgrad               VARCHAR2(255) PATH '$.foreldrepengerRettigheter.dekningsgrad'
          ,rettighet_type             VARCHAR2(255) PATH '$.foreldrepengerRettigheter.rettighetType'
-         ,nested PATH '$.stønadsutvidelser[*]' COLUMNS (
-            type  VARCHAR2(255) PATH '$.type'
-           ,dager NUMBER        PATH '$.dager'
-          )
          ) ) j
 ),
 
