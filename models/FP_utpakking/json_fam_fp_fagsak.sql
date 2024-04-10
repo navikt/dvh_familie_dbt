@@ -102,6 +102,7 @@ final as (
     ,p.pk_fp_meta_data as fk_fp_meta_data
     ,p.kafka_offset
     ,p.kafka_mottatt_dato
+    ,p.kafka_partition
   from pre_final p
 
   left join pre_final_dager flerbarnsdager
@@ -156,6 +157,7 @@ select
     ,kafka_mottatt_dato
     ,localtimestamp as lastet_dato
     ,prematurdager
+    ,kafka_partition
 from final
 
 left join dt_person.ident_aktor_til_fk_person1_ikke_skjermet ident
