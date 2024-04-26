@@ -12,12 +12,12 @@ pre_final as (
 select * from ef_meta_data,
   json_table(melding, '$'
     COLUMNS (
-        fagsak_id                       VARCHAR2 PATH '$.fagsakId'
+        fagsak_id                        VARCHAR2 PATH '$.fagsakId'
         ,BEHANDLINGS_ID                  VARCHAR2 PATH '$.behandlingId'
         ,relatert_behandlings_id         VARCHAR2 PATH '$.relatertBehandlingId'
         ,adressebeskyttelse              VARCHAR2 PATH '$.adressebeskyttelse'
         ,behandling_type                 VARCHAR2 PATH '$.behandlingType'
-        ,behandlings_aarsak               VARCHAR2 PATH '$.behandlingÅrsak'
+        ,behandlings_aarsak              VARCHAR2 PATH '$.behandlingÅrsak'
         ,vedtaks_status                  VARCHAR2 PATH '$.vedtak'
         ,stonadstype                     VARCHAR2 PATH '$.stønadstype'
         ,person_ident                    VARCHAR2 PATH '$.person.personIdent'
@@ -26,9 +26,12 @@ select * from ef_meta_data,
         ,funksjonell_id                  VARCHAR2 PATH '$.funksjonellId'
         ,vedtaks_tidspunkt               VARCHAR2 PATH '$.tidspunktVedtak'
         ,aktivitetsvilkaar_barnetilsyn   VARCHAR2 PATH '$.aktivitetskrav'
-        ,krav_mottatt                     VARCHAR2 PATH '$.kravMottatt'
+        ,krav_mottatt                    VARCHAR2 PATH '$.kravMottatt'
         ,årsak_revurderings_kilde        VARCHAR2 PATH '$.årsakRevurdering.opplysningskilde'
         ,revurderings_årsak              VARCHAR2 PATH '$.årsakRevurdering.årsak'
+        ,medlem_Mer_Enn_5_Aar_Eos        VARCHAR2 PATH '$.eøsUnntak.medlemMerEnn5ÅrEøs'
+        ,medlem_Mer_Enn_5_Aar_Eos_Annen_Forelder_Trygdedekket_I_Norge VARCHAR2 PATH '$.eøsUnntak.medlemMerEnn5ÅrEøsAnnenForelderTrygdedekketINorge'
+        ,oppholder_Seg_I_Annet_Eos_Land  VARCHAR2 PATH '$.eøsUnntak.oppholderSegIAnnetEøsLand'
          )
         ) j
 ),
@@ -40,6 +43,9 @@ final as (
     ,p.relatert_behandlings_id
     ,p.adressebeskyttelse
     ,p.behandling_type
+    ,p.medlem_Mer_Enn_5_Aar_Eos
+    ,p.medlem_Mer_Enn_5_Aar_Eos_Annen_Forelder_Trygdedekket_I_Norge
+    ,p.oppholder_Seg_I_Annet_Eos_Land
     ,p.behandlings_aarsak
     ,p.vedtaks_status
     ,p.stonadstype
@@ -99,10 +105,13 @@ select dvh_famef_kafka.hibernate_sequence.nextval as PK_EF_FAGSAK
   ,cast(null as varchar2(20)) VEDTAKSBEGRUNNELSE_SKOLE
   ,ÅRSAK_REVURDERINGS_KILDE
   ,REVURDERINGS_ÅRSAK
+  ,case when medlem_Mer_Enn_5_Aar_Eos = 'true' then 1
+  else 0
+  end medlem_Mer_Enn_5_Aar_Eos
+  ,case when oppholder_Seg_I_Annet_Eos_Land = 'true' then 1
+  else 0
+  end oppholder_Seg_I_Annet_Eos_Land
+  ,case when medlem_Mer_Enn_5_Aar_Eos_Annen_Forelder_Trygdedekket_I_Norge = 'true' then 1
+  else 0
+  end medlem_Mer_Enn_5_Aar_Eos_Annen_Forelder_Trygdedekket_I_Norge
 from final
-
-
-
-
-
-
