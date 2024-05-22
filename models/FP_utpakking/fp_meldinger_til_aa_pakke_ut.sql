@@ -5,10 +5,11 @@
 }}
 
 with fp_meta_data as (
-  select pk_fp_meta_data, kafka_offset, kafka_mottatt_dato, kafka_partition, melding from {{ source ('fam_fp', 'fam_fp_meta_data') }}
-  --where kafka_offset in (4586, 4596)
-  where kafka_mottatt_dato >= sysdate - 30
-  and (kafka_offset, kafka_partition) not in (select distinct kafka_offset, kafka_partition from {{ source('fam_fp','json_fam_fp_fagsak') }})
+  select A.pk_fp_meta_data, A.kafka_offset, A.kafka_mottatt_dato, A.kafka_partition, melding,B.KAFKA_OFFSET C from dvh_fam_fp.fam_fp_meta_data A
+  LEFT OUTER JOIN dvh_fam_fp.json_fam_fp_fagsak B ON
+  A.KAFKA_OFFSET=B.KAFKA_OFFSET AND
+  A.KAFKA_PARTITION=B.KAFKA_PARTITION
+  where A.kafka_mottatt_dato >= sysdate - 30
+AND B.KAFKA_OFFSET IS NULL
 )
-
 select * from fp_meta_data
