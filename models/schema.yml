@@ -69,7 +69,11 @@ sources:
       - name: fam_ef_meta_data
         description: 'inneholder meta_data for ensligforsørger'
       - name: fam_ef_fagsak
-        description: 'inneholder vedtaks informasjon'
+        description: 'inneholder vedtaksinformasjon'
+      - name: fam_ts_meta_data
+        description: 'inneholder meta_data for tilleggsstønader'
+      - name: fam_ts_fagsak
+        description: 'inneholder vedtaksinformasjon'
 
   - name: fam_pp
     schema: dvh_fam_pp
