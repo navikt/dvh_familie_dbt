@@ -40,12 +40,13 @@ final as (
     ,TO_TIMESTAMP('1970-01-01 00:00:00', 'YYYY-MM-DD HH24:MI:SS') + NUMTODSINTERVAL( tidspunkt_vedtak / 1000, 'SECOND') tidspunkt_vedtak
     ,p.pk_ts_meta_data as fk_ts_meta_data
     ,p.person
-    ,p.behandling_type
+    ,p.behandling_t
     ,p.behandling_arsak
     ,p.vedtak_resultat
     ,p.stonadstype
     ,to_date(p.krav_mottatt,'yyyy-mm-dd') krav_mottatt
     ,nvl(ident.fk_person1, -1) as fk_person1
+    ,p.endret_tid
   from pre_final p
   left outer join dt_person.ident_off_id_til_fk_person1 ident
   on p.person = ident.off_id
@@ -73,4 +74,5 @@ select
   ,KRAV_MOTTATT
   ,tidspunkt_vedtak
   ,STONADSTYPE
+  ,endret_tid
 from final
