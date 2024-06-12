@@ -40,7 +40,7 @@ final as (
     ,TO_TIMESTAMP('1970-01-01 00:00:00', 'YYYY-MM-DD HH24:MI:SS') + NUMTODSINTERVAL( tidspunkt_vedtak / 1000, 'SECOND') tidspunkt_vedtak
     ,p.pk_ts_meta_data as fk_ts_meta_data
     ,p.person
-    ,p.behandling_t
+    ,p.behandling_type
     ,p.behandling_arsak
     ,p.vedtak_resultat
     ,p.stonadstype
