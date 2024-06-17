@@ -1,6 +1,8 @@
 {{
     config(
-        materialized='incremental'
+        materialized='incremental',
+        unique_key='ekstern_behandling_id',
+        incremental_strategy='delete+insert'
     )
 }}
 
@@ -24,6 +26,7 @@ select * from ts_meta_data,
       )
     )
   ) j
+  where json_value (melding, '$.utbetalinger.size()' )> 0
 ),
 
 final as (

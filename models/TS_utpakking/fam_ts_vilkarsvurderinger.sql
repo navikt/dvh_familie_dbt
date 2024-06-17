@@ -18,19 +18,26 @@ pre_final as (
 select * from ts_meta_data,
   json_table(melding, '$'
     COLUMNS (
-      nested                path '$.malgrupper[*]' columns (
-        resultat              varchar2 path '$.resultat'
-        ,type                 varchar2 path '$.type'
+      nested                path '$.vilkarsvurderinger[*]' columns (
+          resultat          path '$.resultat'
+          ,nested                path '$.vilkår[*]' columns (
+            vilkaar_resultat     path '$.resultat'
+            ,nested                path '$.vurderinger[*]' columns (
+              vurdering             varchar2 path '$[*]'
+          )
         )
+      )
     )
-  ) j
+  )j
+  where json_value (melding, '$.vilkarsvurderinger.size()' )> 0
 ),
 
 final as (
   select
-    p.RESULTAT,
-    p.type,
+    p.resultat,
     p.ekstern_behandling_id,
+    p.vilkaar_resultat,
+    p.vurdering,
     pk_ts_FAGSAK as FK_ts_FAGSAK
   from pre_final p
   join ts_fagsak b
@@ -38,10 +45,11 @@ final as (
 )
 
 select
-  dvh_famef_kafka.hibernate_sequence.nextval as PK_ts_malgrupper,
+  dvh_famef_kafka.hibernate_sequence.nextval as PK_ts_vilkarsvurderinger,
   FK_ts_FAGSAK,
-  RESULTAT,
-  type,
+  resultat,
+  vilkaar_resultat,
+  vurdering,
   ekstern_behandling_id,
   localtimestamp AS LASTET_DATO
 from final

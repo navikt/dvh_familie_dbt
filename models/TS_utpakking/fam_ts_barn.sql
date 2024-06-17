@@ -1,6 +1,8 @@
 {{
     config(
-        materialized='incremental'
+        materialized='incremental',
+        unique_key='ekstern_behandling_id',
+        incremental_strategy='merge'
     )
 }}
 
@@ -49,8 +51,10 @@ final as (
 select
   dvh_famef_kafka.hibernate_sequence.nextval as PK_ts_barn,
   FK_ts_FAGSAK,
-  fnr,
-  fk_person1,
+  case wheN fk_person1 = -1  THEN fnr
+      ELSE NULL
+    END fnr,
+  FK_PERSON1,
   ekstern_behandling_id,
   localtimestamp AS LASTET_DATO
 from final
