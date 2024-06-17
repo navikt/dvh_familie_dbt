@@ -2,7 +2,7 @@
     config(
         materialized='incremental',
         unique_key='ekstern_behandling_id',
-        incremental_strategy='merge'
+        incremental_strategy='delete+insert'
     )
 }}
 
