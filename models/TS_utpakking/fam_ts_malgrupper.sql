@@ -45,3 +45,4 @@ select
   ekstern_behandling_id,
   localtimestamp AS LASTET_DATO
 from final
+where type = 'OVERGANGSSTØNAD'
