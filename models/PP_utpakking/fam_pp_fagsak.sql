@@ -79,11 +79,6 @@ select
   ,VEDTAKS_TIDSPUNKT
   ,fk_pp_metadata
 from pleietrengende_final
-where FK_PERSON1_MOTTAKER != -1 and FK_PERSON1_PLEIETRENGENDE != -1
-
-
-
-
-
-
-
+where FK_PERSON1_MOTTAKER != -1
+and (ytelse_type = 'OMP'
+     or (FK_PERSON1_PLEIETRENGENDE != -1 and ytelse_type != 'OMP'))
