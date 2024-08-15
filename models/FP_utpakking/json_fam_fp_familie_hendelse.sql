@@ -43,7 +43,7 @@ final as (
   and fp_fagsak.fagsak_id = p.fagsak_id
   and fp_fagsak.behandling_uuid = p.behandling_uuid
 
-  left join dt_person.ident_aktor_til_fk_person1_ikke_skjermet ident
+  join dt_person.ident_aktor_til_fk_person1_ikke_skjermet ident
   on p.barn_aktor_id = ident.aktor_id
   and trunc(fp_fagsak.vedtakstidspunkt, 'dd') between ident.gyldig_fra_dato and ident.gyldig_til_dato
 )
