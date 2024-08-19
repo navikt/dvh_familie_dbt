@@ -120,8 +120,7 @@ final as (
 fianl_fk_person1 as
 (
   select
-     dvh_fam_fp.fam_fp_seq.nextval as pk_fp_fagsak
-    ,saksnummer
+     saksnummer
     ,fagsak_id
     ,ytelse_type
     ,lov_versjon
@@ -169,7 +168,45 @@ fianl_fk_person1 as
   on final.annen_forelder_aktor_id = ident_annen.aktor_id
   and trunc(final.vedtakstidspunkt, 'dd') between ident_annen.gyldig_fra_dato and ident_annen.gyldig_til_dato
 )
-select *
+select dvh_fam_fp.fam_fp_seq.nextval as pk_fp_fagsak
+      ,saksnummer
+      ,fagsak_id
+      ,ytelse_type
+      ,lov_versjon
+      ,behandling_uuid
+      ,forrige_behandling_uuid
+      ,revurdering_aarsak
+      ,soknadsdato
+      ,skjaeringstidspunkt
+      ,vedtakstidspunkt
+      ,vedtaksresultat
+      ,vilkaar_ikke_oppfylt
+      ,soker_aktor_id
+      ,soker_fk_person1
+      ,saksrolle
+      ,utlands_tilsnitt
+      ,annen_forelder_aktor_id
+      ,annen_forelder_fk_person1
+      ,annen_forelder_saksnummer
+      ,annen_forelder_ytelse_type
+      ,annen_forelder_saksrolle
+      ,termindato
+      ,adopsjonsdato
+      ,antall_barn
+      ,fodselsdato
+      ,hendelse_type
+      ,utbetalingsreferanse
+      ,behandling_id
+      ,engangsstonad_innvilget
+      ,dekningsgrad
+      ,rettighet_type
+      ,flerbarnsdager
+      ,fk_fp_meta_data
+      ,kafka_offset
+      ,kafka_mottatt_dato
+      ,lastet_dato
+      ,prematurdager
+      ,kafka_partition
 from fianl_fk_person1
 where annen_forelder_aktor_id is not null and annen_forelder_fk_person1 is not null
 or annen_forelder_aktor_id is null
