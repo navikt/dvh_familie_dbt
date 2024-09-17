@@ -14,7 +14,7 @@ with ts_barn_data as (
     --
     from {{ source ( 'ur','fak_ur_utbetaling' )}} UR
 
-    JOIN {{ source ( 'dt_kodeverk','dim_tid' )}} TID
+    JOIN {{ source ( 'kode_verk','dim_tid' )}} TID
     ON TID.PK_DIM_TID = UR.FK_DIM_TID_DATO_POSTERT_UR
 
     JOIN {{ source ( 'ur','DIM_KONTO_UR' )}} KONTO ON
