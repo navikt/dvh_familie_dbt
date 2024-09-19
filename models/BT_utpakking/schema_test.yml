@@ -1,7 +1,16 @@
-models: # or seeds:
-  - name : fam_bt_fagsak
-    tests :
-      - dbt_expectations.expect_column_to_exist:
-          column_index: 2
-      - dbt_expectations.expect_column_values_to_be_unique:
-          column_index: 2
+models:
+  - name: fam_bt_fagsak
+    columns:
+      - name: fk_bt_person
+        tests:
+          - dbt_expectations.expect_column_values_to_be_unique:
+              row_condition: "fk_bt_person is not null" # (Optional)
+
+
+
+
+
+
+
+
+

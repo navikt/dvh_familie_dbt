@@ -1,47 +1,45 @@
 dvh_familie:
   target: "{{env_var('DBT_DB_TARGET')}}"
   outputs:
-    dwhu1:
+    U:
       type: oracle
-      user: "{{env_var('DBT_DB_USER')}}"
-      pass: "{{env_var('DBT_DB_PASS')}}"
+      user: "{{env_var('DBT_ENV_SECRET_USER')}}"
+      pass: "{{env_var('DBT_ENV_SECRET_PASS')}}"
       protocol: tcp
-      host: dm07-scan.adeo.no
+      host: dmv07-scan.adeo.no
       port: 1521
-      service: dwhu1
-      database: dwh
+      service: ccdwhu1_ha
       schema: "{{env_var('DBT_DB_SCHEMA')}}"
-      threads: 4
-    dwhr:
+      threads: 10
+    R:
       type: oracle
-      user: "{{env_var('DBT_DB_USER')}}"
-      pass: "{{env_var('DBT_DB_PASS')}}"
+      user: "{{env_var('DBT_ENV_SECRET_USER')}}"
+      pass: "{{env_var('DBT_ENV_SECRET_PASS')}}"
       protocol: tcp
       host: dm07-scan.adeo.no
       port: 1521
       service: dwhr
       schema: "{{env_var('DBT_DB_SCHEMA')}}"
-      database: dwh
-      threads: 4
-    dwhq0:
+      threads: 10
+    Q:
       type: oracle
-      user: "{{env_var('DBT_DB_USER')}}"
-      pass: "{{env_var('DBT_DB_PASS')}}"
+      user: "{{env_var('DBT_ENV_SECRET_USER')}}"
+      pass: "{{env_var('DBT_ENV_SECRET_PASS')}}"
       protocol: tcp
       host: dm07-scan.adeo.no
       port: 1521
       service: dwhq0
       schema: "{{env_var('DBT_DB_SCHEMA')}}"
-      threads: 4
-    prod:
+      threads: 10
+    P:
       type: oracle
-      user: "{{env_var('DBT_DB_USER')}}"
-      pass: "{{env_var('DBT_DB_PASS')}}"
+      user: "{{env_var('DBT_ENV_SECRET_USER')}}"
+      pass: "{{env_var('DBT_ENV_SECRET_PASS')}}"
       protocol: tcp
-      host: dm09-scan.adeo.no
+      host: dm08-scan.adeo.no
       port: 1521
       service: dwh_ha
       schema: "{{env_var('DBT_DB_SCHEMA')}}"
-      threads: 4
+      threads: 10
 config:
   send_anonymous_usage_stats: False
