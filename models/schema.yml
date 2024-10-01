@@ -86,6 +86,8 @@ sources:
         description: 'inneholder meta_data for PP, OMP, PPN'
       - name: fam_pp_fagsak
         description: 'inneholder vedtaks informasjon'
+      - name: fam_pp_diagnose
+        description: 'inneholder diagnose informasjon'
 
   - name: fam_fp
     schema: dvh_fam_fp
