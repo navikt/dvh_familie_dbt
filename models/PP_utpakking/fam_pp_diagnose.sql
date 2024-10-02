@@ -51,7 +51,8 @@ ny_diagnose as
     join {{ source('fam_pp', 'fam_pp_fagsak') }} fagsak
     on diagnose.fk_pp_fagsak = fagsak.pk_pp_fagsak
   ) gml
-  on gml.vedtaks_tidspunkt < ny.vedtaks_tidspunkt
+  on gml.saksnummer = ny.saksnummer
+  and gml.vedtaks_tidspunkt < ny.vedtaks_tidspunkt
   and ny.kode = gml.kode
   and ny.type = gml.type
   where ny.forrige_behandlings_id is not null
