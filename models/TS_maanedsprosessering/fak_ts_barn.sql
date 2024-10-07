@@ -37,3 +37,4 @@ with ts_barn_data as (
 )
 
 select * from ts_barn_data
+where periode = {{ var('periode') }}

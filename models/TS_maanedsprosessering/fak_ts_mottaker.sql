@@ -1,3 +1,12 @@
+{{
+    config(
+        materialized = 'incremental',
+        unique_key = 'periode',
+        incremental_strategy='delete+insert',
+    )
+}}
+
+
 with ts_mottaker_data as (
   SELECT
     to_char(TID.DATO,'YYYYMM') PERIODE,
@@ -67,6 +76,8 @@ with ts_mottaker_data as (
     where konto.HOVEDKONTONR IN
     ('777') -- Tilleggsstønader
 
+    and periode = {{ var ('periode')}}
+
     and UR.FK_DIM_TID_DATO_POSTERT_UR >= 20240501
     AND UR.KLASSEKODE IN (--'TSTBASISP4-OP',
     'TSTBASISP2-OP','TSTBASISP3-OP'--,'TSTBASISP5-OP'
@@ -102,4 +113,39 @@ with ts_mottaker_data as (
     BARN.ANTBU18
 )
 
-select * from ts_mottaker_data
+select
+  PERIODE
+  ,FK_PERSON1
+  ,FK_DIM_PERSON
+  ,FK_DIM_GEOGRAFI
+  ,KOMMUNE_NR
+  ,BYDEL_NR
+  ,STATSBORGERSKAP
+  ,FODELAND
+  ,SIVILSTATUS_KODE
+  ,BEHANDLING_ID
+  ,KLASSEKODE
+  ,TSOTILBARN
+  ,TSOTILBARN_ETTERBETALT
+  ,FODSELS_AAR
+  ,FODSELS_MND
+  ,ALDER
+  ,FK_DIM_KJONN
+  ,KJONN
+  ,AKTIVITET
+  ,AKTIVITET_2
+  ,ANTBARN
+  ,ANTBU1
+  ,ANTBU3
+  ,ANTBU8
+  ,ANTBU10
+  ,ANTBU18
+from ts_mottaker_data
+
+{% if is_incremental() %}
+
+where periode > (select max(periode) from {{ this }})
+
+{% endif %}
+
+

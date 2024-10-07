@@ -10,3 +10,4 @@ with ts_mottaker_barn_data as (
 )
 
 select * from ts_mottaker_barn_data
+where periode = {{ var('periode') }}
