@@ -5,6 +5,8 @@ import json
 import logging
 from pathlib import Path
 import shlex
+from google.cloud import secretmanager
+
 
 from dbt.cli.main import dbtRunner, dbtRunnerResult
 
@@ -16,15 +18,13 @@ def get_dbt_log(log_path) -> str:
     with open(log_path) as log:
         return log.read()
 
-
-def set_secrets_as_envs(secret_name: str):
-    from google.cloud import secretmanager
-
-    secrets = secretmanager.SecretManagerServiceClient()
-    secret = secrets.access_secret_version(name=secret_name)
-    secret_str = secret.payload.data.decode("UTF-8")
-    secrets = json.loads(secret_str)
-    os.environ.update(secrets)
+def set_secrets_as_envs():
+  secrets = secretmanager.SecretManagerServiceClient()
+  resource_name = f"{os.environ['KNADA_TEAM_SECRET']}/versions/latest"
+  secret = secrets.access_secret_version(name=resource_name)
+  secret_str = secret.payload.data.decode('UTF-8')
+  secrets = json.loads(secret_str)
+  os.environ.update(secrets)
 
 logging.basicConfig(
     format='{"msg":"%(message)s", "time":"%(asctime)s", "level":"%(levelname)s"}',
@@ -33,10 +33,7 @@ logging.basicConfig(
 )
 
 if __name__ == "__main__":
-    if secret_name := os.getenv("TEAM_GCP_SECRET_PATH"):
-        set_secrets_as_envs(secret_name=secret_name)
-    else:
-        raise ValueError("missing environment variable TEAM_GCP_SECRET_PATH")
+    set_secrets_as_envs()
 
     log_path = Path(__file__).parent / "logs/dbt.log"
 
