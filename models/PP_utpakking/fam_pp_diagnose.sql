@@ -45,11 +45,15 @@ ny_diagnose as
   left outer join
   (
     select fagsak.saksnummer, fagsak.behandlings_id, fagsak.forrige_behandlings_id, fagsak.vedtaks_tidspunkt
-          ,diagnose.pk_pp_diagnose, diagnose.kode, diagnose.type
-          ,fagsak.pk_pp_fagsak
+          ,diagnose.kode, diagnose.type
     from {{ source('fam_pp', 'fam_pp_diagnose') }} diagnose
     join {{ source('fam_pp', 'fam_pp_fagsak') }} fagsak
     on diagnose.fk_pp_fagsak = fagsak.pk_pp_fagsak
+
+    union all
+    select saksnummer, behandlings_id, forrige_behandlings_id, vedtaks_tidspunkt
+          ,kode, type
+    from pre_final2
   ) gml
   on gml.saksnummer = ny.saksnummer
   and gml.vedtaks_tidspunkt < ny.vedtaks_tidspunkt
