@@ -19,7 +19,7 @@ def get_dbt_log(log_path) -> str:
         return log.read()
 
 
-def set_secrets_as_envs(secret_name: str):
+def set_secrets_as_envs():
     secrets = secretmanager.SecretManagerServiceClient()
     resource_name = f"{os.environ['KNADA_TEAM_SECRET']}/versions/latest"
     secret = secrets.access_secret_version(name=resource_name)
