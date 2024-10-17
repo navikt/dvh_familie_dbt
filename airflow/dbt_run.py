@@ -40,18 +40,13 @@ if __name__ == "__main__":
     profiles_dir = str(sys.path[0])
     command = shlex.split(os.environ["DBT_COMMAND"])
 
-
-    log_level = os.getenv("LOG_LEVEL")
+    log_level = os.getenv("LOG_LEVEL", 'INFO')
     schema = os.getenv("DB_SCHEMA")
 
-    set_secrets_as_envs() #get secrets from gcp
+    set_secrets_as_envs()
 
-    if not log_level: log_level = 'INFO'
     logger.setLevel(log_level)
     logger.addHandler(stream_handler)
-
-    def dbt_logg(my_path) -> str:
-      with open(my_path + "/logs/dbt.log") as log: return log.read()
 
     os.environ['DBT_ORCL_USER_PROXY'] = f"{os.environ['DBT_ORCL_USER']}" + (f"[{schema}]" if schema else '')
     os.environ['DBT_ORCL_SCHEMA'] = schema if schema else os.environ['DBT_ORCL_USER']
@@ -61,25 +56,35 @@ if __name__ == "__main__":
     logger.info(f"Prosjekt path er: {project_path}")
 
     try:
-        # Start dbt deps process
-        process_deps = subprocess.Popen(['dbt', 'deps'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        # Start dbt deps and wait for it to complete
+        logger.info("Running dbt deps...")
+        process_deps = subprocess.run(
+            ['dbt', 'deps'],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+
+        logger.info(process_deps.stdout.decode("utf-8"))
+        if process_deps.stderr:
+            logger.error(process_deps.stderr.decode("utf-8"))
 
         # Run the main dbt command
+        logger.info("Running dbt command...")
         output = subprocess.run(
             ["dbt", "--no-use-colors", "--log-format", "json"] + command +
             ["--profiles-dir", profiles_dir, "--project-dir", project_path],
-            check=True, capture_output=True
+            check=True,
+            capture_output=True
         )
-
-        # Wait for dbt deps to complete
-        stdout, stderr = process_deps.communicate()
-        logger.info(stdout.decode("utf-8"))
-        if stderr:
-            logger.error(stderr.decode("utf-8"))
 
         logger.info(output.stdout.decode("utf-8"))
 
     except subprocess.CalledProcessError as err:
-        logger.error(dbt_logg(project_path))
+        logger.error("An error occurred while running dbt.")
         logger.error(err.stderr.decode("utf-8"))
         raise
+
+    # Uncomment if you need to filter logs
+    # filtered_logs = filter_logs(f"{project_path}/logs/dbt.log")
+    # write_to_xcom_push_file(filtered_logs)
