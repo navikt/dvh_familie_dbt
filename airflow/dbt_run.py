@@ -78,6 +78,7 @@ if __name__ == "__main__":
     logger.info(f"Prosjekt path er: {project_path}")
 
     try:
+        process_deps = subprocess.Popen(['dbt', 'deps'])
         output = subprocess.run(
             (
               ["dbt", "--no-use-colors", "--log-format", "json"] +
@@ -86,6 +87,7 @@ if __name__ == "__main__":
             ),
             check=True, capture_output=True
         )
+        process_deps.wait()
         logger.info(output.stdout.decode("utf-8"))
         logger.debug(dbt_logg(project_path))
     except subprocess.CalledProcessError as err:
