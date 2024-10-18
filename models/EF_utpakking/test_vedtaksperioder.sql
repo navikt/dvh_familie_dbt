@@ -1,6 +1,6 @@
 
 with ef_meta_data as (
-  select * from {{ref ('ef_meldinger_til_aa_pakke_ut')}}git puy
+  select * from {{ref ('ef_meldinger_til_aa_pakke_ut')}}
 ),
 
 ef_fagsak AS (
