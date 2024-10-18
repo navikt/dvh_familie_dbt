@@ -48,6 +48,19 @@ sources:
         description: 'inneholder meta_data for barnetrygd'
       - name: fam_bt_fagsak
         description: 'inneholder vedtaks informasjon'
+        columns:
+          - name: PK_BT_FAGSAK
+            description: Primær nøkkel, en unik id for hver rad (vedtak), autogenerert, Kan eventuelt være trans_id!
+          - name: FAGSAK_TYPE
+            quote: true
+            description: Type vedtak og det er enten NORMAL, BARN_ENSLIG_MINDREÅRIG eller INSTITUSJON
+          - name: KAFKA_MOTTATT_DATO
+            description: Tidspunkt til når vedtaket er kommet på kafka_topic-en
+          - name: KATEGORI
+            description: Vedtakets kategori og det er enten NASJONAL (Norge) eller EØS
+          - name: UNDERKATEGORI
+            description: Mer info om vedtaket, kategorien kan deles til 2 underkategori ORDINÆR (ordinær barnetrygd) eller UTVIDET (utvidet barnetrygd)
+
 
   - name: fam_ks
     schema: dvh_fam_ks
