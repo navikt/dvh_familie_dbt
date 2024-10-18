@@ -37,6 +37,7 @@ sources:
         description: 'inneholder informasjon om brukere, bla navn, telefon_mobil, k67_flagg osv, '
       - name: dvh_person_ident_off_id_ikke_skjermet
         description: 'inneholder informasjon om personer som er ikke skjemet, bl.a fk_person1, off_id'
+      - name: DIM_PERSON
 
   - name: fam_bt
     schema: dvh_fam_bt
@@ -62,6 +63,7 @@ sources:
     schema: dt_kodeverk
     tables:
      - name: dim_alder
+     - name: dim_tid
 
   - name: fam_ef
     schema: dvh_fam_ef
@@ -69,7 +71,13 @@ sources:
       - name: fam_ef_meta_data
         description: 'inneholder meta_data for ensligforsørger'
       - name: fam_ef_fagsak
-        description: 'inneholder vedtaks informasjon'
+        description: 'inneholder vedtaksinformasjon'
+      - name: fam_ts_meta_data
+        description: 'inneholder meta_data for tilleggsstønader'
+      - name: fam_ts_fagsak
+        description: 'inneholder vedtaksinformasjon'
+      - name: FAM_TS_BARN
+        description: 'innholder informasjon om barna som kommer i vedtaket'
 
   - name: fam_pp
     schema: dvh_fam_pp
@@ -78,3 +86,23 @@ sources:
         description: 'inneholder meta_data for PP, OMP, PPN'
       - name: fam_pp_fagsak
         description: 'inneholder vedtaks informasjon'
+      - name: fam_pp_diagnose
+        description: 'inneholder diagnose informasjon'
+
+  - name: fam_fp
+    schema: dvh_fam_fp
+    tables:
+      - name: fam_fp_meta_data
+        description: 'inneholder meta_data for FP'
+      - name: json_fam_fp_fagsak
+        description: 'inneholder fagsak info for FP'
+
+  - name: ur
+    schema: dvh_ur
+    tables:
+      - name: fak_ur_utbetaling
+        description: 'Et view som inneholder utbetalingers detaljier'
+      - name: DIM_KONTO_UR
+
+
+

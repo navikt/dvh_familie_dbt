@@ -73,4 +73,3 @@ SELECT
   localtimestamp AS LASTET_DATO,
   fk_ks_fagsak
 from final
-

@@ -26,6 +26,7 @@ select * from barnetrygd_meta_data,
         )
       )
     ) j
+    where stønad_fom is not null
       --where json_value (melding, '$.utbetalingsperioderV2.size()' )> 0
 ),
 

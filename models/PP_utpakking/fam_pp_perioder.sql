@@ -32,6 +32,9 @@ pre_final as (
       ,utfall                            varchar2 path '$.utfall'
       ,uttaksgrad                        number path '$.uttaksgrad'
       ,sokers_tapte_arbeidstid           number path '$.søkersTapteArbeidstid'
+      ,total_utbetalingsgrad             number path '$.totalUtbetalingsgrad'
+      ,total_utbetalingsgrad_fra_uttak   number path '$.totalUtbetalingsgradFraUttak'
+      ,total_utbetalingsgrad_etter_reduksjon_ved_tilkommet_inntekt  number path '$.totalUtbetalingsgradEtterReduksjonVedTilkommetInntekt'
       )
     )
   ) j
@@ -56,6 +59,9 @@ final as (
     ,p.kafka_offset
     ,p.uttaksgrad
     ,p.sokers_tapte_arbeidstid
+    ,p.total_utbetalingsgrad
+    ,p.total_utbetalingsgrad_fra_uttak
+    ,p.total_utbetalingsgrad_etter_reduksjon_ved_tilkommet_inntekt
     ,f.pk_pp_fagsak as FK_PP_FAGSAK
   from pre_final p
   join pp_fagsak f
@@ -82,4 +88,7 @@ select
   ,FK_PP_FAGSAK
   ,localtimestamp as LASTET_DATO
   ,kafka_offset
+  ,total_utbetalingsgrad
+  ,total_utbetalingsgrad_fra_uttak
+  ,total_utbetalingsgrad_etter_reduksjon_ved_tilkommet_inntekt
 from final

@@ -38,10 +38,7 @@ mottaker_final as (
     ,nvl(ident.fk_person1, -1) as FK_PERSON1_MOTTAKER
     ,p.kafka_partition
     ,p.pk_pp_meta_data as fk_pp_metadata
-    ,CASE
-    WHEN LENGTH(p.vedtaks_tidspunkt) = 25 THEN CAST(to_timestamp_tz(p.vedtaks_tidspunkt, 'yyyy-mm-dd"T"hh24:mi:ss TZH:TZM') AT TIME ZONE 'Europe/Belgrade' AS TIMESTAMP)
-    ELSE CAST(to_timestamp_tz(p.vedtaks_tidspunkt, 'FXYYYY-MM-DD"T"HH24:MI:SS.FXFFTZH:TZM') AT TIME ZONE 'Europe/Belgrade' AS TIMESTAMP)
-    END vedtaks_tidspunkt
+    ,CAST(to_timestamp_tz(p.vedtaks_tidspunkt, 'yyyy-mm-dd"T"hh24:mi:ss.ff3') AT TIME ZONE 'Europe/Belgrade' AS TIMESTAMP) vedtaks_tidspunkt
     ,p.forrige_behandlings_id
   from pre_final p
   left outer join dt_person.ident_off_id_til_fk_person1 ident
@@ -82,10 +79,6 @@ select
   ,VEDTAKS_TIDSPUNKT
   ,fk_pp_metadata
 from pleietrengende_final
-
-
-
-
-
-
-
+where FK_PERSON1_MOTTAKER != -1
+and (ytelse_type = 'OMP'
+     or (FK_PERSON1_PLEIETRENGENDE != -1 and ytelse_type != 'OMP'))

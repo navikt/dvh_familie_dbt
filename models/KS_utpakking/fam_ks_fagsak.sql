@@ -79,5 +79,3 @@ select
   kafka_mottatt_dato,
   fk_ks_meta_data
 from final
-
-

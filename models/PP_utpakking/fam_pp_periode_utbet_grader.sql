@@ -20,7 +20,8 @@ pre_final as (
       dato_fom         date path '$.fom'
       ,dato_tom         date path '$.tom'
       , nested path '$.utbetalingsgrader[*]' columns (
-         arbeidsforhold_aktorid varchar2 path '$.arbeidsforhold.aktørId'
+         aktivitet_status       varchar2 path '$.aktivitetStatus'
+        ,arbeidsforhold_aktorid varchar2 path '$.arbeidsforhold.aktørId'
         ,arbeidsforhold_id      varchar2 path '$.arbeidsforhold.arbeidsforholdId'
         ,arbeidsforhold_orgnr   varchar2 path '$.arbeidsforhold.organisasjonsnummer'
         ,arbeidsforhold_type    varchar2 path '$.arbeidsforhold.type'
@@ -38,7 +39,8 @@ pre_final as (
 
 final as (
   select
-    p.arbeidsforhold_aktorid
+     p.aktivitet_status
+    ,p.arbeidsforhold_aktorid
     ,p.arbeidsforhold_id
     ,p.arbeidsforhold_orgnr
     ,p.arbeidsforhold_type
@@ -73,6 +75,7 @@ select
   ,FK_PP_PERIODER
   ,BRUKER_ER_MOTTAKER
   ,localtimestamp as LASTET_DATO
+  ,aktivitet_status
 from final
 
 

@@ -48,4 +48,3 @@ from pre_final
 )
 
 select * from final
-

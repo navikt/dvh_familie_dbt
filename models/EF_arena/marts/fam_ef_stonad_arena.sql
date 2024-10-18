@@ -1,6 +1,8 @@
 {{
     config(
-        materialized = 'incremental'
+        materialized = 'incremental',
+        unique_key = 'periode',
+        incremental_strategy='delete+insert',
     )
 }}
 
