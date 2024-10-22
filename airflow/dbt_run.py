@@ -43,7 +43,6 @@ def filter_logs(file_path: str) -> List[dict]:
 
     return filtered_logs
 
-
 if __name__ == "__main__":
     logger = logging.getLogger(__name__)
     stream_handler = logging.StreamHandler(sys.stdout)
@@ -62,9 +61,6 @@ if __name__ == "__main__":
     logger.setLevel(log_level)
     logger.addHandler(stream_handler)
 
-    #logger.debug(f"dbt command: {command}")
-    #logger.debug(f"db schema: {schema}")
-
     def dbt_logg(my_path) -> str:
       with open(my_path + "/logs/dbt.log") as log: return log.read()
 
@@ -78,6 +74,8 @@ if __name__ == "__main__":
     logger.info(f"Prosjekt path er: {project_path}")
 
     try:
+        process_deps = subprocess.run(['dbt', 'deps'],
+            check=True, capture_output=True)
         output = subprocess.run(
             (
               ["dbt", "--no-use-colors", "--log-format", "json"] +
@@ -91,7 +89,4 @@ if __name__ == "__main__":
     except subprocess.CalledProcessError as err:
         raise Exception(logger.error(dbt_logg(project_path)),
                        err.stdout.decode("utf-8"))
-       #raise Exception("dbt feiler")
 
-    #filtered_logs = filter_logs(f"{project_path}/logs/dbt.log")
-    #write_to_xcom_push_file(filtered_logs)
