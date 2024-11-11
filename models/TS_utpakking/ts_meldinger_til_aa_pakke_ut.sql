@@ -5,7 +5,7 @@
 }}
 
 with ts_meta_data as (
-  SELECT m.*
+  SELECT distinct m.pk_ts_meta_data
     FROM {{ source ('fam_ef', 'fam_ts_meta_data') }} m,
         JSON_TABLE(
             m.melding,
@@ -21,4 +21,7 @@ with ts_meta_data as (
         --and endret_tid <= (select max(endret_tid) from {{ this }})
 )
 
-select * from ts_meta_data
+select meta.*
+from {{ source ('fam_ef', 'fam_ts_meta_data') }} meta
+join ts_meta_data
+on meta.pk_ts_meta_data = ts_meta_data.pk_ts_meta_data
