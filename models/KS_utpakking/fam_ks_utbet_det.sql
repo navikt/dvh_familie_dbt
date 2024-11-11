@@ -80,5 +80,6 @@ select
   lastet_dato,
   delytelse_id,
   fk_person1_barn,
-  fk_ks_utbetaling
+  fk_ks_utbetaling,
+  klassekode
 from final
