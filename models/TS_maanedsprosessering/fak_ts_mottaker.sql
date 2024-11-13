@@ -140,6 +140,7 @@ select
   ,ANTBU8
   ,ANTBU10
   ,ANTBU18
+  ,localtimestamp AS lastet_dato
 from ts_mottaker_data
 
 {% if is_incremental() %}
