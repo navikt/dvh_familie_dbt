@@ -60,7 +60,7 @@ joining_pre_final as (
     pre_final.personidentbarn=b.off_id
     and b.gyldig_fra_dato<=pre_final.kafka_mottatt_dato
     and b.gyldig_til_dato>=kafka_mottatt_dato
-    and b.skjermet_kode=0
+    --and b.skjermet_kode=0
 ),
 
 final as (
