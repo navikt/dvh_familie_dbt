@@ -8,10 +8,6 @@ with ks_meta_data as (
   select * from {{ref ('ks_meldinger_til_aa_pakke_ut')}}
 ),
 
-ks_fagsak as (
-  select * from {{ref('fam_ks_fagsak')}}
-),
-
 pre_final as (
   select * from
   (
