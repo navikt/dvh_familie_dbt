@@ -11,11 +11,11 @@ with kontantstotte_meta_data as (
     --  select kafka_offset from {{ source ('fam_ks', 'fam_ks_fagsak') }}) and kafka_offset >= 31172
     where pk_ks_meta_data in
     (
-      select fam_ks_meta_data
+      select fk_ks_meta_data
       from {{ source ('fam_ks', 'fam_ks_fagsak') }}
       where pk_ks_fagsak not in
       (
-        select fam_ks_fagsak
+        select fk_ks_fagsak
         from {{ source ('fam_ks', 'fam_ks_vilkaar_resultat') }}
       )
     )
