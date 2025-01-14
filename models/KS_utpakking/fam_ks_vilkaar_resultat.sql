@@ -18,7 +18,7 @@ pre_final as (
           nested          path '$.vilkårResultater[*]'
           columns(
             resultat              varchar2(255) path '$.resultat',
-            antall_timer          varchar2(255) path '$.antallTimer',
+            antall_timer          number(10,2) path '$.antallTimer',
             periode_fom           varchar2(255) path '$.periodeFom',
             periode_tom           varchar2(255) path '$.periodeTom',
             ident                 varchar2(255) path '$.ident',
