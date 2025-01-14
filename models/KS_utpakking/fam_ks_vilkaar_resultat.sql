@@ -18,7 +18,7 @@ pre_final as (
           nested          path '$.vilkårResultater[*]'
           columns(
             resultat              varchar2(255) path '$.resultat',
-            antall_timer          number(10,2) path '$.antallTimer',
+            antall_timer          number path '$.antallTimer',
             periode_fom           varchar2(255) path '$.periodeFom',
             periode_tom           varchar2(255) path '$.periodeTom',
             ident                 varchar2(255) path '$.ident',
@@ -38,7 +38,7 @@ final as (
   resultat,
   ident,
   replace(antall_timer, '.', ',') antall_timer,
-  replace(antall_timer, '.', ',') antall_timer2,
+  antall_timer antall_timer2,
   replace(antall_timer, '.', ',') antall_timer3,
   --case when antall_timer is not null
   --  then to_number(antall_timer)
