@@ -14,15 +14,15 @@ pre_final as (
     select *  from ks_meta_data,
       json_table(melding, '$'
         columns(
-          behandlings_id  path  '$.behandlingsId',
+          behandlings_id  number(38,0) path  '$.behandlingsId',
           nested          path '$.vilkårResultater[*]'
           columns(
-            resultat              path '$.resultat',
-            antall_timer          path '$.antallTimer',
-            periode_fom           path '$.periodeFom',
-            periode_tom           path '$.periodeTom',
-            ident                 path '$.ident',
-            vilkaar_type          path '$.vilkårType'
+            resultat              varchar2(255) path '$.resultat',
+            antall_timer          varchar2(255) path '$.antallTimer',
+            periode_fom           varchar2(255) path '$.periodeFom',
+            periode_tom           varchar2(255) path '$.periodeTom',
+            ident                 varchar2(255) path '$.ident',
+            vilkaar_type          varchar2(255) path '$.vilkårType'
             )
           )
         ) j
