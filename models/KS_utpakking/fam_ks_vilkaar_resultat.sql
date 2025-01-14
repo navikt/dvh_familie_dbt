@@ -39,6 +39,7 @@ final as (
   ident,
   replace(antall_timer, '.', ',') antall_timer,
   replace(antall_timer, '.', ',') antall_timer2,
+  replace(antall_timer, '.', ',') antall_timer3,
   --case when antall_timer is not null
   --  then to_number(antall_timer)
   --else antall_timer
@@ -69,5 +70,6 @@ SELECT
   VILKAAR_TYPE,
   localtimestamp AS LASTET_DATO,
   fk_ks_fagsak,
-  antall_timer2
+  antall_timer2,
+  antall_timer3
 from final
