@@ -58,6 +58,8 @@ sources:
         description: 'inneholder vedtaks data for kontantstøtte'
       - name: ks_meta_data_test
         description: 'tabellen inneholder en del av data som ligger i fam_ks_meta_data bare for å teste incremental tabell og snapshots'
+      - name: fam_ks_vilkaar_resultat
+        description: 'Test'
 
   - name: kode_verk
     schema: dt_kodeverk
