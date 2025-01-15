@@ -104,5 +104,15 @@ sources:
         description: 'Et view som inneholder utbetalingers detaljier'
       - name: DIM_KONTO_UR
 
-
+  - name: fam_bb
+    schema: dvh_fam_bb
+    tables:
+      - name: fam_bb_meta_data
+        description: 'inneholder meta_data for BB'
+      - name: fam_bb_fagsak
+        description: 'inneholder fagsak info for BB'
+      - name: fam_bb_forkudds_periode
+        description: 'inneholder forkudds periode info for BB'
+      - name: fam_bb_inntekt
+        description: 'inneholder inntekt info for BB'
 
