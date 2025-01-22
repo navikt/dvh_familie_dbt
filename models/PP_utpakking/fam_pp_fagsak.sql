@@ -12,14 +12,15 @@ pre_final as (
 select * from pp_meta_data,
   json_table(melding, '$'
     COLUMNS (
-      behandlings_id          varchar2 path '$.behandlingUuid'
-      ,pleietrengende         varchar2 path '$.pleietrengende'
-      ,saksnummer             varchar2 path '$.saksnummer'
-      ,soker                  varchar2 path '$.søker'
-      ,utbetalingsreferanse   varchar2 path '$.utbetalingsreferanse'
-      ,ytelse_type            varchar2 path '$.ytelseType'
-      ,vedtaks_tidspunkt      varchar2 path '$.vedtakstidspunkt'
-      ,forrige_behandlings_id varchar2 path '$.forrigeBehandlingUuid'
+      behandlings_id                        varchar2 path '$.behandlingUuid'
+      ,pleietrengende                       varchar2 path '$.pleietrengende'
+      ,saksnummer                           varchar2 path '$.saksnummer'
+      ,soker                                varchar2 path '$.søker'
+      ,utbetalingsreferanse                 varchar2 path '$.utbetalingsreferanse'
+      ,ytelse_type                          varchar2 path '$.ytelseType'
+      ,vedtaks_tidspunkt                    varchar2 path '$.vedtakstidspunkt'
+      ,forrige_behandlings_id               varchar2 path '$.forrigeBehandlingUuid'
+      ,KUN_KRONISK_SYKT_BARN_OVER12         varchar2 path '$.harBrukerKunOmsorgenForKroniskSyktBarnOver12'
     )
   ) j
 ),
@@ -40,6 +41,10 @@ mottaker_final as (
     ,p.pk_pp_meta_data as fk_pp_metadata
     ,CAST(to_timestamp_tz(p.vedtaks_tidspunkt, 'yyyy-mm-dd"T"hh24:mi:ss.ff3') AT TIME ZONE 'Europe/Belgrade' AS TIMESTAMP) vedtaks_tidspunkt
     ,p.forrige_behandlings_id
+    ,CASE
+        WHEN p.KUN_KRONISK_SYKT_BARN_OVER12 = 'false' THEN '0'
+            ELSE '1'
+        END AS KUN_KRONISK_SYKT_BARN_OVER12
   from pre_final p
   left outer join dt_person.ident_off_id_til_fk_person1 ident
   on p.soker = ident.off_id
@@ -78,6 +83,7 @@ select
   ,ytelse_type
   ,VEDTAKS_TIDSPUNKT
   ,fk_pp_metadata
+  ,KUN_KRONISK_SYKT_BARN_OVER12
 from pleietrengende_final
 where FK_PERSON1_MOTTAKER != -1
 and (ytelse_type = 'OMP'
