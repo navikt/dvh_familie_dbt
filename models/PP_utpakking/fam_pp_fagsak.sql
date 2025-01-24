@@ -42,9 +42,13 @@ mottaker_final as (
     ,CAST(to_timestamp_tz(p.vedtaks_tidspunkt, 'yyyy-mm-dd"T"hh24:mi:ss.ff3') AT TIME ZONE 'Europe/Belgrade' AS TIMESTAMP) vedtaks_tidspunkt
     ,p.forrige_behandlings_id
     ,CASE
-        WHEN p.KUN_KRONISK_SYKT_BARN_OVER12 = 'false' THEN '0'
-            ELSE '1'
-        END AS KUN_KRONISK_SYKT_BARN_OVER12
+      WHEN ytelse_type = 'OMP' THEN
+        CASE
+          WHEN p.KUN_KRONISK_SYKT_BARN_OVER12 = 'false' THEN '0'
+          ELSE '1'
+        END
+      ELSE NULL
+    END AS KUN_KRONISK_SYKT_BARN_OVER12
   from pre_final p
   left outer join dt_person.ident_off_id_til_fk_person1 ident
   on p.soker = ident.off_id
