@@ -63,3 +63,6 @@ models:
     KS_transformasjon:
       +materialized: view
 
+  DVH_FAMILIE_DBT: # the name of a project
+    PP_manedsprosessering:
+      +schema: pp_omp

@@ -1,0 +1,19 @@
+version: 2
+
+sources:
+  - name: fam_pp
+    description: 'Familie pleiepenger data'
+    schema: dvh_fam_pp
+    tables:
+      - name: fam_pp_perioder
+        description: 'Inneholder infromasjon om perioder'
+      - name: fam_pp_fagsak
+        description: 'Inneholder infromasjon om fagsak'
+      - name: fam_pp_periode_utbet_grader
+        description: 'Inneholder infromasjon om utbetalinger'
+  - name: dt_kodeverk
+    description: 'Datavarehus dimensjons data'
+    schema: dt_kodeverk
+    tables:
+      - name: dim_tid
+        description: 'Inneholder infromasjon om tid'
