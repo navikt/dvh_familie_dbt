@@ -9,6 +9,10 @@ config-version: 2
 #vars:
 #  periode: 202401
 # This setting configures which "profile" dbt uses for this project.
+vars:
+  # The `p_in_vedtak_periode_yyyymm` variable will be accessible in all resources
+  pp_omp_periode:
+
 profile: 'dvh_familie'
 
 # These configurations specify where dbt should look for different types of files.
@@ -62,7 +66,3 @@ models:
       +materialized: view
     KS_transformasjon:
       +materialized: view
-
-  DVH_FAMILIE_DBT: # the name of a project
-    PP_manedsprosessering:
-      +schema: pp_omp

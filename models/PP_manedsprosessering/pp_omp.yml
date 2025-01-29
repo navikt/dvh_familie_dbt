@@ -1,7 +1,7 @@
 version: 2
 
 sources:
-  - name: fam_pp
+  - name: fam_pp_omp
     description: 'Familie pleiepenger data'
     schema: dvh_fam_pp
     tables:
