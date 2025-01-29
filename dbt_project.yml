@@ -11,7 +11,9 @@ config-version: 2
 # This setting configures which "profile" dbt uses for this project.
 vars:
   # The `p_in_vedtak_periode_yyyymm` variable will be accessible in all resources
-  pp_omp_periode:
+  PP_manedsprosessering:
+    pp_omp_periode:
+    pp_omp_max_vedtaksperiode:
 
 profile: 'dvh_familie'
 

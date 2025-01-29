@@ -45,7 +45,7 @@ vedtak1 as
   on perioder.fk_pp_fagsak = fagsak.pk_pp_fagsak
   and fagsak.ytelse_type = 'OMP'
   and fagsak.fk_person1_mottaker != -1
-  and fagsak.vedtaks_tidspunkt < last_day(to_date({{var("pp_omp_periode")}}, 'yyyymm')) + 1
+  and fagsak.vedtaks_tidspunkt < last_day(to_date({{var("pp_omp_max_vedtaksperiode")}}, 'yyyymm'))
 
   where perioder.utfall = 'OPPFYLT'
 )
@@ -84,5 +84,8 @@ agg as
   from vedtak2
   group by fk_person1_mottaker, dato_fom, dato_tom, saksnummer, utbetalingsreferanse
 )
-select *
+select agg.*
+      ,{{ var("pp_omp_periode") }} as periode
+      ,last_day(to_date({{var("pp_omp_max_vedtaksperiode")}}, 'yyyymm')) as max_vedtaksdato
+      ,localtimestamp as lastet_dato
 from agg
