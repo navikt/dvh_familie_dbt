@@ -1,0 +1,10 @@
+version: 2
+
+sources:
+  - name: bt_statistikk_bank
+    description: 'Familie barnetrygd statistikk bank data'
+    tables:
+      - name: fam_bt_mottaker
+        description: 'Inneholder barnetrgyd statistikk data'
+      - name: fam_bt_statistikk_alder_gruppe
+        description: 'Inneholder alders gruppe til barnetrygd statistikk bank'
