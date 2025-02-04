@@ -1,0 +1,5 @@
+version: 2
+data_tests:
+  - name: fam_bt_statistikk_bank_mottaker_diff
+    description: >
+      Antall fra ny kjøring skal ikke være mindre eller mer enn 2% enn publisert antall på nav.no.

@@ -1,10 +1,21 @@
 version: 2
 
 sources:
-  - name: bt_statistikk_bank
+  - name: dvh_fam_bt
     description: 'Familie barnetrygd statistikk bank data'
     tables:
       - name: fam_bt_mottaker
-        description: 'Inneholder barnetrgyd statistikk data'
+        description: 'Inneholder barnetrgyd statistikk mottaker data'
+      - name: fam_bt_barn
+        description: 'Inneholder barnetrgyd statistikk barn data'
       - name: fam_bt_statistikk_alder_gruppe
         description: 'Inneholder alders gruppe til barnetrygd statistikk bank'
+
+models:
+  - name: fam_bt_statistikk_bank_mottaker
+    columns:
+      - name: antall
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 503
+              max_value: 503
