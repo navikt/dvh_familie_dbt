@@ -1,7 +1,8 @@
 version: 2
 
 sources:
-  - name: dvh_fam_bt
+  - name: statistikk_bank_dvh_fam_bt
+    schema: dvh_fam_bt
     description: 'Familie barnetrygd statistikk bank data'
     tables:
       - name: fam_bt_mottaker
@@ -10,6 +11,12 @@ sources:
         description: 'Inneholder barnetrgyd statistikk barn data'
       - name: fam_bt_statistikk_alder_gruppe
         description: 'Inneholder alders gruppe til barnetrygd statistikk bank'
+
+  - name: statistikk_bank_dt_kodeverk
+    schema: dt_kodeverk
+    description: 'Dimensjons data'
+    tables:
+      - name: dim_tid
 
 models:
   - name: fam_bt_statistikk_bank_mottaker
