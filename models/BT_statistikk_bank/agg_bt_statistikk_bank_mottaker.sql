@@ -9,6 +9,7 @@ with mottaker_kjonn as (
        , mottaker.kjonn
        , alder_gruppe.alder_gruppe_besk
        , count(distinct case when barn.fk_person1 is null then mottaker.fk_person1 end) antall --Ekskludere som barn selv er mottaker
+       , count(distinct case when barn.fk_person1 is not null then mottaker.fk_person1 end) antall_mottaker_barn --Barn selv er mottaker
 
   from {{ source('statistikk_bank_dvh_fam_bt', 'fam_bt_mottaker') }} mottaker
 
@@ -41,6 +42,7 @@ mottaker_kjonn_sum as (
        , aar
        , 'ALT' as alder_gruppe_besk
        , sum(antall)  antall
+       , sum(antall_mottaker_barn) antall_mottaker_barn
   from mottaker_kjonn
   group by kjonn, aar
 )
@@ -50,6 +52,7 @@ mottaker_alt_alder_gruppe as (
        , mottaker.aar
        , mottaker.alder_gruppe_besk
        , sum(mottaker.antall) antall
+       , sum(antall_mottaker_barn) antall_mottaker_barn
   from mottaker_kjonn mottaker
   group by mottaker.aar, mottaker.alder_gruppe_besk
 )
@@ -59,6 +62,7 @@ mottaker_alt_sum as (
        , aar
        , 'ALT' as alder_gruppe_besk
        , sum(antall)  antall
+       , sum(antall_mottaker_barn) antall_mottaker_barn
   from mottaker_alt_alder_gruppe
   group by aar
 )
@@ -67,6 +71,7 @@ select kjonn
      , aar
      , alder_gruppe_besk
      , antall
+     , antall_mottaker_barn
 from mottaker_alt_sum
 
 union all
@@ -74,6 +79,7 @@ select kjonn
      , aar
      , alder_gruppe_besk
      , antall
+     , antall_mottaker_barn
 from mottaker_alt_alder_gruppe
 
 union all
@@ -81,6 +87,7 @@ select kjonn
      , aar
      , alder_gruppe_besk
      , antall
+     , antall_mottaker_barn
 from mottaker_kjonn_sum
 
 union all
@@ -88,6 +95,7 @@ select kjonn
      , aar
      , alder_gruppe_besk
      , antall
+     , antall_mottaker_barn
 from mottaker_kjonn
 
 

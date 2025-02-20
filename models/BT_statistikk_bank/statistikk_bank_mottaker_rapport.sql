@@ -42,7 +42,7 @@ final as (
        , max(case when mottaker.aar = 2022 then mottaker.antall end) as aar_2022
        , max(case when mottaker.aar = 2023 then mottaker.antall end) as aar_2023
        , max(case when mottaker.aar = 2024 then mottaker.antall end) as aar_2024
-  from {{ ref('fam_bt_statistikk_bank_mottaker') }} mottaker
+  from {{ ref('agg_bt_statistikk_bank_mottaker') }} mottaker
 
   join {{ ref('statistikk_bank_mottaker_kjonn') }} kjonn
   on mottaker.kjonn = kjonn.kjonn

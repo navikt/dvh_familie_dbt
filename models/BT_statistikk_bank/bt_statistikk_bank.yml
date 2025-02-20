@@ -11,6 +11,8 @@ sources:
         description: 'Inneholder barnetrgyd statistikk barn data'
       - name: fam_bt_statistikk_alder_gruppe
         description: 'Inneholder alders gruppe til barnetrygd statistikk bank'
+      - name: statistikk_bank_mottaker_rapport_nav
+        description: 'Publisert barnetrygd data på nav.no'
 
   - name: statistikk_bank_dt_kodeverk
     schema: dt_kodeverk
