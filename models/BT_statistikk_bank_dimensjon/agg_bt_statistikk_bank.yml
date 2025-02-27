@@ -23,5 +23,17 @@ sources:
       - name: statistikk_bank_mottaker_rapport_nav
         description: 'Publisert barnetrygd data på nav.no'
 
-      - name: agg_bt_statistikk_bank_mottaker
-        description: 'Inneholder barnetrygd aggregert data i forhold til statistikkbank.'
+  - name: statistikk_bank_dt_kodeverk
+    schema: dt_kodeverk
+    description: 'Dimensjons data'
+    tables:
+      - name: dim_tid
+
+models:
+  - name: fam_bt_statistikk_bank_mottaker
+    columns:
+      - name: antall
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 503
+              max_value: 503

@@ -13,7 +13,7 @@ with mottaker_kjonn as (
 
   from {{ source('statistikk_bank_dvh_fam_bt', 'fam_bt_mottaker') }} mottaker
 
-  join {{ ref('statistikk_bank_mottaker_alder_gruppe') }} alder_gruppe
+  join {{ source('statistikk_bank_dvh_fam_bt', 'statistikk_bank_mottaker_alder_gruppe') }} alder_gruppe
   on mottaker.alder between alder_gruppe.alder_fra_og_med and alder_gruppe.alder_til_og_med
 
   left join
@@ -27,7 +27,7 @@ with mottaker_kjonn as (
   on mottaker.fk_person1 = barn.fk_person1
   and mottaker.stat_aarmnd = barn.stat_aarmnd
 
-  join {{ ref('statistikk_bank_mottaker_periode') }} periode
+  join {{ source('statistikk_bank_dvh_fam_bt', 'statistikk_bank_mottaker_periode') }} periode
   on mottaker.stat_aarmnd = periode.aar_maaned
 
   where mottaker.gyldig_flagg = 1
