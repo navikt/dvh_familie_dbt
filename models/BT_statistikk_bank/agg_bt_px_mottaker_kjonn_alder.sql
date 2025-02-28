@@ -9,15 +9,15 @@ with alle_kjonn_alder as (
           ,alder_gruppe.alder_gruppe_besk
           ,periode.aar
     from {{ source('statistikk_bank_dvh_fam_bt', 'statistikk_bank_mottaker_kjonn') }} kjonn
-    cross join {{ source('statistikk_bank_dvh_fam_bt', 'statistikk_bank_mottaker_alder_gruppe') }} alder_gruppe
-    cross join {{ source('statistikk_bank_dvh_fam_bt', 'statistikk_bank_mottaker_periode') }} periode
+    cross join {{ source('statistikk_bank_bt', 'statistikk_bank_mottaker_alder_gruppe') }} alder_gruppe
+    cross join {{ source('statistikk_bank_bt', 'statistikk_bank_mottaker_periode') }} periode
 )
 ,
 fakta_tall as (
     select mottaker.*
           ,kjonn.kjonn_besk
-    from {{ source('statistikk_bank_dvh_fam_bt', 'agg_bt_statistikk_bank_mottaker') }} mottaker
-    join {{ source('statistikk_bank_dvh_fam_bt', 'statistikk_bank_mottaker_kjonn')}} kjonn
+    from {{ source('statistikk_bank_bt', 'agg_bt_statistikk_bank_mottaker') }} mottaker
+    join {{ source('statistikk_bank_bt', 'statistikk_bank_mottaker_kjonn')}} kjonn
     on mottaker.kjonn = kjonn.kjonn
 )
 ,

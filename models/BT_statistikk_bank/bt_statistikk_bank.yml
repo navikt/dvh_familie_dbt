@@ -1,16 +1,10 @@
 version: 2
 
 sources:
-  - name: statistikk_bank_dvh_fam_bt
+  - name: statistikk_bank_bt
     schema: dvh_fam_bt
     description: 'Familie barnetrygd statistikk bank data'
     tables:
-      - name: fam_bt_mottaker
-        description: 'Inneholder barnetrgyd mottaker data'
-
-      - name: fam_bt_barn
-        description: 'Inneholder barnetrgyd barn data'
-
       - name: statistikk_bank_mottaker_alder_gruppe
         description: 'Inneholder alders gruppe til barnetrygd statistikkbank'
 
@@ -25,3 +19,18 @@ sources:
 
       - name: agg_bt_statistikk_bank_mottaker
         description: 'Inneholder barnetrygd aggregert data i forhold til statistikkbank.'
+
+models:
+  - name: agg_bt_px_mottaker_kjonn_alder
+    description: "#NAVN: agg_bt_px_mottaker_kjonn_alder
+                  #INNHOLD: Testdata av barnetrgyd"
+    columns:
+      - name: kjonn_besk
+        description: "#NAVN: kjonn_besk
+                      #INNHOLD: Kvinner, Menn eller I alt"
+      - name: ALDER_GRUPPE_BESK
+        description: "#NAVN: kjonn_besk
+                      #INNHOLD: 20 år og yngre, 21-29 år, 30-39 år, 40-49 år, 50-59 år, 60 år+ eller ALT"
+      - name: AAR
+        description: "#NAVN: kjonn_besk
+                      #INNHOLD: 2015-2024, 10 år"
