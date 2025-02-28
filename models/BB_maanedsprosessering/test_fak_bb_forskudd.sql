@@ -92,7 +92,7 @@ periode_uten_opphort as
         ,vedtaks_id, behandlings_type, pk_bb_forskudds_periode as fk_bb_forskudds_periode
         ,periode_fra, periode_til, belop, resultat
         ,barnets_alders_gruppe, periode_fra_opphor, aar
-        ,to_date('20250228','yyyymmdd') max_vedtakstidsdato --Input max_vedtaksdato
+        ,to_date('20250228','yyyymmdd') max_vedtaksdato --Input max_vedtaksdato
         ,fk_dim_tid_mnd
         ,'M' periode_type --Input periode_type
         ,dim_kravhaver.pk_dim_person as fk_dim_person_kravhaver
