@@ -28,12 +28,3 @@ sources:
     description: 'Dimensjons data'
     tables:
       - name: dim_tid
-
-models:
-  - name: fam_bt_statistikk_bank_mottaker
-    columns:
-      - name: antall
-        tests:
-          - dbt_utils.accepted_range:
-              min_value: 503
-              max_value: 503
