@@ -1,6 +1,6 @@
 {{
     config(
-        materialized='table'
+        materialized='incremental'
     )
 }}
 
@@ -31,7 +31,7 @@ mottaker as (
 )
 ,
 
-mottaker_kjonn as (
+mottaker_kjonn_alder as (
      select
           periode.aar
          ,periode.aar_kvartal
@@ -78,7 +78,7 @@ mottaker_kjonn as (
          ,alder_gruppe.alder_gruppe_besk
 )
 ,
-
+--Summere opp alle alders gruppe
 mottaker_kjonn_sum as (
      select
           aar
@@ -90,7 +90,7 @@ mottaker_kjonn_sum as (
          ,alder_gruppe.alder_gruppe_besk
          ,sum(antall) antall
          ,sum(antall_mottaker_barn) antall_mottaker_barn
-     from mottaker_kjonn
+     from mottaker_kjonn_alder
 
      join alder_gruppe
      on alder_gruppe.alder_fra_og_med = -1 --I alt
@@ -105,7 +105,7 @@ mottaker_kjonn_sum as (
          ,alder_gruppe.alder_gruppe_besk
 )
 ,
-
+--Summere opp alle kjonn
 mottaker_alt_alder_gruppe as (
      select
           aar
@@ -117,7 +117,7 @@ mottaker_alt_alder_gruppe as (
          ,alder_gruppe_besk
          ,sum(antall) antall
          ,sum(antall_mottaker_barn) antall_mottaker_barn
-     from mottaker_kjonn
+     from mottaker_kjonn_alder
 
      join kjonn
      on kjonn.kjonn_kode = -1 --I alt
@@ -131,50 +131,110 @@ mottaker_alt_alder_gruppe as (
          ,kjonn.kjonn_besk
          ,alder_gruppe_besk
 )
-select * from mottaker_alt_alder_gruppe
-/*
 ,
+--Summere opp alle alders gruppe og alle kjonn
 mottaker_alt_sum as (
-  select 'ALT' as kjonn
-       , aar
-       , 'ALT' as alder_gruppe_besk
-       , sum(antall)  antall
-       , sum(antall_mottaker_barn) antall_mottaker_barn
-  from mottaker_alt_alder_gruppe
-  group by aar
+     select
+          aar
+         ,aar_kvartal
+         ,kvartal
+         ,kvartal_besk
+         ,stat_aarmnd
+         ,kjonn.kjonn_besk
+         ,alder_gruppe.alder_gruppe_besk
+         ,sum(antall) antall
+         ,sum(antall_mottaker_barn) antall_mottaker_barn
+     from mottaker_kjonn_alder
+
+     join alder_gruppe
+     on alder_gruppe.alder_fra_og_med = -1 --I alt
+
+     join kjonn
+     on kjonn.kjonn_kode = -1 --I alt
+
+     group by
+          aar
+         ,aar_kvartal
+         ,kvartal
+         ,kvartal_besk
+         ,stat_aarmnd
+         ,kjonn.kjonn_besk
+         ,alder_gruppe.alder_gruppe_besk
 )
 
-select kjonn
-     , aar
-     , alder_gruppe_besk
-     , antall
-     , antall_mottaker_barn
-from mottaker_alt_sum
+,
+resultat as (
+     select
+          aar
+         ,aar_kvartal
+         ,kvartal
+         ,kvartal_besk
+         ,stat_aarmnd
+         ,kjonn_besk
+         ,alder_gruppe_besk
+         ,antall
+         ,antall_mottaker_barn
+     from mottaker_alt_sum
 
-union all
-select kjonn
-     , aar
-     , alder_gruppe_besk
-     , antall
-     , antall_mottaker_barn
-from mottaker_alt_alder_gruppe
+     union all
+     select
+          aar
+         ,aar_kvartal
+         ,kvartal
+         ,kvartal_besk
+         ,stat_aarmnd
+         ,kjonn_besk
+         ,alder_gruppe_besk
+         ,antall
+         ,antall_mottaker_barn
+     from mottaker_alt_alder_gruppe
 
-union all
-select kjonn
-     , aar
-     , alder_gruppe_besk
-     , antall
-     , antall_mottaker_barn
-from mottaker_kjonn_sum
+     union all
+     select
+          aar
+         ,aar_kvartal
+         ,kvartal
+         ,kvartal_besk
+         ,stat_aarmnd
+         ,kjonn_besk
+         ,alder_gruppe_besk
+         ,antall
+         ,antall_mottaker_barn
+     from mottaker_kjonn_sum
 
-union all
-select kjonn
-     , aar
-     , alder_gruppe_besk
-     , antall
-     , antall_mottaker_barn
-from mottaker_kjonn
-*/
+     union all
+     select
+          aar
+         ,aar_kvartal
+         ,kvartal
+         ,kvartal_besk
+         ,stat_aarmnd
+         ,kjonn_besk
+         ,alder_gruppe_besk
+         ,antall
+         ,antall_mottaker_barn
+     from mottaker_kjonn_alder
+)
+
+select
+     aar
+    ,aar_kvartal
+    ,kvartal
+    ,kvartal_besk
+    ,stat_aarmnd
+    ,kjonn_besk
+    ,alder_gruppe_besk
+    ,antall
+    ,antall_mottaker_barn
+    ,current_timestamp as lastet_dato
+    ,current_timestamp as oppdatert_dato
+from resultat
 
 
+--Last opp kun ny periode siden siste periode fra tabellen
+--Tidligste periode fra tabellen er 201401
+{% if is_incremental() %}
 
+where stat_aarmnd > (select coalesce(max(stat_aarmnd), 201400) from {{ this }})
+
+{% endif %}

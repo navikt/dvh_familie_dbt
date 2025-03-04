@@ -43,19 +43,41 @@ models:
         description: "#NAVN: px_data
                       #INNHOLD: Antall mottakere av barnetrgyd."
 
-  - name: test_agg_bt_px_mottaker_kjonn_alder
+  - name: agg_bt_px_mottaker_kjonn_alder
     description: "#NAVN: agg_bt_px_mottaker_kjonn_alder
                   #INNHOLD: Testdata av barnetrgyd"
     columns:
       - name: kjonn_besk
         description: "#NAVN: kjonn_besk
                       #INNHOLD: Kvinner, Menn eller I alt"
+
+      - name: sortering_kjonn
+        description: "#NAVN: sortering_kjonn
+                      #INNHOLD: I alt=1, Menn=2, Kvinner=3"
+
       - name: alder_gruppe_besk
         description: "#NAVN: alder_gruppe_besk
-                      #INNHOLD: 20 år og yngre, 21-29 år, 30-39 år, 40-49 år, 50-59 år, 60 år+ eller ALT"
+                      #INNHOLD: 20 år og yngre, 21-29 år, 30-39 år, 40-49 år, 50-59 år, 60 år+ eller I alt"
+
+      - name: sortering_alder_gruppe
+        description: "#NAVN: sortering_alder_gruppe
+                      #INNHOLD: I alt=1, 20 år og yngre=2, 21-29 år=3, 30-39 år=4, 40-49 år=5, 50-59 år=6, 60 år+=7"
+
       - name: aar
         description: "#NAVN: aar
-                      #INNHOLD: 2015-2024, 10 år"
+                      #INNHOLD: år siden 2014"
+
+      - name: aar_kvartal
+        description: "#NAVN: aar_kvartal
+                      #INNHOLD: år + '0' + kvartal"
+
+      - name: kvartal
+        description: "#NAVN: kvartal
+                      #INNHOLD: 1, 2, 3 eller 4"
+
+      - name: kvartal_besk
+        description: "#NAVN: kvartal_besk
+                      #INNHOLD: 1. kvartal, 2. kvartal, 3. kvartal eller 4. kvartal"
 
       - name: statistikkvariabel
         description: "#NAVN: statistikkvariabel

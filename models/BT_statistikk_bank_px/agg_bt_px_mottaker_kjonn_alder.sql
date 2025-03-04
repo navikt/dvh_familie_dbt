@@ -1,7 +1,6 @@
 {{
     config(
-        materialized='incremental',
-        unique_key='aar'
+        materialized='table'
     )
 }}
 
@@ -11,8 +10,13 @@ with data as (
 )
 
 select kjonn_besk
+      ,sortering_kjonn
       ,alder_gruppe_besk
-      ,aar
+      ,sortering_alder_gruppe
       ,statistikkvariabel
+      ,aar
+      ,aar_kvartal
+      ,kvartal
+      ,kvartal_besk
       ,px_data
 from data
