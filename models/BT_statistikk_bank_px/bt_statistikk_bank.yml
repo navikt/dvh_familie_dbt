@@ -21,28 +21,6 @@ sources:
         description: 'Inneholder barnetrygd aggregert data i forhold til statistikkbank.'
 
 models:
-  - name: v_agg_bt_px_mottaker_kjonn_alder
-    description: "#NAVN: agg_bt_px_mottaker_kjonn_alder
-                  #INNHOLD: Testdata av barnetrgyd"
-    columns:
-      - name: kjonn_besk
-        description: "#NAVN: kjonn_besk
-                      #INNHOLD: Kvinner, Menn eller I alt"
-      - name: alder_gruppe_besk
-        description: "#NAVN: alder_gruppe_besk
-                      #INNHOLD: 20 år og yngre, 21-29 år, 30-39 år, 40-49 år, 50-59 år, 60 år+ eller ALT"
-      - name: aar
-        description: "#NAVN: aar
-                      #INNHOLD: 2015-2024, 10 år"
-
-      - name: statistikkvariabel
-        description: "#NAVN: statistikkvariabel
-                      #INNHOLD: PX format spesifikk felt."
-
-      - name: px_data
-        description: "#NAVN: px_data
-                      #INNHOLD: Antall mottakere av barnetrgyd."
-
   - name: agg_bt_px_mottaker_kjonn_alder
     description: "#NAVN: agg_bt_px_mottaker_kjonn_alder
                   #INNHOLD: Testdata av barnetrgyd"
@@ -81,8 +59,8 @@ models:
 
       - name: statistikkvariabel
         description: "#NAVN: statistikkvariabel
-                      #INNHOLD: PX format spesifikk felt."
+                      #INNHOLD: PX format spesifikk felt. Antall og prosent."
 
       - name: px_data
         description: "#NAVN: px_data
-                      #INNHOLD: Antall mottakere av barnetrgyd."
+                      #INNHOLD: Antall mottakere for statistikkvariabel='antall' og prosent av antall mottakere for statistikkvariabel='prosent'"

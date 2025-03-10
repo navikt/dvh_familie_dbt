@@ -78,62 +78,9 @@ mottaker_kjonn_alder as (
          ,alder_gruppe.alder_gruppe_besk
 )
 ,
---Summere opp alle alders gruppe
-mottaker_kjonn_sum as (
-     select
-          aar
-         ,aar_kvartal
-         ,kvartal
-         ,kvartal_besk
-         ,stat_aarmnd
-         ,kjonn_besk
-         ,alder_gruppe.alder_gruppe_besk
-         ,sum(antall) antall
-         ,sum(antall_mottaker_barn) antall_mottaker_barn
-     from mottaker_kjonn_alder
 
-     join alder_gruppe
-     on alder_gruppe.alder_fra_og_med = -1 --I alt
-
-     group by
-          aar
-         ,aar_kvartal
-         ,kvartal
-         ,kvartal_besk
-         ,stat_aarmnd
-         ,kjonn_besk
-         ,alder_gruppe.alder_gruppe_besk
-)
-,
---Summere opp alle kjonn
-mottaker_alt_alder_gruppe as (
-     select
-          aar
-         ,aar_kvartal
-         ,kvartal
-         ,kvartal_besk
-         ,stat_aarmnd
-         ,kjonn.kjonn_besk
-         ,alder_gruppe_besk
-         ,sum(antall) antall
-         ,sum(antall_mottaker_barn) antall_mottaker_barn
-     from mottaker_kjonn_alder
-
-     join kjonn
-     on kjonn.kjonn_kode = -1 --I alt
-
-     group by
-          aar
-         ,aar_kvartal
-         ,kvartal
-         ,kvartal_besk
-         ,stat_aarmnd
-         ,kjonn.kjonn_besk
-         ,alder_gruppe_besk
-)
-,
---Summere opp alle alders gruppe og alle kjonn
-mottaker_alt_sum as (
+--Summere opp alle alders gruppe og alle kjonn. kjonn_besk='I alt' og alder_gruppe_besk='I alt'.
+alt_sum as (
      select
           aar
          ,aar_kvartal
@@ -144,6 +91,7 @@ mottaker_alt_sum as (
          ,alder_gruppe.alder_gruppe_besk
          ,sum(antall) antall
          ,sum(antall_mottaker_barn) antall_mottaker_barn
+         ,round(100,1) as prosent
      from mottaker_kjonn_alder
 
      join alder_gruppe
@@ -161,8 +109,82 @@ mottaker_alt_sum as (
          ,kjonn.kjonn_besk
          ,alder_gruppe.alder_gruppe_besk
 )
-
 ,
+
+--Summere opp alle kjonn. kjonn_besk='I alt'.
+alt_alder_gruppe as (
+     select
+          mottaker_kjonn_alder.aar
+         ,mottaker_kjonn_alder.aar_kvartal
+         ,mottaker_kjonn_alder.kvartal
+         ,mottaker_kjonn_alder.kvartal_besk
+         ,mottaker_kjonn_alder.stat_aarmnd
+         ,kjonn.kjonn_besk
+         ,mottaker_kjonn_alder.alder_gruppe_besk
+         ,sum(mottaker_kjonn_alder.antall) antall
+         ,sum(mottaker_kjonn_alder.antall_mottaker_barn) antall_mottaker_barn
+         ,case when alt_sum.antall != 0 then round(sum(mottaker_kjonn_alder.antall)/alt_sum.antall*100,1) end prosent
+     from mottaker_kjonn_alder
+
+     join kjonn
+     on kjonn.kjonn_kode = -1 --I alt
+
+     join alt_sum
+     on alt_sum.stat_aarmnd = mottaker_kjonn_alder.stat_aarmnd --Regn ut prosent for hver aldersgruppe av total antall av kjonn_besk='I alt'.
+
+     group by
+          mottaker_kjonn_alder.aar
+         ,mottaker_kjonn_alder.aar_kvartal
+         ,mottaker_kjonn_alder.kvartal
+         ,mottaker_kjonn_alder.kvartal_besk
+         ,mottaker_kjonn_alder.stat_aarmnd
+         ,kjonn.kjonn_besk
+         ,mottaker_kjonn_alder.alder_gruppe_besk
+         ,alt_sum.antall
+)
+,
+
+--Summere opp alle aldersgruppe.
+kjonn_sum as (
+     select
+          aar
+         ,aar_kvartal
+         ,kvartal
+         ,kvartal_besk
+         ,stat_aarmnd
+         ,kjonn_besk
+         ,alder_gruppe.alder_gruppe_besk
+         ,sum(antall) antall
+         ,sum(antall_mottaker_barn) antall_mottaker_barn
+         ,round(100,1) as prosent
+     from mottaker_kjonn_alder
+
+     join alder_gruppe
+     on alder_gruppe.alder_fra_og_med = -1 --I alt
+
+     group by
+          aar
+         ,aar_kvartal
+         ,kvartal
+         ,kvartal_besk
+         ,stat_aarmnd
+         ,kjonn_besk
+         ,alder_gruppe.alder_gruppe_besk
+)
+,
+
+kjonn_alder_prosent as (
+     select
+          mottaker_kjonn_alder.*
+         ,case when kjonn_sum.antall != 0 then round(mottaker_kjonn_alder.antall/kjonn_sum.antall*100,1) end prosent
+     from mottaker_kjonn_alder
+
+     join kjonn_sum
+     on mottaker_kjonn_alder.stat_aarmnd = kjonn_sum.stat_aarmnd
+     and mottaker_kjonn_alder.kjonn_besk = kjonn_sum.kjonn_besk
+)
+,
+
 resultat as (
      select
           aar
@@ -174,7 +196,8 @@ resultat as (
          ,alder_gruppe_besk
          ,antall
          ,antall_mottaker_barn
-     from mottaker_alt_sum
+         ,prosent
+     from alt_sum
 
      union all
      select
@@ -187,7 +210,8 @@ resultat as (
          ,alder_gruppe_besk
          ,antall
          ,antall_mottaker_barn
-     from mottaker_alt_alder_gruppe
+         ,prosent
+     from alt_alder_gruppe
 
      union all
      select
@@ -200,7 +224,8 @@ resultat as (
          ,alder_gruppe_besk
          ,antall
          ,antall_mottaker_barn
-     from mottaker_kjonn_sum
+         ,prosent
+     from kjonn_sum
 
      union all
      select
@@ -213,7 +238,8 @@ resultat as (
          ,alder_gruppe_besk
          ,antall
          ,antall_mottaker_barn
-     from mottaker_kjonn_alder
+         ,prosent
+     from kjonn_alder_prosent
 )
 
 select
@@ -226,6 +252,7 @@ select
     ,alder_gruppe_besk
     ,antall
     ,antall_mottaker_barn
+    ,prosent
     ,current_timestamp as lastet_dato
     ,current_timestamp as oppdatert_dato
 from resultat
