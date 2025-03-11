@@ -1,24 +1,24 @@
 {{
     config(
-        materialized='incremental'
+        materialized='table'
     )
 }}
 
 with kjonn as (
      select *
-     from {{ source('statistikk_bank_dvh_fam_bt', 'statistikk_bank_mottaker_kjonn') }}
+     from {{ source('bt_statistikk_bank_dvh_fam_bt', 'statistikk_bank_mottaker_kjonn') }}
 )
 ,
 
 alder_gruppe as (
      select *
-     from {{ source('statistikk_bank_dvh_fam_bt', 'statistikk_bank_mottaker_alder_gruppe') }}
+     from {{ source('bt_statistikk_bank_dvh_fam_bt', 'statistikk_bank_mottaker_alder_gruppe') }}
 )
 ,
 
 periode as (
      select aar, aar_kvartal, kvartal, kvartal_besk, forste_dato_i_perioden, siste_dato_i_perioden
-     from {{ source('statistikk_bank_dt_kodeverk', 'dim_tid') }}
+     from {{ source('bt_statistikk_bank_dt_kodeverk', 'dim_tid') }}
      where gyldig_flagg = 1
      and dim_nivaa = 4 --På kvartal nivå
      and aar >= 2014
@@ -27,7 +27,7 @@ periode as (
 
 mottaker as (
      select *
-     from {{ source('statistikk_bank_dvh_fam_bt', 'fam_bt_mottaker') }}
+     from {{ source('bt_statistikk_bank_dvh_fam_bt', 'fam_bt_mottaker') }}
 )
 ,
 
@@ -54,7 +54,7 @@ mottaker_kjonn_alder as (
      left join
      (
           select stat_aarmnd, fk_person1
-          from {{ source('statistikk_bank_dvh_fam_bt', 'fam_bt_barn') }}
+          from {{ source('bt_statistikk_bank_dvh_fam_bt', 'fam_bt_barn') }}
           where gyldig_flagg = 1
           and fk_person1 = fkb_person1 --Barn selv er mottaker
           group by stat_aarmnd, fk_person1
@@ -79,7 +79,7 @@ mottaker_kjonn_alder as (
 )
 ,
 
---Summere opp alle alders gruppe og alle kjonn. kjonn_besk='I alt' og alder_gruppe_besk='I alt'.
+--Summere opp alle aldersgruppe og alle kjonn per periode. kjonn_besk='I alt' og alder_gruppe_besk='I alt'.
 alt_sum as (
      select
           aar
@@ -111,7 +111,8 @@ alt_sum as (
 )
 ,
 
---Summere opp alle kjonn. kjonn_besk='I alt'.
+--Summere opp alle kjonn per aldersgruppe og per periode. kjonn_besk='I alt'.
+--Regn ut prosent per aldersgruppe av total antall
 alt_alder_gruppe as (
      select
           mottaker_kjonn_alder.aar
@@ -144,7 +145,7 @@ alt_alder_gruppe as (
 )
 ,
 
---Summere opp alle aldersgruppe.
+--Summere opp alle aldersgruppe. alder_gruppe_besk='I alt'.
 kjonn_sum as (
      select
           aar
@@ -173,6 +174,7 @@ kjonn_sum as (
 )
 ,
 
+--Regn ut prosent per aldersgruppe av total antall per kjonn
 kjonn_alder_prosent as (
      select
           mottaker_kjonn_alder.*

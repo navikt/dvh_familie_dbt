@@ -1,7 +1,7 @@
 version: 2
 
 sources:
-  - name: statistikk_bank_dvh_fam_bt
+  - name: bt_statistikk_bank_dvh_fam_bt
     schema: dvh_fam_bt
     description: 'Familie barnetrygd statistikk bank data'
     tables:
@@ -23,7 +23,7 @@ sources:
       - name: statistikk_bank_mottaker_rapport_nav
         description: 'Publisert barnetrygd data på nav.no'
 
-  - name: statistikk_bank_dt_kodeverk
+  - name: bt_statistikk_bank_dt_kodeverk
     schema: dt_kodeverk
     description: 'Dimensjons data'
     tables:

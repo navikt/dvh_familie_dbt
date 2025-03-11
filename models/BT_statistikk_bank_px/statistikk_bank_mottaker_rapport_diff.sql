@@ -79,9 +79,9 @@ from
         ,case when mottaker.aar = 2024 then mottaker.antall end antall_2024
         ,publisert.aar_2024 antall_2024_publisert
 
-  from {{ ref('agg_bt_statistikk_bank_mottaker') }} mottaker
+  from {{ source('bt_statistikk_bank_px_dvh_fam_bt', 'agg_bt_statistikk_bank_mottaker') }} mottaker
 
-  left join {{ source('statistikk_bank_dvh_fam_bt', 'statistikk_bank_mottaker_rapport_nav') }} publisert
+  left join {{ source('bt_statistikk_bank_px_dvh_fam_bt', 'statistikk_bank_mottaker_rapport_nav') }} publisert
   on decode(mottaker.kjonn, 'ALT', 'I alt', 'K', 'Kvinner', 'M', 'Menn') = publisert.kjonn
   and decode(mottaker.alder_gruppe_besk, 'ALT', 'I alt', mottaker.alder_gruppe_besk) = publisert.felt_besk
 )

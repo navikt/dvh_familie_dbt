@@ -11,14 +11,14 @@ with dim_alle_kjonn_alder as (
        ,kjonn.rapport_rekkefolge sortering_kjonn
        ,alder_gruppe.alder_gruppe_besk
        ,alder_gruppe.rapport_rekkefolge sortering_alder_gruppe
-    from {{ source('statistikk_bank_dvh_fam_bt', 'statistikk_bank_mottaker_kjonn') }} kjonn
-    cross join {{ source('statistikk_bank_bt', 'statistikk_bank_mottaker_alder_gruppe') }} alder_gruppe
+    from {{ source('bt_statistikk_bank_px_dvh_fam_bt', 'statistikk_bank_mottaker_kjonn') }} kjonn
+    cross join {{ source('bt_statistikk_bank_px_dvh_fam_bt', 'statistikk_bank_mottaker_alder_gruppe') }} alder_gruppe
 )
 ,
 
 mottaker as (
     select *
-    from {{ source('statistikk_bank_bt', 'agg_bt_statistikk_bank_mottaker') }}
+    from {{ source('bt_statistikk_bank_px_dvh_fam_bt', 'agg_bt_statistikk_bank_mottaker') }}
 )
 ,
 
