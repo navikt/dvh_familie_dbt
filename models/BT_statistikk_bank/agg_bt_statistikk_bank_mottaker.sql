@@ -28,8 +28,8 @@ periode as (
 mottaker as (
      select *
      from {{ source('bt_statistikk_bank_dvh_fam_bt', 'fam_bt_mottaker') }}
-     where (statusk != 4 and stat_aarmnd <= 202212)
-     or stat_aarmnd >= 202301
+     where (statusk != 4 and stat_aarmnd <= 202212) --Publisert statistikk(nav.no) til og med 2022, har data fra Infotrygd, og Institusjon(statusk=4) ble filtrert vekk.
+     or stat_aarmnd >= 202301 --Statistikk fra og med 2023, inkluderer Institusjon.
 )
 ,
 
