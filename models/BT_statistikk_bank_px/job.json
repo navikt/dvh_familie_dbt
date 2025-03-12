@@ -1,6 +1,6 @@
 {
   "px_bt_mottaker_kjonn_alder_antall": {
-    "agg_name": "agg_bt_px_mottaker_kjonn_alder",
+    "agg_name": "agg_bt_px_mottaker_kjonn_alder_aggregat",
     "stub": "ALDER_GRUPPE_BESK",
     "headings": [
       "STATISTIKKVARIABEL",
