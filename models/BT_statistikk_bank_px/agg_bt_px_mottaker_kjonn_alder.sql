@@ -60,3 +60,4 @@ resultat as (
 )
 select *
 from resultat
+order by sortering_kjonn, sortering_alder_gruppe
