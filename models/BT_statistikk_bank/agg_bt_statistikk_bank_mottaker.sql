@@ -28,6 +28,8 @@ periode as (
 mottaker as (
      select *
      from {{ source('bt_statistikk_bank_dvh_fam_bt', 'fam_bt_mottaker') }}
+     where (statusk != 4 and stat_aarmnd <= 202212)
+     or stat_aarmnd >= 202301
 )
 ,
 
