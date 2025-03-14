@@ -40,7 +40,7 @@ models:
 
       - name: aar
         description: "#NAVN: aar
-                      #INNHOLD: år siden 2014"
+                      #INNHOLD: år siden 2015"
 
       - name: aar_kvartal
         description: "#NAVN: aar_kvartal

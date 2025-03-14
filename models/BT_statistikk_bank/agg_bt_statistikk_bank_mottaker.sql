@@ -1,6 +1,6 @@
 {{
     config(
-        materialized='table'
+        materialized='incremental'
     )
 }}
 
@@ -21,15 +21,19 @@ periode as (
      from {{ source('bt_statistikk_bank_dt_kodeverk', 'dim_tid') }}
      where gyldig_flagg = 1
      and dim_nivaa = 4 --På kvartal nivå
-     and aar >= 2014
+     and aar >= 2015
 )
 ,
 
 mottaker as (
      select *
      from {{ source('bt_statistikk_bank_dvh_fam_bt', 'fam_bt_mottaker') }}
-     where (statusk != 4 and stat_aarmnd <= 202212) --Publisert statistikk(nav.no) til og med 2022, har data fra Infotrygd, og Institusjon(statusk=4) ble filtrert vekk.
-     or stat_aarmnd >= 202301 --Statistikk fra og med 2023, inkluderer Institusjon.
+     where (
+               (statusk != 4 and stat_aarmnd <= 202212) --Publisert statistikk(nav.no) til og med 2022, har data fra Infotrygd, og Institusjon(statusk=4) ble filtrert vekk.
+               or stat_aarmnd >= 202301 --Statistikk fra og med 2023, inkluderer Institusjon.
+           )
+     and gyldig_flagg = 1
+     and belop > 0 -- Etterbetalinger telles ikke
 )
 ,
 
@@ -66,9 +70,6 @@ mottaker_kjonn_alder as (
 
      join periode
      on mottaker.stat_aarmnd = to_char(periode.siste_dato_i_perioden, 'yyyymm') --Siste måned i kvartal
-
-     where mottaker.gyldig_flagg = 1
-     and mottaker.belop > 0 -- Etterbetalinger telles ikke
 
      group by
           periode.aar
@@ -266,6 +267,6 @@ from resultat
 --Tidligste periode fra tabellen er 201401
 {% if is_incremental() %}
 
-where stat_aarmnd > (select coalesce(max(stat_aarmnd), 201400) from {{ this }})
+where stat_aarmnd > (select coalesce(max(stat_aarmnd), 201500) from {{ this }})
 
 {% endif %}
