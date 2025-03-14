@@ -42,7 +42,7 @@ mottaker_kjonn_alder as (
          ,mottaker.stat_aarmnd
          ,kjonn.kjonn_besk
          ,alder_gruppe.alder_gruppe_besk
-         ,count(distinct case when barn.fk_person1 is null then mottaker.fk_person1 end) antall --Ekskludere som barn selv er mottaker
+         ,count(distinct case when barn.fk_person1 is null then mottaker.fk_person1 end) antall --Ekskludere barn selv er mottaker
          ,count(distinct case when barn.fk_person1 is not null then mottaker.fk_person1 end) antall_mottaker_barn --Barn selv er mottaker
 
      from mottaker
