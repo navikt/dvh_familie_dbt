@@ -35,7 +35,6 @@ clean-targets:         # directories to be removed by `dbt clean`
 quoting:
   database: true
 
-
 # Configuring models
 # Full documentation: https://docs.getdbt.com/docs/configuring-models
 
